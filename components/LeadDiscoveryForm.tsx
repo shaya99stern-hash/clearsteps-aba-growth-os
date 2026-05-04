@@ -19,8 +19,16 @@ const leadTypes = [
 type DiscoveryLead = {
   id: string;
   name: string;
+  business_name?: string;
   classification: string;
   source_type: string;
+  address?: string;
+  phone?: string;
+  website?: string;
+  rating?: number;
+  reviews?: number;
+  best_contact_role?: string;
+  contact_status?: string;
   evidence_url?: string;
   evidence_title?: string;
   evidence_snippet?: string;
@@ -28,6 +36,7 @@ type DiscoveryLead = {
   detected_signals: string[];
   evidence_confidence: string;
   verification_status: string;
+  score_breakdown?: Record<string, number>;
   opportunity_score: {
     total: number;
     classification: string;
@@ -52,6 +61,20 @@ type DiscoveryResult = {
   leads?: DiscoveryLead[];
 };
 
+function scoreLabel(key: string) {
+  const labels: Record<string, string> = {
+    referralAccess: "Referral access",
+    needSignal: "Need signal",
+    nonCompetitor: "Non-competitor",
+    contactability: "Contactability",
+    crossReferenceStrength: "Public footprint",
+    localServiceAreaFit: "Local fit",
+    payorFit: "Payor fit",
+    evidenceConfidence: "Evidence confidence",
+  };
+  return labels[key] ?? key;
+}
+
 export function LeadDiscoveryForm() {
   const [state, setState] = useState("NJ");
   const [cityOrZip, setCityOrZip] = useState("");
@@ -61,11 +84,13 @@ export function LeadDiscoveryForm() {
   const [excludeCompetitors, setExcludeCompetitors] = useState(true);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<DiscoveryResult | null>(null);
+  const [selectedLead, setSelectedLead] = useState<DiscoveryLead | null>(null);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     setResult(null);
+    setSelectedLead(null);
 
     try {
       const response = await fetch("/api/discovery", {
@@ -86,6 +111,8 @@ export function LeadDiscoveryForm() {
       setLoading(false);
     }
   }
+
+  const profileLead = selectedLead ?? result?.leads?.[0] ?? null;
 
   return (
     <div className="space-y-5">
@@ -151,14 +178,6 @@ export function LeadDiscoveryForm() {
               </div>
             </div>
           ) : null}
-          {result.providerErrors && result.providerErrors.length > 0 ? (
-            <div className="mt-4 rounded-2xl bg-white/70 p-3 text-xs text-amber-900">
-              <p className="font-bold">Provider warnings</p>
-              <ul className="mt-1 list-disc pl-4">
-                {result.providerErrors.map((warning) => <li key={warning}>{warning}</li>)}
-              </ul>
-            </div>
-          ) : null}
         </section>
       ) : (
         <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
@@ -167,50 +186,99 @@ export function LeadDiscoveryForm() {
       )}
 
       {result?.leads && result.leads.length > 0 ? (
-        <section className="space-y-3">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <p className="text-sm font-bold uppercase tracking-[0.18em] text-cyan-700">Live public results</p>
-              <h2 className="mt-1 text-2xl font-black text-slate-950">{result.leads.length} opportunities/signals found</h2>
+        <section className="grid gap-5 xl:grid-cols-[1fr_0.9fr]">
+          <div className="space-y-3">
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <p className="text-sm font-bold uppercase tracking-[0.18em] text-cyan-700">Live public results</p>
+                <h2 className="mt-1 text-2xl font-black text-slate-950">{result.leads.length} opportunities/signals found</h2>
+              </div>
+              <p className="text-xs text-slate-500">Click View Profile. Do not outreach without review.</p>
             </div>
-            <p className="text-xs text-slate-500">Review evidence before outreach.</p>
+
+            <div className="grid gap-3">
+              {result.leads.map((lead) => (
+                <article key={lead.id} className={`rounded-3xl border bg-white p-5 shadow-sm ${profileLead?.id === lead.id ? "border-cyan-400" : "border-slate-200"}`}>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-700">{lead.classification}</p>
+                      <h3 className="mt-1 text-xl font-black text-slate-950">{lead.business_name ?? lead.name}</h3>
+                      <p className="mt-2 text-sm text-slate-600">Why: {lead.short_reason}</p>
+                    </div>
+                    <div className="rounded-2xl bg-slate-50 px-4 py-3 text-left sm:text-right">
+                      <p className="text-xs font-bold text-slate-500">Score</p>
+                      <p className="text-2xl font-black text-slate-950">{lead.opportunity_score.total}/100</p>
+                      <p className="text-xs text-slate-500">{lead.opportunity_score.classification}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
+                    <p><span className="font-bold">Phone:</span> {lead.phone ?? "Missing"}</p>
+                    <p><span className="font-bold">Address:</span> {lead.address ?? "Missing"}</p>
+                    <p><span className="font-bold">Website:</span> {lead.website ? "Found" : "Missing"}</p>
+                    <p><span className="font-bold">Best contact:</span> {lead.best_contact_role ?? "Needs enrichment"}</p>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {lead.detected_signals.length > 0 ? lead.detected_signals.slice(0, 10).map((signal) => (
+                      <span key={signal} className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-800">{signal}</span>
+                    )) : <span className="rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">weak evidence</span>}
+                  </div>
+
+                  <button type="button" onClick={() => setSelectedLead(lead)} className="mt-4 rounded-xl border border-cyan-300 bg-cyan-50 px-4 py-2 text-sm font-bold text-cyan-800 hover:bg-cyan-100">
+                    View lead profile
+                  </button>
+                </article>
+              ))}
+            </div>
           </div>
 
-          <div className="grid gap-3">
-            {result.leads.map((lead) => (
-              <article key={lead.id} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-700">{lead.classification}</p>
-                    <h3 className="mt-1 text-xl font-black text-slate-950">{lead.name}</h3>
-                    <p className="mt-2 text-sm text-slate-600">Why: {lead.short_reason}</p>
-                  </div>
-                  <div className="rounded-2xl bg-slate-50 px-4 py-3 text-left sm:text-right">
-                    <p className="text-xs font-bold text-slate-500">Score</p>
-                    <p className="text-2xl font-black text-slate-950">{lead.opportunity_score.total}/100</p>
-                    <p className="text-xs text-slate-500">{lead.opportunity_score.classification}</p>
-                  </div>
-                </div>
+          {profileLead ? (
+            <aside className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm xl:sticky xl:top-4 xl:self-start">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-700">Internal lead profile</p>
+              <h2 className="mt-2 text-2xl font-black text-slate-950">{profileLead.business_name ?? profileLead.name}</h2>
+              <p className="mt-2 text-sm text-slate-600">{profileLead.classification} · {profileLead.source_type}</p>
 
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {lead.detected_signals.length > 0 ? lead.detected_signals.slice(0, 10).map((signal) => (
-                    <span key={signal} className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-800">{signal}</span>
-                  )) : <span className="rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">weak evidence</span>}
-                </div>
+              <div className="mt-5 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                <p><span className="font-bold">Company:</span> {profileLead.business_name ?? profileLead.name}</p>
+                <p className="mt-2"><span className="font-bold">Address:</span> {profileLead.address ?? "Missing"}</p>
+                <p className="mt-2"><span className="font-bold">Phone:</span> {profileLead.phone ?? "Missing"}</p>
+                <p className="mt-2"><span className="font-bold">Website:</span> {profileLead.website ?? "Missing"}</p>
+                <p className="mt-2"><span className="font-bold">Target contact role:</span> {profileLead.best_contact_role ?? "Needs enrichment"}</p>
+                <p className="mt-2"><span className="font-bold">Contact status:</span> {profileLead.contact_status ?? "Needs enrichment"}</p>
+                {typeof profileLead.rating === "number" ? <p className="mt-2"><span className="font-bold">Public rating/reviews:</span> {profileLead.rating} · {profileLead.reviews ?? 0} reviews</p> : null}
+              </div>
 
-                <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
-                  <p><span className="font-bold">Evidence title:</span> {lead.evidence_title || "No title returned"}</p>
-                  <p className="mt-2"><span className="font-bold">Snippet:</span> {lead.evidence_snippet || "No snippet returned"}</p>
-                  <p className="mt-2"><span className="font-bold">Confidence:</span> {lead.evidence_confidence} · <span className="font-bold">Status:</span> {lead.verification_status}</p>
-                  {lead.evidence_url ? <a className="mt-3 inline-block font-bold text-cyan-700 underline" href={lead.evidence_url} target="_blank" rel="noreferrer">Open source</a> : null}
+              <div className="mt-5">
+                <p className="font-bold text-slate-950">Score breakdown</p>
+                <div className="mt-3 grid gap-2">
+                  {Object.entries(profileLead.opportunity_score.breakdown ?? profileLead.score_breakdown ?? {}).map(([key, value]) => (
+                    <div key={key} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm">
+                      <span className="font-medium text-slate-700">{scoreLabel(key)}</span>
+                      <span className="font-black text-slate-950">{value}</span>
+                    </div>
+                  ))}
                 </div>
+                <p className="mt-3 text-xs text-slate-500">This is a rule-based referral-opportunity score. It is not a claim that the organization has referrals or that families need ABA.</p>
+              </div>
 
-                {lead.recommendation ? (
-                  <p className="mt-4 text-sm text-slate-700"><span className="font-bold">Next action:</span> {lead.recommendation.recommended_action}</p>
-                ) : null}
-              </article>
-            ))}
-          </div>
+              <div className="mt-5 rounded-2xl border border-slate-200 p-4 text-sm text-slate-700">
+                <p className="font-bold text-slate-950">Evidence</p>
+                <p className="mt-2"><span className="font-bold">Title:</span> {profileLead.evidence_title || "No title returned"}</p>
+                <p className="mt-2"><span className="font-bold">Snippet:</span> {profileLead.evidence_snippet || "No snippet returned"}</p>
+                <p className="mt-2"><span className="font-bold">Confidence:</span> {profileLead.evidence_confidence} · <span className="font-bold">Status:</span> {profileLead.verification_status}</p>
+                {profileLead.evidence_url ? <a className="mt-3 inline-block text-xs font-bold text-cyan-700 underline" href={profileLead.evidence_url} target="_blank" rel="noreferrer">External source, optional</a> : null}
+              </div>
+
+              {profileLead.recommendation ? (
+                <div className="mt-5 rounded-2xl bg-cyan-50 p-4 text-sm text-cyan-950">
+                  <p className="font-bold">Next action</p>
+                  <p className="mt-1">{profileLead.recommendation.recommended_action}</p>
+                  <p className="mt-2 text-xs">{profileLead.recommendation.reason}</p>
+                </div>
+              ) : null}
+            </aside>
+          ) : null}
         </section>
       ) : result?.ok ? (
         <section className="rounded-3xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-600">
