@@ -15,37 +15,46 @@ type DiscoveryBody = {
   excludeCompetitors?: boolean;
 };
 
-function buildSearchQueries(leadType: string, cityOrZip: string, state: string, excludeCompetitors: boolean) {
+function isZip(value: string) {
+  return /^\d{5}$/.test(value.trim());
+}
+
+function buildSearchQueries(leadType: string, cityOrZip: string, state: string, radiusMiles: number, excludeCompetitors: boolean) {
   const location = `${cityOrZip}, ${state}`;
-  const base = `${leadType} ${location}`;
+  const radiusText = `within ${radiusMiles} miles`;
+  const base = `${leadType} near ${location} ${radiusText}`;
   const queries = [base];
 
   if (leadType.includes("daycare") || leadType.includes("preschool")) {
-    queries.push(`child care center ${location}`, `early childhood center ${location}`, `inclusive preschool ${location}`);
+    queries.push(
+      `child care center near ${location} ${radiusText}`,
+      `early childhood center near ${location} ${radiusText}`,
+      `inclusive preschool near ${location} ${radiusText}`,
+    );
   }
 
   if (leadType.includes("speech")) {
-    queries.push(`pediatric speech therapy ${location}`, `children speech delay therapy ${location}`);
+    queries.push(`pediatric speech therapy near ${location} ${radiusText}`, `children speech delay therapy near ${location} ${radiusText}`);
   }
 
   if (leadType.includes("occupational")) {
-    queries.push(`pediatric occupational therapy ${location}`, `sensory processing occupational therapy ${location}`);
+    queries.push(`pediatric occupational therapy near ${location} ${radiusText}`, `sensory processing occupational therapy near ${location} ${radiusText}`);
   }
 
   if (leadType.includes("psychologist") || leadType.includes("evaluator") || leadType.includes("neuropsych")) {
-    queries.push(`autism evaluation children ${location}`, `child psychologist autism testing ${location}`);
+    queries.push(`autism evaluation children near ${location} ${radiusText}`, `child psychologist autism testing near ${location} ${radiusText}`);
   }
 
   if (leadType.includes("pediatrician")) {
-    queries.push(`pediatric clinic ${location}`, `developmental screening pediatrician ${location}`);
+    queries.push(`pediatric clinic near ${location} ${radiusText}`, `developmental screening pediatrician near ${location} ${radiusText}`);
   }
 
   if (leadType.includes("community")) {
-    queries.push(`autism resources ${location}`, `special needs parent resources ${location}`, `family resource center ${location}`);
+    queries.push(`autism resources near ${location} ${radiusText}`, `special needs parent resources near ${location} ${radiusText}`, `family resource center near ${location} ${radiusText}`);
   }
 
   if (!excludeCompetitors) {
-    queries.push(`ABA therapy provider ${location}`, `BCBA RBT hiring ${location}`);
+    queries.push(`ABA therapy provider near ${location} ${radiusText}`, `BCBA RBT hiring near ${location} ${radiusText}`);
   }
 
   return Array.from(new Set(queries));
@@ -83,8 +92,9 @@ export async function POST(request: Request) {
     }, { status: 503 });
   }
 
-  const location = `${cityOrZip}, ${state}`;
-  const queries = buildSearchQueries(leadType ?? "", cityOrZip ?? "", state ?? "", Boolean(body.excludeCompetitors));
+  const displayLocation = `${cityOrZip}, ${state}`;
+  const searchLocation = isZip(cityOrZip ?? "") ? undefined : `${cityOrZip}, ${state}, United States`;
+  const queries = buildSearchQueries(leadType ?? "", cityOrZip ?? "", state ?? "", radiusMiles, Boolean(body.excludeCompetitors));
   const allResults: NormalizedSearchResult[] = [];
   const providerErrors: string[] = [];
   const perQueryLimit = Math.min(10, Math.max(3, Math.ceil(maxResults / Math.max(queries.length, 1))));
@@ -94,7 +104,7 @@ export async function POST(request: Request) {
     try {
       const response = await provider.search({
         query,
-        location,
+        location: searchLocation,
         limit: perQueryLimit,
         language: "en",
         country: "us",
@@ -110,7 +120,7 @@ export async function POST(request: Request) {
   }
 
   const uniqueResults = Array.from(new Map(allResults.map((result) => [result.url, result])).values()).slice(0, maxResults);
-  let opportunities = buildOpportunities(uniqueResults, location);
+  let opportunities = buildOpportunities(uniqueResults, displayLocation);
 
   if (body.excludeCompetitors) {
     opportunities = opportunities.filter((item) => item.classification !== "Competitor / Market Signal");
