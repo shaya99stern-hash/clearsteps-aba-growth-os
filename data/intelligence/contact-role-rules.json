@@ -1,0 +1,7 @@
+{
+  "daycare_preschool": ["director", "owner", "administrator", "program director"],
+  "school": ["principal", "special education coordinator", "student services director", "preschool coordinator"],
+  "pediatric_office": ["office manager", "practice manager", "referral coordinator", "care coordinator", "physician owner"],
+  "speech_ot_clinic": ["owner", "clinical director", "office manager", "referral coordinator"],
+  "community_organization": ["program director", "family services coordinator", "executive director"]
+}
