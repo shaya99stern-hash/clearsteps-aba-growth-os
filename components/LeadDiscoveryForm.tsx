@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { SAVED_LEADS_KEY, SAVED_RUNS_KEY, upsertById, readStorageArray, writeStorageArray, type StoredRun } from "@/lib/clientStorage";
 
 const leadTypes = [
   "daycare",
@@ -15,6 +16,13 @@ const leadTypes = [
   "autism community organization",
   "competitor ABA provider",
 ];
+
+type EvidenceSource = {
+  source_type: string;
+  title: string;
+  url?: string;
+  snippet?: string;
+};
 
 type DiscoveryLead = {
   id: string;
@@ -32,6 +40,9 @@ type DiscoveryLead = {
   evidence_url?: string;
   evidence_title?: string;
   evidence_snippet?: string;
+  evidence_sources?: EvidenceSource[];
+  cross_reference_summary?: string;
+  enrichment_status?: string;
   short_reason: string;
   detected_signals: string[];
   evidence_confidence: string;
@@ -47,6 +58,9 @@ type DiscoveryLead = {
     recommended_action: string;
     reason: string;
   };
+  saved_at?: string;
+  territory?: string;
+  lead_type?: string;
 };
 
 type DiscoveryResult = {
@@ -67,7 +81,7 @@ function scoreLabel(key: string) {
     needSignal: "Need signal",
     nonCompetitor: "Non-competitor",
     contactability: "Contactability",
-    crossReferenceStrength: "Public footprint",
+    crossReferenceStrength: "Cross-reference strength",
     localServiceAreaFit: "Local fit",
     payorFit: "Payor fit",
     evidenceConfidence: "Evidence confidence",
@@ -85,12 +99,36 @@ export function LeadDiscoveryForm() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<DiscoveryResult | null>(null);
   const [selectedLead, setSelectedLead] = useState<DiscoveryLead | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+
+  function saveDiscovery(data: DiscoveryResult) {
+    if (!data.ok || !data.leads || data.leads.length === 0) return;
+    const now = new Date().toISOString();
+    const territory = `${cityOrZip}, ${state}`;
+    const enrichedLeads = data.leads.map((lead) => ({ ...lead, saved_at: now, territory, lead_type: leadType }));
+    upsertById<DiscoveryLead>(SAVED_LEADS_KEY, enrichedLeads);
+    const existingRuns = readStorageArray<StoredRun>(SAVED_RUNS_KEY);
+    const run: StoredRun = {
+      id: `run-${Date.now()}`,
+      createdAt: now,
+      territory,
+      leadType,
+      queries: data.queries ?? [],
+      resultsFound: data.leads.length,
+      saved: enrichedLeads.length,
+      excluded: 0,
+      errors: data.providerErrors ?? [],
+    };
+    writeStorageArray(SAVED_RUNS_KEY, [run, ...existingRuns]);
+    setSaveMessage(`Saved ${enrichedLeads.length} leads and 1 research run in this app/browser.`);
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     setResult(null);
     setSelectedLead(null);
+    setSaveMessage(null);
 
     try {
       const response = await fetch("/api/discovery", {
@@ -100,6 +138,7 @@ export function LeadDiscoveryForm() {
       });
       const data = (await response.json()) as DiscoveryResult;
       setResult(data);
+      saveDiscovery(data);
     } catch (error) {
       setResult({
         ok: false,
@@ -165,6 +204,8 @@ export function LeadDiscoveryForm() {
         </p>
       </form>
 
+      {saveMessage ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">{saveMessage}</div> : null}
+
       {result ? (
         <section className={`rounded-3xl border p-5 text-sm ${result.ok ? "border-cyan-200 bg-cyan-50 text-cyan-950" : "border-amber-200 bg-amber-50 text-amber-950"}`}>
           <p className="font-bold">{result.ok ? "Discovery completed" : "Discovery not run"}</p>
@@ -217,6 +258,8 @@ export function LeadDiscoveryForm() {
                     <p><span className="font-bold">Address:</span> {lead.address ?? "Missing"}</p>
                     <p><span className="font-bold">Website:</span> {lead.website ? "Found" : "Missing"}</p>
                     <p><span className="font-bold">Best contact:</span> {lead.best_contact_role ?? "Needs enrichment"}</p>
+                    <p><span className="font-bold">Sources:</span> {lead.evidence_sources?.length ?? 1}</p>
+                    <p><span className="font-bold">Enrichment:</span> {lead.enrichment_status ?? "Needs enrichment"}</p>
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-2">
@@ -263,11 +306,17 @@ export function LeadDiscoveryForm() {
               </div>
 
               <div className="mt-5 rounded-2xl border border-slate-200 p-4 text-sm text-slate-700">
-                <p className="font-bold text-slate-950">Evidence</p>
-                <p className="mt-2"><span className="font-bold">Title:</span> {profileLead.evidence_title || "No title returned"}</p>
-                <p className="mt-2"><span className="font-bold">Snippet:</span> {profileLead.evidence_snippet || "No snippet returned"}</p>
-                <p className="mt-2"><span className="font-bold">Confidence:</span> {profileLead.evidence_confidence} · <span className="font-bold">Status:</span> {profileLead.verification_status}</p>
-                {profileLead.evidence_url ? <a className="mt-3 inline-block text-xs font-bold text-cyan-700 underline" href={profileLead.evidence_url} target="_blank" rel="noreferrer">External source, optional</a> : null}
+                <p className="font-bold text-slate-950">Cross-reference evidence</p>
+                <p className="mt-2 text-xs text-slate-500">{profileLead.cross_reference_summary ?? "Needs additional source matching."}</p>
+                <div className="mt-3 space-y-2">
+                  {(profileLead.evidence_sources ?? [{ source_type: profileLead.source_type, title: profileLead.evidence_title ?? profileLead.name, url: profileLead.evidence_url, snippet: profileLead.evidence_snippet }]).map((source, index) => (
+                    <div key={`${source.title}-${index}`} className="rounded-xl bg-slate-50 p-3">
+                      <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{source.source_type}</p>
+                      <p className="mt-1 font-semibold">{source.title}</p>
+                      {source.snippet ? <p className="mt-1 text-xs text-slate-600">{source.snippet}</p> : null}
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {profileLead.recommendation ? (
