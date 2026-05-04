@@ -1,0 +1,4 @@
+{
+  "description": "Targeted query families for ABA referral-source discovery, demand signals, board/minutes signals, job-posting market signals, and contact discovery.",
+  "families": ["daycare-preschool", "pediatric", "speech-ot", "developmental-autism-evaluation", "early-intervention", "community-parent", "demand-signal", "board-minutes", "job-posting-signals", "contact-discovery"]
+}

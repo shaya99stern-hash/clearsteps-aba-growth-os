@@ -1,0 +1,9 @@
+{
+  "categories": [
+    { "id": "daycare-preschool", "label": "Daycare / Preschool", "targetRoles": ["director", "owner", "administrator", "program director"] },
+    { "id": "pediatric-office", "label": "Pediatric Office", "targetRoles": ["office manager", "practice manager", "referral coordinator", "care coordinator", "physician owner"] },
+    { "id": "speech-ot", "label": "Speech / OT Clinic", "targetRoles": ["owner", "clinical director", "office manager", "referral coordinator"] },
+    { "id": "school-special-ed", "label": "School / Special Education", "targetRoles": ["principal", "special education coordinator", "student services director", "preschool coordinator"] },
+    { "id": "community-parent", "label": "Community / Parent Resource", "targetRoles": ["program director", "family services coordinator", "executive director"] }
+  ]
+}
