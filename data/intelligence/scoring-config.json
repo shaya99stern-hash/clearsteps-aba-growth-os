@@ -1,0 +1,25 @@
+{
+  "components": {
+    "referralAccess": 20,
+    "needSignal": 20,
+    "nonCompetitor": 15,
+    "contactability": 15,
+    "crossReferenceStrength": 10,
+    "localServiceAreaFit": 10,
+    "payorFit": 5,
+    "evidenceConfidence": 5
+  },
+  "classifications": {
+    "85-100": "High-Priority Referral Opportunity",
+    "70-84": "Ready for Outreach",
+    "55-69": "Needs Enrichment",
+    "40-54": "Research Further",
+    "below40": "Low Priority"
+  },
+  "caps": {
+    "noEvidenceUrl": "Needs Enrichment",
+    "weakSnippetOnly": 69,
+    "competitor": "Competitor / Market Signal",
+    "demandOnly": "Area Demand Signal"
+  }
+}
