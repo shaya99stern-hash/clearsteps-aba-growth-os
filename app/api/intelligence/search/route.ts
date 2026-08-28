@@ -66,7 +66,9 @@ export async function POST(request: Request) {
     observations.push(...census.observations);
     completeSource(sourceStatus, "U.S. Census ACS", `${census.geographyName} · ${formatNumber(census.metrics.under18)} residents under 18 · ACS ${census.year}`);
   } else {
-    const detail = errorMessage(censusSettled.reason, "Census demographic source failed");
+    const detail = censusSettled.status === "rejected"
+      ? errorMessage(censusSettled.reason, "Census demographic source failed")
+      : "Census demographic source failed";
     unavailableSource(sourceStatus, "U.S. Census ACS", detail);
     errors.push(`census: ${detail}`);
   }
@@ -82,7 +84,9 @@ export async function POST(request: Request) {
         .map((hit) => ({ lane: "referral" as const, hit })));
     }
   } else {
-    const detail = errorMessage(nppesSettled.reason, "NPPES source failed");
+    const detail = nppesSettled.status === "rejected"
+      ? errorMessage(nppesSettled.reason, "NPPES source failed")
+      : "NPPES source failed";
     unavailableSource(sourceStatus, "CMS NPPES", detail);
     errors.push(`nppes: ${detail}`);
   }
