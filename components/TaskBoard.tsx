@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type FormEvent } from "react";
 import { ArrowRight, CalendarDays, Check, Circle, Clock3, Link2, Plus } from "lucide-react";
 import { getServerCrmLeads, loadCrmLeads, subscribeCrmLeads, syncDurableCrmLeads } from "@/lib/crm/local-store";
 import { nextTaskStatus, type TaskPriority, type TaskStatus } from "@/lib/tasks/model";
@@ -14,6 +14,7 @@ const COLUMNS: Array<{ status: TaskStatus; label: string; icon: typeof Circle }>
 ];
 
 const PRIORITY_RANK: Record<TaskPriority, number> = { urgent: 0, high: 1, normal: 2, low: 3 };
+const TASK_VIEW_REFERENCE_TIME = Date.now();
 
 export function TaskBoard() {
   const tasks = useSyncExternalStore(subscribeTasks, loadTasks, getServerTasks);
@@ -32,7 +33,7 @@ export function TaskBoard() {
   const leadById = useMemo(() => new Map(crmLeads.map((lead) => [lead.id, lead])), [crmLeads]);
   const openCount = tasks.filter((task) => task.status === "open").length;
   const activeCount = tasks.filter((task) => task.status === "in_progress").length;
-  const overdueCount = tasks.filter((task) => task.status !== "done" && task.dueAt && Date.parse(task.dueAt) < Date.now()).length;
+  const overdueCount = tasks.filter((task) => isTaskOverdue(task, TASK_VIEW_REFERENCE_TIME)).length;
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -130,7 +131,7 @@ export function TaskBoard() {
                 <div className={styles.cards}>
                   {columnTasks.map((task) => {
                     const linkedLead = task.entityId ? leadById.get(task.entityId) : undefined;
-                    const isOverdue = task.status !== "done" && Boolean(task.dueAt) && Date.parse(task.dueAt as string) < Date.now();
+                    const isOverdue = isTaskOverdue(task, TASK_VIEW_REFERENCE_TIME);
                     return (
                       <article className={styles.card} key={task.id}>
                         <div className={styles.cardTopline}>
@@ -144,7 +145,7 @@ export function TaskBoard() {
                           {linkedLead && <span><Link2 size={13} /> {linkedLead.name}</span>}
                         </div>
                         <div className={styles.cardFooter}>
-                          <span>{task.updatedAt ? `Updated ${formatRelative(task.updatedAt)}` : "Local task"}</span>
+                          <span>{task.updatedAt ? `Updated ${formatRelative(task.updatedAt, TASK_VIEW_REFERENCE_TIME)}` : "Local task"}</span>
                           <button type="button" onClick={() => advance(task)} disabled={task.status === "done"}>
                             {task.status === "done" ? <><Check size={14} /> Complete</> : <><ArrowRight size={14} /> {task.status === "open" ? "Start" : "Complete"}</>}
                           </button>
@@ -167,6 +168,10 @@ export function TaskBoard() {
   );
 }
 
+function isTaskOverdue(task: SavedTask, referenceTime: number) {
+  return task.status !== "done" && Boolean(task.dueAt) && Date.parse(task.dueAt as string) < referenceTime;
+}
+
 function compareTasks(a: SavedTask, b: SavedTask) {
   const priority = PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
   if (priority !== 0) return priority;
@@ -181,8 +186,8 @@ function formatDue(value: string) {
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(date);
 }
 
-function formatRelative(value: string) {
-  const minutes = Math.max(0, Math.round((Date.now() - Date.parse(value)) / 60_000));
+function formatRelative(value: string, referenceTime: number) {
+  const minutes = Math.max(0, Math.round((referenceTime - Date.parse(value)) / 60_000));
   if (minutes < 1) return "now";
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.round(minutes / 60);
