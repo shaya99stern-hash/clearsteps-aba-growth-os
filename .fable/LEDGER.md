@@ -18,7 +18,7 @@
 ## Card CS-004 — Playwright browser acquisition
 **Goal:** Enable public JS-rendered forms/pages as an optional acquisition method.
 **Acceptance:** runtime reports real browser availability and the browser collector can launch installed Chromium, while blocking private-network requests and revalidating final navigation targets.
-**Status:** implemented and verified with real chromium-headless-shell launch in GitHub Actions run `33150961118`.
+**Status:** implemented and verified with real chromium-headless-shell launch in GitHub Actions run `33152086411` on head `44cf09af277495f2dfd3168341e38f861c74670f`.
 
 ## Card CS-005 — Official source adapters
 **Goal:** Add free authoritative sources that improve referral/provider evidence beyond general web search.
@@ -38,9 +38,9 @@
 ## Card CS-008 — Operational Tasks workspace
 **Goal:** Replace the Tasks placeholder with a ClickUp-style local-first operational board linked to CRM records.
 **Acceptance:** user can create tasks with priority/due date, optionally link a saved CRM record, move tasks through Open → In Progress → Done, retain them in browser storage, and automatically sync/merge PostgreSQL tasks when durable storage is configured.
-**Status:** active. Durable repository/API are implemented; client board and local-first sync are next.
+**Status:** implemented and verified in GitHub Actions run `33152082863` on head `44cf09af277495f2dfd3168341e38f861c74670f`, including task acceptance rules, Prisma validation/generation, ESLint, and full Next.js production build.
 
 ## Card CS-009 — Outreach preparation OS
 **Goal:** Replace the Outreach placeholder with a compliant campaign/draft preparation workflow for eligible organization/professional contacts.
 **Acceptance:** user can build a segment from outreach-eligible CRM records, prepare reviewed message drafts, and preserve suppression/manual-review boundaries without enabling uncontrolled bulk sending.
-**Status:** planned after CS-008 verification.
+**Status:** implemented and verified in GitHub Actions run `33152082863` on head `44cf09af277495f2dfd3168341e38f861c74670f`. Referral eligibility, suppression, template rendering, manual review, Prisma, lint, and production build all pass. Sending remains intentionally disabled.
