@@ -5,7 +5,7 @@ import { buildSearchPlan } from "@/lib/intelligence/query-planner";
 import { enrichPublicWebsite, searchPublicWeb } from "@/lib/intelligence/free-search";
 import { resolveSearchHits } from "@/lib/intelligence/entity-resolution";
 import { inferTerritorySignals, scoreTerritory } from "@/lib/intelligence/territory-score";
-import { playwrightAvailable } from "@/lib/intelligence/browser-collector";
+import { collectPublicPageWithPlaywright, playwrightAvailable } from "@/lib/intelligence/browser-collector";
 import { searchNjChildCare } from "@/lib/intelligence/official/nj-childcare";
 
 export const runtime = "nodejs";
@@ -74,9 +74,18 @@ export async function POST(request: Request) {
   const uniqueForEnrichment = Array.from(
     new Map(rows.map((row) => [safeDomain(row.hit.url) ?? row.hit.url, row])).values(),
   ).slice(0, 6);
+  const browserReady = await playwrightAvailable();
+  let browserEnrichments = 0;
 
   await Promise.all(uniqueForEnrichment.map(async (row) => {
     row.enrichment = await enrichPublicWebsite(row.hit.url);
+    if (!browserReady || !needsBrowserEnrichment(row.enrichment)) return;
+    try {
+      row.enrichment = await collectPublicPageWithPlaywright(row.hit.url);
+      browserEnrichments += 1;
+    } catch (error) {
+      errors.push(`browser enrichment: ${error instanceof Error ? error.message : "failed"}`);
+    }
   }));
 
   const enrichmentByDomain = new Map(uniqueForEnrichment.map((row) => [safeDomain(row.hit.url), row.enrichment]));
@@ -90,7 +99,6 @@ export async function POST(request: Request) {
 
   const signals = inferTerritorySignals(resolved);
   const territory = scoreTerritory(signals);
-  const browserReady = await playwrightAvailable();
 
   return NextResponse.json({
     ok: true,
@@ -99,13 +107,20 @@ export async function POST(request: Request) {
     browser: {
       source: "Playwright Public Browser",
       status: browserReady ? "complete" : "unavailable",
-      detail: browserReady ? "runtime available" : "optional runtime not installed; fetch collectors used",
+      detail: browserReady
+        ? `${browserEnrichments} weak fetch result(s) upgraded with browser rendering`
+        : "browser binary unavailable; fetch/download collectors used",
     },
     screened: rows.length,
     leads: resolved,
     territory: { location: location || "Unspecified territory", signals, ...territory },
     errors,
   });
+}
+
+function needsBrowserEnrichment(enrichment: Awaited<ReturnType<typeof enrichPublicWebsite>>) {
+  if (!enrichment) return true;
+  return enrichment.emails.length === 0 && enrichment.phones.length === 0 && enrichment.textSample.length < 600;
 }
 
 function safeDomain(value: string) {
