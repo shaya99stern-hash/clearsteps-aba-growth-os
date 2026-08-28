@@ -9,17 +9,17 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 
 export const metadata: Metadata = {
   title: { default: "Clear Steps", template: "%s · Clear Steps" },
-  description: "Evidence-first ABA territory intelligence, referral growth, talent sourcing, outreach, and CRM.",
-  applicationName: "Clear Steps",
+  description: "Missouri and Kansas ABA client, RBT, and BCBA intelligence with evidence-first CRM workflows.",
+  applicationName: "ABA Engine",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Clear Steps",
+    title: "ABA Engine",
   },
   icons: {
-    icon: [{ url: "/api/brand-mark", sizes: "180x180", type: "image/png" }],
-    apple: [{ url: "/api/brand-mark", sizes: "180x180", type: "image/png" }],
+    icon: [{ url: "/api/app-icon", sizes: "512x512", type: "image/png" }],
+    apple: [{ url: "/api/app-icon", sizes: "512x512", type: "image/png" }],
   },
 };
 
