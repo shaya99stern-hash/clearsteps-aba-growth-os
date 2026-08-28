@@ -1,0 +1,49 @@
+name: Verify Playwright Browser
+
+on:
+  pull_request:
+    paths:
+      - "lib/intelligence/browser-collector.ts"
+      - "lib/intelligence/network-safety.ts"
+      - "app/api/intelligence/search/route.ts"
+      - "scripts/verify-browser.ts"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/verify-browser.yml"
+  push:
+    branches:
+      - feat/clearsteps-intelligence-os-v1
+    paths:
+      - "lib/intelligence/browser-collector.ts"
+      - "lib/intelligence/network-safety.ts"
+      - "app/api/intelligence/search/route.ts"
+      - "scripts/verify-browser.ts"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/verify-browser.yml"
+
+jobs:
+  browser-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: postgresql://clearsteps:clearsteps@127.0.0.1:5432/clearsteps
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium shell
+        run: npm run browser:install
+
+      - name: Launch Chromium smoke test
+        run: npm run verify:browser
