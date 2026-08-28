@@ -1,6 +1,7 @@
 "use client";
 
 import { normalizeOutreachEmail } from "@/lib/outreach/model";
+import { reconcileTimestampedRecords } from "@/lib/sync/reconcile";
 
 export type OutreachDraftStatus = "needs_review" | "reviewed";
 
@@ -114,30 +115,38 @@ export function addOutreachSuppression(value: string) {
 export function syncDurableOutreachWorkspace() {
   if (typeof window === "undefined") return Promise.resolve();
   if (syncInFlight) return syncInFlight;
-  syncInFlight = fetch("/api/outreach/workspace", { cache: "no-store" })
-    .then(async (response) => {
-      if (!response.ok) return;
-      const json = await response.json() as { workspace?: unknown };
-      if (!json.workspace || typeof json.workspace !== "object") return;
-      const durable = json.workspace as Partial<OutreachWorkspaceState>;
-      const durableDrafts = Array.isArray(durable.drafts) ? durable.drafts.filter(isSavedDraft) : [];
-      const durableSuppressions = Array.isArray(durable.suppressions)
-        ? durable.suppressions.filter((value): value is string => typeof value === "string").map(normalizeOutreachEmail).filter(Boolean)
-        : [];
-      const current = loadOutreachWorkspace();
-      const mergedDrafts = new Map(current.drafts.map((draft) => [draft.id, draft]));
-      for (const draft of durableDrafts) {
-        const local = mergedDrafts.get(draft.id);
-        if (!local || Date.parse(draft.updatedAt) >= Date.parse(local.updatedAt)) mergedDrafts.set(draft.id, draft);
-      }
-      writeState({
-        drafts: Array.from(mergedDrafts.values()).sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)),
-        suppressions: Array.from(new Set([...current.suppressions, ...durableSuppressions])),
-      });
-    })
-    .catch(() => undefined)
-    .finally(() => { syncInFlight = null; });
+  syncInFlight = reconcileDurableOutreachWorkspace().finally(() => { syncInFlight = null; });
   return syncInFlight;
+}
+
+async function reconcileDurableOutreachWorkspace() {
+  try {
+    const response = await fetch("/api/outreach/workspace", { cache: "no-store" });
+    if (!response.ok) return;
+    const json = await response.json() as { workspace?: unknown };
+    if (!json.workspace || typeof json.workspace !== "object") return;
+    const durable = json.workspace as Partial<OutreachWorkspaceState>;
+    const durableDrafts = Array.isArray(durable.drafts) ? durable.drafts.filter(isSavedDraft) : [];
+    const durableSuppressions = Array.isArray(durable.suppressions)
+      ? durable.suppressions.filter((value): value is string => typeof value === "string").map(normalizeOutreachEmail).filter(Boolean)
+      : [];
+    const current = loadOutreachWorkspace();
+    const draftResult = reconcileTimestampedRecords(current.drafts, durableDrafts);
+    const durableSuppressionSet = new Set(durableSuppressions);
+    const suppressionsToBackfill = current.suppressions.filter((email) => !durableSuppressionSet.has(email));
+
+    writeState({
+      drafts: draftResult.merged.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)),
+      suppressions: Array.from(new Set([...current.suppressions, ...durableSuppressions])),
+    });
+
+    await Promise.allSettled([
+      ...draftResult.backfill.filter((draft) => draft.status === "reviewed").map((draft) => persistDraft(draft)),
+      ...suppressionsToBackfill.map((email) => persistSuppression(email)),
+    ]);
+  } catch {
+    // Browser storage remains the operational fallback until a later sync.
+  }
 }
 
 async function persistDraft(draft: SavedOutreachDraft) {
