@@ -1,5 +1,5 @@
 import { getPrisma } from "@/lib/db/prisma";
-import { taskInputSchema, type TaskInput, type TaskStatus } from "@/lib/tasks/model";
+import { type TaskInput, type TaskStatus } from "@/lib/tasks/model";
 
 export { taskInputSchema } from "@/lib/tasks/model";
 export type { TaskInput } from "@/lib/tasks/model";
