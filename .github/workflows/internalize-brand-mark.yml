@@ -1,0 +1,50 @@
+name: Internalize Clear Steps Brand Mark
+
+on:
+  push:
+    branches:
+      - feat/clearsteps-intelligence-os-v2
+    paths:
+      - ".github/workflows/internalize-brand-mark.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  internalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout Phase 2 branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/clearsteps-intelligence-os-v2
+
+      - name: Download owned Navi mark
+        run: curl --fail --silent --show-error --location https://navi-deed-search.vercel.app/api/property-scout-icon --output public/clearsteps-mark.png
+
+      - name: Validate PNG dimensions
+        run: |
+          python - <<'PY'
+          import struct
+          from pathlib import Path
+          path = Path('public/clearsteps-mark.png')
+          data = path.read_bytes()
+          assert data[:8] == b'\x89PNG\r\n\x1a\n', 'not a PNG'
+          assert data[12:16] == b'IHDR', 'missing IHDR'
+          width, height = struct.unpack('>II', data[16:24])
+          assert (width, height) == (180, 180), f'unexpected dimensions: {width}x{height}'
+          print(f'validated {width}x{height} PNG ({len(data)} bytes)')
+          PY
+
+      - name: Commit static mark
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add public/clearsteps-mark.png
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "assets: internalize Clear Steps Navi mark"
+          git push origin HEAD:feat/clearsteps-intelligence-os-v2
