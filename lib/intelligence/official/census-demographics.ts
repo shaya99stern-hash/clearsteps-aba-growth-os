@@ -13,6 +13,7 @@ const VARIABLES = [
   "B09001_006E",
   "B09001_007E",
   "B09001_008E",
+  "B09001_009E",
 ] as const;
 
 type GeographyKind = "state" | "county" | "place" | "zcta";
