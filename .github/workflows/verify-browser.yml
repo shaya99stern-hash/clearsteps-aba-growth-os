@@ -17,6 +17,7 @@ on:
     branches:
       - feat/clearsteps-intelligence-os-v1
       - feat/clearsteps-intelligence-os-v2
+      - feat/clearsteps-aba-engine-v3
     paths:
       - "lib/intelligence/browser-collector.ts"
       - "lib/intelligence/network-safety.ts"
