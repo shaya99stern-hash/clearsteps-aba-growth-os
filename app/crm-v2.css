@@ -1,0 +1,738 @@
+.crmWorkspace {
+  width: 100%;
+  min-width: 0;
+}
+
+.crmKpiStrip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  border: 1px solid var(--workspace-line);
+  border-radius: 13px;
+  background: var(--workspace-line);
+}
+
+.crmKpi {
+  min-width: 0;
+  padding: 12px 14px;
+  background: #141417;
+}
+
+.crmKpi span {
+  display: block;
+  color: var(--tertiary);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.crmKpi strong {
+  display: block;
+  margin-top: 5px;
+  font-family: ui-serif, "New York", "Iowan Old Style", Georgia, serif;
+  font-size: 25px;
+  font-weight: 590;
+  line-height: 1;
+}
+
+.crmToolbar {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.crmViewTabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--workspace-line);
+  border-radius: 10px;
+  background: #141417;
+}
+
+.crmViewTabs button {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--tertiary);
+  font-size: 10px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.crmViewTabs button.active {
+  background: #242428;
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.055);
+}
+
+.crmViewTabs button:focus-visible,
+.crmSearchField:focus-within,
+.crmNameButton:focus-visible,
+.crmCardOpen:focus-visible,
+.crmAdvanceIcon:focus-visible,
+.crmDrawer button:focus-visible,
+.crmDrawer a:focus-visible {
+  outline: 2px solid var(--workspace-focus);
+  outline-offset: 2px;
+}
+
+.crmSearchField {
+  min-width: 220px;
+  max-width: 380px;
+  flex: 1;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border: 1px solid var(--workspace-line);
+  border-radius: 10px;
+  background: #141417;
+  color: var(--tertiary);
+}
+
+.crmSearchField input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 11px;
+}
+
+.crmSearchField input::placeholder {
+  color: #6f6b65;
+}
+
+.crmResultCount {
+  margin-left: auto;
+  color: #77736d;
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.crmBoard {
+  width: 100%;
+  overflow: hidden;
+}
+
+.boardScroller {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 1px 1px 15px;
+  scroll-snap-type: x proximity;
+  scrollbar-color: #333338 transparent;
+}
+
+.boardColumn {
+  flex: 0 0 268px;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--workspace-line);
+  border-radius: 13px;
+  background: #111113;
+  scroll-snap-align: start;
+}
+
+.boardColumn > header {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 11px;
+  border-bottom: 1px solid var(--workspace-line);
+  background: #151518;
+  color: var(--secondary);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.boardColumn > header b {
+  min-width: 22px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: #202024;
+  color: var(--tertiary);
+  text-align: center;
+  font-size: 9px;
+}
+
+.boardCards {
+  min-height: 170px;
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  padding: 7px;
+}
+
+.crmCard {
+  overflow: hidden;
+  border: 1px solid var(--workspace-line);
+  border-radius: 11px;
+  background: #19191c;
+  transition: border-color 130ms var(--ease), background 130ms var(--ease);
+}
+
+.crmCard:hover {
+  border-color: rgba(215,122,89,.22);
+  background: #1c1c1f;
+}
+
+.crmCardOpen {
+  width: 100%;
+  display: block;
+  padding: 11px 11px 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.crmCardTopline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.crmCardTopline > span {
+  color: #77736d;
+  font-size: 8px;
+}
+
+.crmScore {
+  width: 31px;
+  height: 31px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(215,122,89,.15);
+  border-radius: 9px;
+  background: rgba(215,122,89,.08);
+  color: var(--accent);
+  font-family: ui-serif, "New York", Georgia, serif;
+  font-size: 16px;
+}
+
+.crmCard h3 {
+  margin: 9px 0 3px;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crmCardOpen > p {
+  margin: 0;
+  overflow: hidden;
+  color: var(--tertiary);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crmMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.crmMeta span {
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: #222226;
+  color: #858078;
+  font-size: 8px;
+}
+
+.crmActions {
+  min-height: 39px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 8px;
+  border-top: 1px solid rgba(255,255,255,.055);
+}
+
+.crmActions a,
+.crmActions > span {
+  width: 28px;
+  height: 28px;
+}
+
+.crmActions a {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--workspace-line);
+  border-radius: 8px;
+  color: var(--tertiary);
+}
+
+.crmActions button {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 8px;
+  background: #f0ece3;
+  color: #111113;
+  font-size: 8px;
+  font-weight: 760;
+  cursor: pointer;
+}
+
+.crmActions button:disabled,
+.crmAdvanceIcon:disabled,
+.crmDrawerFooter button:disabled {
+  opacity: .32;
+  cursor: default;
+}
+
+.columnEmpty {
+  padding: 24px 5px;
+  color: #68645e;
+  text-align: center;
+  font-size: 9px;
+}
+
+.crmListShell {
+  overflow-x: auto;
+  border: 1px solid var(--workspace-line);
+  border-radius: 13px;
+  background: #141417;
+}
+
+.crmTable {
+  width: 100%;
+  min-width: 820px;
+  border-collapse: collapse;
+  font-size: 10px;
+}
+
+.crmTable th {
+  height: 36px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--workspace-line);
+  color: #77736d;
+  text-align: left;
+  font-size: 8px;
+  font-weight: 760;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.crmTable td {
+  height: 52px;
+  padding: 7px 12px;
+  border-bottom: 1px solid rgba(255,255,255,.055);
+  color: var(--workspace-muted);
+  vertical-align: middle;
+}
+
+.crmTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.crmTable tbody tr:hover td {
+  background: #18181b;
+}
+
+.crmNameButton {
+  max-width: 300px;
+  display: grid;
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.crmNameButton strong,
+.crmNameButton span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crmNameButton strong {
+  color: var(--text);
+  font-size: 10px;
+}
+
+.crmNameButton span {
+  color: #77736d;
+  font-size: 8px;
+}
+
+.crmStagePill {
+  display: inline-flex;
+  padding: 5px 7px;
+  border: 1px solid var(--workspace-line);
+  border-radius: 999px;
+  background: #1b1b1f;
+  color: var(--secondary);
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+.crmListScore {
+  color: var(--accent);
+  font-family: ui-serif, "New York", Georgia, serif;
+  font-size: 15px;
+}
+
+.crmContactValue {
+  display: block;
+  max-width: 210px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crmAdvanceIcon {
+  width: 29px;
+  height: 29px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--workspace-line);
+  border-radius: 8px;
+  background: #1b1b1f;
+  color: var(--secondary);
+  cursor: pointer;
+}
+
+.crmListEmpty {
+  padding: 34px 16px;
+  color: var(--tertiary);
+  text-align: center;
+  font-size: 10px;
+}
+
+.crmDrawerBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(0,0,0,.56);
+  backdrop-filter: blur(5px);
+}
+
+.crmDrawer {
+  width: min(100%, 430px);
+  height: 100dvh;
+  overflow-y: auto;
+  padding: max(17px, env(safe-area-inset-top)) 16px max(22px, env(safe-area-inset-bottom));
+  border-left: 1px solid var(--workspace-line);
+  background: #121214;
+  box-shadow: -22px 0 60px rgba(0,0,0,.34);
+}
+
+.crmDrawerHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 16px;
+}
+
+.crmDrawerHeader h2 {
+  margin: 6px 0 4px;
+  font-family: ui-serif, "New York", "Iowan Old Style", Georgia, serif;
+  font-size: 27px;
+  font-weight: 570;
+  line-height: 1;
+  letter-spacing: -.03em;
+}
+
+.crmDrawerHeader p {
+  margin: 0;
+  color: var(--tertiary);
+  font-size: 10px;
+}
+
+.crmDrawerScore {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 13px;
+  align-items: center;
+  padding: 13px;
+  border: 1px solid rgba(215,122,89,.17);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(215,122,89,.1), rgba(255,255,255,.02));
+}
+
+.crmDrawerScore > div:first-child {
+  display: grid;
+  justify-items: center;
+  padding-right: 12px;
+  border-right: 1px solid var(--workspace-line);
+}
+
+.crmDrawerScore strong {
+  color: var(--accent);
+  font-family: ui-serif, "New York", Georgia, serif;
+  font-size: 38px;
+  font-weight: 570;
+  line-height: 1;
+}
+
+.crmDrawerScore > div:first-child span {
+  margin-top: 5px;
+  color: var(--tertiary);
+  font-size: 8px;
+  text-transform: uppercase;
+}
+
+.crmProgressBlock > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--secondary);
+  font-size: 9px;
+}
+
+.crmProgressBlock b {
+  color: var(--accent);
+}
+
+.crmProgressTrack {
+  height: 4px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #29282b;
+}
+
+.crmProgressTrack i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.crmProgressBlock p {
+  margin: 8px 0 0;
+  color: #77736d;
+  font-size: 8px;
+}
+
+.crmDrawerSection {
+  padding-top: 22px;
+}
+
+.crmDrawerSection h3 {
+  margin: 0 0 9px;
+  color: #77736d;
+  font-size: 8px;
+  font-weight: 760;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.crmContactGrid {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--workspace-line);
+  border-radius: 12px;
+  background: var(--workspace-line);
+}
+
+.crmContactGrid > div {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px;
+  background: #19191c;
+  color: var(--secondary);
+  font-size: 9px;
+}
+
+.crmContactGrid span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.crmReasonList,
+.crmUnknownList {
+  display: grid;
+  gap: 6px;
+}
+
+.crmReasonList p,
+.crmUnknownList p,
+.crmMuted {
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--workspace-line);
+  border-radius: 10px;
+  background: #18181b;
+  color: var(--workspace-muted);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.crmUnknownList p {
+  color: #8c8780;
+  border-style: dashed;
+}
+
+.crmEvidenceList {
+  display: grid;
+  border-top: 1px solid var(--workspace-line);
+}
+
+.crmEvidenceList a {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 16px;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 2px;
+  border-bottom: 1px solid var(--workspace-line);
+}
+
+.crmEvidenceList span {
+  color: #77736d;
+  font-size: 8px;
+  text-transform: uppercase;
+}
+
+.crmEvidenceList strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 9px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crmEvidenceList svg {
+  color: var(--tertiary);
+}
+
+.crmDrawerFooter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  margin-top: 24px;
+  padding-top: 14px;
+  border-top: 1px solid var(--workspace-line);
+}
+
+.crmDrawerFooter a,
+.crmDrawerFooter button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border-radius: 9px;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.crmDrawerFooter a {
+  border: 1px solid var(--workspace-line);
+  color: var(--secondary);
+}
+
+.crmDrawerFooter button {
+  border: 1px solid rgba(215,122,89,.2);
+  background: var(--accent);
+  color: #18100d;
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .crmKpiStrip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .crmToolbar {
+    flex-wrap: wrap;
+  }
+
+  .crmSearchField {
+    min-width: min(100%, 260px);
+  }
+
+  .crmResultCount {
+    margin-left: 0;
+  }
+
+  .boardColumn {
+    flex-basis: 258px;
+  }
+}
+
+@media (max-width: 600px) {
+  .crmKpi {
+    padding: 10px 11px;
+  }
+
+  .crmKpi strong {
+    font-size: 22px;
+  }
+
+  .crmToolbar {
+    align-items: stretch;
+  }
+
+  .crmViewTabs {
+    flex: 0 0 auto;
+  }
+
+  .crmSearchField {
+    order: 3;
+    flex-basis: 100%;
+    max-width: none;
+  }
+
+  .crmResultCount {
+    margin-left: auto;
+    align-self: center;
+  }
+
+  .boardColumn {
+    flex-basis: min(82vw, 258px);
+  }
+
+  .crmDrawerBackdrop {
+    align-items: flex-end;
+  }
+
+  .crmDrawer {
+    width: 100%;
+    height: auto;
+    max-height: 91dvh;
+    border-top: 1px solid var(--workspace-line);
+    border-left: 0;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -22px 60px rgba(0,0,0,.34);
+  }
+}

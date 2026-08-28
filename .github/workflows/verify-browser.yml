@@ -6,7 +6,7 @@ on:
       - "lib/intelligence/browser-collector.ts"
       - "lib/intelligence/network-safety.ts"
       - "app/**/*.tsx"
-      - "app/globals.css"
+      - "app/**/*.css"
       - "components/**/*.tsx"
       - "components/**/*.css"
       - "scripts/verify-browser.ts"
@@ -16,11 +16,12 @@ on:
   push:
     branches:
       - feat/clearsteps-intelligence-os-v1
+      - feat/clearsteps-intelligence-os-v2
     paths:
       - "lib/intelligence/browser-collector.ts"
       - "lib/intelligence/network-safety.ts"
       - "app/**/*.tsx"
-      - "app/globals.css"
+      - "app/**/*.css"
       - "components/**/*.tsx"
       - "components/**/*.css"
       - "scripts/verify-browser.ts"
