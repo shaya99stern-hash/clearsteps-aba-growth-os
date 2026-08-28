@@ -115,6 +115,7 @@ function isAggregatorDomain(domain: string) {
     "yelp.com",
     "google.com",
     "npiregistry.cms.hhs.gov",
+    "gis.mo.gov",
   ].some((item) => domain === item || domain.endsWith(`.${item}`));
 }
 
