@@ -190,6 +190,19 @@
   outline: 0;
 }
 
+.suppressionForm input:focus-visible,
+.field input:focus-visible,
+.field select:focus-visible,
+.field textarea:focus-visible,
+.panelHeader > button:focus-visible,
+.recipient:focus-visible,
+.suppressionForm button:focus-visible,
+.reviewCheck input:focus-visible,
+.saveButton:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .suppressionForm input,
 .field input,
 .field select { min-height: 38px; padding: 0 10px; }
