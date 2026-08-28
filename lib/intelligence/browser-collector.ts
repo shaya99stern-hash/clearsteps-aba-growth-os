@@ -18,13 +18,15 @@ type BrowserPage = {
   route(url: string, handler: (route: BrowserRoute) => Promise<void>): Promise<void>;
 };
 
+type BrowserInstance = {
+  newPage(options?: { userAgent?: string }): Promise<BrowserPage>;
+  close(): Promise<void>;
+};
+
 type BrowserModule = {
   chromium: {
     executablePath(): string;
-    launch(options?: { headless?: boolean }): Promise<{
-      newPage(options?: { userAgent?: string }): Promise<BrowserPage>;
-      close(): Promise<void>;
-    }>;
+    launch(options?: { headless?: boolean }): Promise<BrowserInstance>;
   };
 };
 
@@ -33,6 +35,8 @@ export interface PlaywrightRuntimeStatus {
   browserAvailable: boolean;
   executablePath?: string;
 }
+
+let runtimeStatusPromise: Promise<PlaywrightRuntimeStatus> | null = null;
 
 async function loadPlaywright(): Promise<BrowserModule | null> {
   try {
@@ -44,14 +48,30 @@ async function loadPlaywright(): Promise<BrowserModule | null> {
 }
 
 export async function getPlaywrightRuntimeStatus(): Promise<PlaywrightRuntimeStatus> {
+  if (!runtimeStatusPromise) runtimeStatusPromise = detectPlaywrightRuntimeStatus();
+  return runtimeStatusPromise;
+}
+
+async function detectPlaywrightRuntimeStatus(): Promise<PlaywrightRuntimeStatus> {
   const playwright = await loadPlaywright();
   if (!playwright) return { packageAvailable: false, browserAvailable: false };
+
   const executablePath = playwright.chromium.executablePath();
   try {
     await access(executablePath);
     return { packageAvailable: true, browserAvailable: true, executablePath };
   } catch {
-    return { packageAvailable: true, browserAvailable: false, executablePath };
+    // `playwright install --only-shell chromium` intentionally omits the regular
+    // Chromium executable. A headless launch is the authoritative capability
+    // check for worker runtimes that install only chromium-headless-shell.
+  }
+
+  try {
+    const browser = await playwright.chromium.launch({ headless: true });
+    await browser.close();
+    return { packageAvailable: true, browserAvailable: true };
+  } catch {
+    return { packageAvailable: true, browserAvailable: false };
   }
 }
 
