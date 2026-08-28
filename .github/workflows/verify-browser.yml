@@ -33,7 +33,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      DATABASE_URL: postgresql://clearsteps:clearsteps@127.0.0.1:5432/clearsteps
       CLEARSTEPS_UI_URL: http://127.0.0.1:3000
 
     steps:
