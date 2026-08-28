@@ -6,73 +6,47 @@ export function PageShell({
   title,
   description,
   children,
+  compact = false,
 }: {
   title: string;
   description: string;
   children: ReactNode;
+  compact?: boolean;
 }) {
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-950">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-          <Link href="/" className="text-sm font-bold uppercase tracking-[0.25em] text-cyan-700">
-            Clear Steps ABA
-          </Link>
-          <div className="mt-3 max-w-4xl">
-            <h1 className="text-3xl font-black tracking-tight sm:text-5xl">{title}</h1>
-            <p className="mt-3 text-base text-slate-600 sm:text-lg">{description}</p>
+    <main className="appFrame">
+      <header className="appHeader">
+        <div className="headerInner">
+          <div className="brandRow">
+            <Link href="/" className="brandLockup">
+              <span className="brandMark">CS</span>
+              <span><i>Clear Steps</i><b>Growth OS</b></span>
+            </Link>
+            <span className="livePill"><i /> API-free core</span>
           </div>
-          <div className="mt-6">
-            <AppNav />
-          </div>
+          {!compact && (
+            <div className="pageIntro">
+              <span className="eyebrow">Evidence-first ABA growth intelligence</span>
+              <h1>{title}</h1>
+              <p>{description}</p>
+            </div>
+          )}
+          <AppNav />
         </div>
       </header>
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">{children}</div>
+      <div className={compact ? "pageContent compact" : "pageContent"}>{children}</div>
     </main>
   );
 }
 
-export function EmptyState({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description: string;
-  children?: ReactNode;
-}) {
-  return (
-    <section className="rounded-3xl border border-dashed border-slate-300 bg-white p-6 shadow-sm">
-      <h2 className="text-xl font-bold text-slate-950">{title}</h2>
-      <p className="mt-2 max-w-3xl text-sm text-slate-600">{description}</p>
-      {children ? <div className="mt-5">{children}</div> : null}
-    </section>
-  );
+export function EmptyState({ title, description, children }: { title: string; description: string; children?: ReactNode }) {
+  return <section className="emptyDark"><h2>{title}</h2><p>{description}</p>{children ? <div className="emptyActions">{children}</div> : null}</section>;
 }
 
 export function MetricCard({ title, value }: { title: string; value: string | number }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <p className="text-sm text-slate-500">{title}</p>
-      <p className="mt-2 text-3xl font-black text-slate-950">{value}</p>
-    </div>
-  );
+  return <div className="metricCard"><p>{title}</p><strong>{value}</strong></div>;
 }
 
-export function InfoCard({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description?: string;
-  children?: ReactNode;
-}) {
-  return (
-    <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-xl font-bold text-slate-950">{title}</h2>
-      {description ? <p className="mt-2 text-sm text-slate-600">{description}</p> : null}
-      {children ? <div className="mt-4">{children}</div> : null}
-    </article>
-  );
+export function InfoCard({ title, description, children }: { title: string; description?: string; children?: ReactNode }) {
+  return <article className="infoCard"><h2>{title}</h2>{description ? <p>{description}</p> : null}{children ? <div className="infoCardBody">{children}</div> : null}</article>;
 }
