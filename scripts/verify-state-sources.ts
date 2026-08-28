@@ -3,6 +3,7 @@ import {
   parseMissouriChildCareFeatures,
   buildMissouriChildCareObservations,
 } from "../lib/intelligence/official/mo-child-care-gis";
+import { stateSourceSelection } from "../lib/intelligence/official/state-source-selection";
 
 const payload = {
   features: [
@@ -86,5 +87,14 @@ assert(density, "licensed child-care density observation should be emitted");
 assert.equal(density.value, 5, "one provider per 10,000 children should normalize to 5/100 when 20 per 10k is strong");
 assert.equal(density.confidence, 92);
 assert.deepEqual(density.sourceIds, ["mo-dhss-child-care-gis"]);
+
+assert.deepEqual(
+  stateSourceSelection("MO", "client"),
+  { missouriChildCare: true, kansasEarlyIntervention: false },
+  "Missouri Client research should use the Missouri child-care source",
+);
+assert.equal(stateSourceSelection("MO", "rbt").missouriChildCare, false, "RBT recruiting should not run the child-care collector");
+assert.equal(stateSourceSelection("MO", "bcba").missouriChildCare, false, "BCBA recruiting should not run the child-care collector");
+assert.equal(stateSourceSelection("KS", "client").missouriChildCare, false, "Kansas research must never call the Missouri collector");
 
 console.log("Missouri/Kansas state source verification passed.");
