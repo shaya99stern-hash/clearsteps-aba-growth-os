@@ -74,7 +74,9 @@ async function verifyDesktopCrm(baseUrl: string) {
     const brandImage = page.locator('.brandLockup img[src*="brand-mark"]');
     assert.equal(await brandImage.count(), 1, "workspace should render the Navi-derived Clear Steps brand mark");
 
-    assert.equal((await page.getByText("Browser Test Pediatrics", { exact: true }).count()) > 0, true, "seeded CRM record should render on the board");
+    const seededRecord = page.getByText("Browser Test Pediatrics", { exact: true }).first();
+    await seededRecord.waitFor({ state: "visible", timeout: 10_000 });
+    assert.equal(await seededRecord.innerText(), "Browser Test Pediatrics", "seeded CRM record should render after hydration");
     await assertVisibleKeyboardFocus(page, page.getByPlaceholder("Search name, stage, location, contact…"), "CRM search");
 
     await page.getByPlaceholder("Search name, stage, location, contact…").fill("pediatrics");
@@ -84,13 +86,16 @@ async function verifyDesktopCrm(baseUrl: string) {
     await page.getByPlaceholder("Search name, stage, location, contact…").fill("");
 
     await page.getByRole("button", { name: "List", exact: true }).click();
+    await page.locator(".crmTable").waitFor({ state: "visible" });
     assert.equal(await page.locator(".crmTable").count(), 1, "List view should render the dense CRM table");
     await page.getByRole("button", { name: "Board", exact: true }).click();
 
     await page.getByRole("button", { name: "Open Browser Test Pediatrics details" }).click();
+    await page.getByRole("dialog").waitFor({ state: "visible" });
     assert.equal(await page.getByRole("dialog").count(), 1, "CRM record should open a detail drawer");
     assert.equal(await page.getByRole("heading", { name: "Browser Test Pediatrics" }).innerText(), "Browser Test Pediatrics");
     await page.keyboard.press("Escape");
+    await page.getByRole("dialog").waitFor({ state: "detached" });
     assert.equal(await page.getByRole("dialog").count(), 0, "Escape should close the CRM detail drawer");
   } finally {
     await context.close();
