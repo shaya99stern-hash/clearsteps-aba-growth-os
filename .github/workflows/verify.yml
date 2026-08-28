@@ -29,6 +29,27 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Audit production dependencies
+        id: production_audit
+        continue-on-error: true
+        shell: bash
+        run: |
+          npm audit --omit=dev --json > npm-audit-production.json || true
+          node - <<'NODE'
+          const fs = require('fs');
+          const report = JSON.parse(fs.readFileSync('npm-audit-production.json', 'utf8'));
+          const v = report.metadata?.vulnerabilities ?? {};
+          console.log(`Production dependency audit: critical=${v.critical ?? 0} high=${v.high ?? 0} moderate=${v.moderate ?? 0} low=${v.low ?? 0}`);
+          NODE
+
+      - name: Upload production dependency audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-production
+          path: npm-audit-production.json
+          if-no-files-found: error
+
       - name: Verify intelligence rules
         run: npm run verify:intelligence
 
