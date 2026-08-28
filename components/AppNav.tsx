@@ -2,47 +2,40 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Activity, Database, KanbanSquare, Mail, Map, Search, Settings, SquareCheckBig, Users } from "lucide-react";
 
 const navItems = [
-  { label: "Dashboard", href: "/" },
-  { label: "Lead Discovery", href: "/lead-discovery" },
-  { label: "Research Runs", href: "/research-runs" },
-  { label: "Referral Sources", href: "/referral-sources" },
-  { label: "Organizations", href: "/organizations" },
-  { label: "Contacts", href: "/contacts" },
-  { label: "Demand Signals", href: "/demand-signals" },
-  { label: "Competitor Signals", href: "/competitor-signals" },
-  { label: "Intelligence", href: "/intelligence" },
-  { label: "Outreach", href: "/outreach" },
-  { label: "Follow-Ups", href: "/follow-ups" },
-  { label: "CSV Imports", href: "/csv-imports" },
-  { label: "Connectors", href: "/connectors" },
-  { label: "Settings", href: "/settings" },
+  { label: "Scout", href: "/", icon: Search },
+  { label: "Territories", href: "/territories", icon: Map },
+  { label: "Pipeline", href: "/pipeline", icon: KanbanSquare },
+  { label: "Talent", href: "/talent", icon: Users },
+  { label: "Outreach", href: "/outreach", icon: Mail },
+  { label: "Tasks", href: "/tasks", icon: SquareCheckBig },
+  { label: "Intelligence", href: "/intelligence", icon: Activity },
+  { label: "Sources", href: "/connectors", icon: Database },
+  { label: "Settings", href: "/settings", icon: Settings },
 ];
 
 export function AppNav() {
   const pathname = usePathname();
-
   return (
-    <nav className="flex gap-2 overflow-x-auto pb-2" aria-label="Clear Steps Growth OS navigation">
+    <nav className="appNav" aria-label="Clear Steps navigation">
       {navItems.map((item) => {
-        const active = pathname === item.href;
+        const Icon = item.icon;
+        const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
         return (
           <Link
             key={item.href}
             href={item.href}
-            className={`whitespace-nowrap rounded-full border px-3 py-2 text-xs font-semibold transition ${
-              active
-                ? "border-cyan-600 bg-cyan-50 text-cyan-800 shadow-sm"
-                : "border-slate-200 bg-white text-slate-700 hover:border-cyan-300 hover:bg-cyan-50"
-            }`}
+            className={active ? "navItem active" : "navItem"}
+            aria-current={active ? "page" : undefined}
           >
-            {item.label}
+            <Icon size={15} aria-hidden="true" focusable="false" />
+            <span>{item.label}</span>
           </Link>
         );
       })}
     </nav>
   );
 }
-
 export { navItems };

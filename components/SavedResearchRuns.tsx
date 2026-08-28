@@ -1,18 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { readStorageArray, SAVED_RUNS_KEY, writeStorageArray, type StoredRun } from "@/lib/clientStorage";
+import { useSyncExternalStore } from "react";
+import { getServerStorageArray, readStorageArray, SAVED_RUNS_KEY, subscribeStorageKey, writeStorageArray, type StoredRun } from "@/lib/clientStorage";
+
+function subscribeRuns(onStoreChange: () => void) {
+  return subscribeStorageKey(SAVED_RUNS_KEY, onStoreChange);
+}
+
+function getRuns() {
+  return readStorageArray<StoredRun>(SAVED_RUNS_KEY);
+}
+
+function getServerRuns() {
+  return getServerStorageArray<StoredRun>();
+}
 
 export function SavedResearchRuns() {
-  const [runs, setRuns] = useState<StoredRun[]>([]);
-
-  useEffect(() => {
-    setRuns(readStorageArray<StoredRun>(SAVED_RUNS_KEY));
-  }, []);
+  const runs = useSyncExternalStore(subscribeRuns, getRuns, getServerRuns);
 
   function clearRuns() {
     writeStorageArray(SAVED_RUNS_KEY, []);
-    setRuns([]);
   }
 
   if (runs.length === 0) {

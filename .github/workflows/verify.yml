@@ -1,0 +1,117 @@
+name: Verify Clear Steps
+
+on:
+  pull_request:
+  push:
+    branches:
+      - feat/clearsteps-intelligence-os-v1
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: postgresql://clearsteps:clearsteps@127.0.0.1:5432/clearsteps
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit production dependencies
+        id: production_audit
+        continue-on-error: true
+        shell: bash
+        run: |
+          npm audit --omit=dev --json > npm-audit-production.json || true
+          node - <<'NODE'
+          const fs = require('fs');
+          const report = JSON.parse(fs.readFileSync('npm-audit-production.json', 'utf8'));
+          const v = report.metadata?.vulnerabilities ?? {};
+          console.log(`Production dependency audit: critical=${v.critical ?? 0} high=${v.high ?? 0} moderate=${v.moderate ?? 0} low=${v.low ?? 0}`);
+          NODE
+
+      - name: Upload production dependency audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-production
+          path: npm-audit-production.json
+          if-no-files-found: error
+
+      - name: Verify intelligence rules
+        run: npm run verify:intelligence
+
+      - name: Verify task rules
+        run: npx tsx scripts/verify-tasks.ts
+
+      - name: Verify outreach rules
+        run: npx tsx scripts/verify-outreach.ts
+
+      - name: Verify local-first reconciliation
+        run: npx tsx scripts/verify-local-first-sync.ts
+
+      - name: Validate Prisma schema
+        run: npx prisma validate
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Lint changed source files
+        id: lint
+        continue-on-error: true
+        shell: bash
+        run: |
+          mapfile -t files < <(git diff --name-only origin/main...HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs')
+          if [ ${#files[@]} -eq 0 ]; then
+            echo '[]' > lint-results.json
+          else
+            npx eslint "${files[@]}" --format json --output-file lint-results.json
+          fi
+
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-results
+          path: lint-results.json
+          if-no-files-found: ignore
+
+      - name: Build
+        id: build
+        if: steps.lint.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee build.log
+
+      - name: Upload build report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-results
+          path: build.log
+          if-no-files-found: ignore
+
+      - name: Enforce lint gate
+        if: steps.lint.outcome == 'failure'
+        run: |
+          node -e 'const r=require("./lint-results.json"); for (const f of r.filter(x=>x.errorCount||x.warningCount)) console.error(f.filePath, "errors="+f.errorCount, "warnings="+f.warningCount); process.exit(1)'
+
+      - name: Enforce build gate
+        if: steps.lint.outcome == 'success' && steps.build.outcome == 'failure'
+        run: |
+          tail -n 120 build.log
+          exit 1
