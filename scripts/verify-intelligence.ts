@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { durableCrmLeadSchema } from "../lib/crm/server-store";
 import { resolveSearchHits } from "../lib/intelligence/entity-resolution";
 import { buildSearchPlan } from "../lib/intelligence/query-planner";
 import { evaluateResearchRequest } from "../lib/intelligence/request-policy";
@@ -44,5 +45,27 @@ const nppesFiles = parseNppesDownloadLinks(`
 assert.equal(nppesFiles.find((file) => file.kind === "monthly")?.url, "https://download.cms.gov/nppes/NPPES_Data_Dissemination_August_2026_V2.zip");
 assert.equal(nppesFiles.filter((file) => file.kind === "weekly").length, 1);
 assert.equal(nppesFiles.filter((file) => file.kind === "deactivation").length, 1);
+
+const durableBase = {
+  id: "lead-1",
+  name: "Bright Steps Learning Center",
+  domain: "brightsteps.example",
+  website: "https://brightsteps.example/",
+  location: "Lakewood, NJ",
+  score: 86,
+  confidence: 82,
+  reasons: ["Licensed child-care evidence"],
+  unknowns: [],
+  emails: ["director@brightsteps.example"],
+  phones: ["732-555-1212"],
+  evidence: [{ id: "e1", sourceId: "nj-childcare-download", title: "Licensed child care", url: "https://data.nj.gov/", snippet: "Official licensed center", query: "Lakewood NJ", capturedAt: new Date().toISOString(), purpose: "discover" as const }],
+  signals: ["childcare"],
+  pipeline: "referral" as const,
+  stage: "Qualified",
+  savedAt: new Date().toISOString(),
+};
+assert.equal(durableCrmLeadSchema.safeParse({ ...durableBase, kind: "referral" }).success, true);
+assert.equal(durableCrmLeadSchema.safeParse({ ...durableBase, kind: "community_signal" }).success, false);
+assert.equal(durableCrmLeadSchema.safeParse({ ...durableBase, kind: "talent_signal", pipeline: "talent" }).success, false);
 
 console.log("Clear Steps intelligence verification passed.");
