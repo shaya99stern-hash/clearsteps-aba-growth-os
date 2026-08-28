@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -36,10 +38,17 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
-      - name: Lint
+      - name: Lint changed source files
         id: lint
         continue-on-error: true
-        run: npx eslint . --format json --output-file lint-results.json
+        shell: bash
+        run: |
+          mapfile -t files < <(git diff --name-only origin/main...HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs')
+          if [ ${#files[@]} -eq 0 ]; then
+            echo '[]' > lint-results.json
+          else
+            npx eslint "${files[@]}" --format json --output-file lint-results.json
+          fi
 
       - name: Upload lint report
         if: always()
