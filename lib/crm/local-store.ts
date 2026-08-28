@@ -33,6 +33,7 @@ const CHANGE_EVENT = "clearsteps:crm-change";
 const EMPTY_LEADS: SavedCrmLead[] = [];
 let cachedRaw: string | undefined;
 let cachedLeads: SavedCrmLead[] = EMPTY_LEADS;
+let syncInFlight: Promise<void> | null = null;
 
 export function loadCrmLeads(): SavedCrmLead[] {
   if (typeof window === "undefined") return EMPTY_LEADS;
@@ -40,7 +41,7 @@ export function loadCrmLeads(): SavedCrmLead[] {
   if (raw === cachedRaw) return cachedLeads;
   try {
     const parsed = JSON.parse(raw);
-    cachedLeads = Array.isArray(parsed) ? parsed : EMPTY_LEADS;
+    cachedLeads = Array.isArray(parsed) ? parsed.filter(isSavedCrmLead) : EMPTY_LEADS;
   } catch {
     cachedLeads = EMPTY_LEADS;
   }
@@ -86,13 +87,63 @@ export function saveCrmLead(lead: ResolvedLead): SavedCrmLead {
   const current = loadCrmLeads();
   const next = [saved, ...current.filter((item) => item.id !== saved.id)];
   writeCrmLeads(next);
+  void persistCrmLead(saved);
   return saved;
 }
 
 export function updateCrmStage(id: string, stage: PipelineStage | TalentStage) {
   const next = loadCrmLeads().map((lead) => lead.id === id ? { ...lead, stage } : lead);
   writeCrmLeads(next);
+  void persistStage(id, stage);
   return next;
+}
+
+export function syncDurableCrmLeads() {
+  if (typeof window === "undefined") return Promise.resolve();
+  if (syncInFlight) return syncInFlight;
+  syncInFlight = fetch("/api/crm/leads", { cache: "no-store" })
+    .then(async (response) => {
+      if (!response.ok) return;
+      const json = await response.json() as { leads?: unknown };
+      if (!Array.isArray(json.leads)) return;
+      const durable = json.leads.filter(isSavedCrmLead);
+      if (durable.length === 0) return;
+      const merged = new Map(loadCrmLeads().map((lead) => [lead.id, lead]));
+      for (const lead of durable) {
+        const local = merged.get(lead.id);
+        if (!local || Date.parse(lead.savedAt) >= Date.parse(local.savedAt)) merged.set(lead.id, lead);
+      }
+      writeCrmLeads(Array.from(merged.values()));
+    })
+    .catch(() => undefined)
+    .finally(() => { syncInFlight = null; });
+  return syncInFlight;
+}
+
+async function persistCrmLead(lead: SavedCrmLead) {
+  try {
+    await fetch("/api/crm/leads", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(lead),
+      keepalive: true,
+    });
+  } catch {
+    // Browser storage remains the authoritative fallback until the next sync.
+  }
+}
+
+async function persistStage(id: string, stage: PipelineStage | TalentStage) {
+  try {
+    await fetch("/api/crm/leads", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id, stage }),
+      keepalive: true,
+    });
+  } catch {
+    // Browser storage remains the authoritative fallback until the next sync.
+  }
 }
 
 function writeCrmLeads(leads: SavedCrmLead[]) {
@@ -102,4 +153,21 @@ function writeCrmLeads(leads: SavedCrmLead[]) {
   cachedRaw = raw;
   cachedLeads = leads;
   window.dispatchEvent(new Event(CHANGE_EVENT));
+}
+
+function isSavedCrmLead(value: unknown): value is SavedCrmLead {
+  if (!value || typeof value !== "object") return false;
+  const lead = value as Partial<SavedCrmLead>;
+  return typeof lead.id === "string"
+    && typeof lead.name === "string"
+    && ["organization", "referral", "professional", "candidate"].includes(String(lead.kind))
+    && (lead.pipeline === "referral" || lead.pipeline === "talent")
+    && typeof lead.stage === "string"
+    && typeof lead.savedAt === "string"
+    && Array.isArray(lead.evidence)
+    && Array.isArray(lead.reasons)
+    && Array.isArray(lead.unknowns)
+    && Array.isArray(lead.emails)
+    && Array.isArray(lead.phones)
+    && Array.isArray(lead.signals);
 }
