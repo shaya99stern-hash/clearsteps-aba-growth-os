@@ -1,11 +1,13 @@
 {
-  "phase": "execute",
-  "route": "fable-execute",
+  "phase": "verify",
+  "route": "fable-verify",
   "failure_streak": 0,
   "evidence": {
     "base_commit": "d7f715fe927871d356f64c724724d5228cf58e31",
     "branch": "feat/clearsteps-intelligence-os-v1",
     "api_free_core": true,
-    "playwright_runtime": "adapter-ready-package-unavailable-in-current-environment"
+    "playwright_runtime": "adapter-ready-package-unavailable-in-current-environment",
+    "syntax_check": "23 TypeScript/TSX files, 0 syntax errors",
+    "acceptance_check": "passed query planning, unknown-safe territory scoring, community de-identification, talent-signal classification, household-targeting request guard"
   }
 }

@@ -34,14 +34,8 @@ export async function enrichPublicWebsite(url: string): Promise<EnrichedWebsite 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 9_000);
   try {
-    const response = await fetch(safeUrl, {
-      headers: { "user-agent": "Mozilla/5.0 ClearStepsResearch/1.0" },
-      redirect: "follow",
-      cache: "no-store",
-      signal: controller.signal,
-    });
-    const contentType = response.headers.get("content-type") ?? "";
-    if (!response.ok || !contentType.includes("text/html")) return null;
+    const response = await fetchPublicHtml(safeUrl, controller.signal);
+    if (!response) return null;
     const html = await response.text();
     const text = htmlToText(html);
     return {
@@ -58,6 +52,30 @@ export async function enrichPublicWebsite(url: string): Promise<EnrichedWebsite 
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function fetchPublicHtml(startUrl: string, signal: AbortSignal) {
+  let current = startUrl;
+  for (let redirects = 0; redirects <= 4; redirects += 1) {
+    const validated = await validatePublicHttpUrl(current);
+    if (!validated) return null;
+    const response = await fetch(validated, {
+      headers: { "user-agent": "Mozilla/5.0 ClearStepsResearch/1.0" },
+      redirect: "manual",
+      cache: "no-store",
+      signal,
+    });
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      if (!location || redirects === 4) return null;
+      current = new URL(location, validated).toString();
+      continue;
+    }
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!response.ok || !contentType.includes("text/html")) return null;
+    return response;
+  }
+  return null;
 }
 
 function parseDuckDuckGo(html: string, query: string): PublicSearchHit[] {

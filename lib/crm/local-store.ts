@@ -40,7 +40,14 @@ export function loadCrmLeads(): SavedCrmLead[] {
   }
 }
 
+export function canSaveToCrm(lead: ResolvedLead) {
+  return ["organization", "referral", "professional", "candidate"].includes(lead.kind);
+}
+
 export function saveCrmLead(lead: ResolvedLead): SavedCrmLead {
+  if (!canSaveToCrm(lead)) {
+    throw new Error("Area-level signals are intelligence only and cannot be saved as outreach contacts.");
+  }
   const pipeline = lead.kind === "candidate" ? "talent" : "referral";
   const saved: SavedCrmLead = {
     ...lead,

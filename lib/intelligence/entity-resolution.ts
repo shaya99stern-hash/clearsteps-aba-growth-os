@@ -55,7 +55,7 @@ function toLead(
   const lanes = new Set(matches.map((row) => row.lane));
   const text = matches.map((row) => `${row.hit.title} ${row.hit.snippet} ${row.enrichment?.textSample ?? ""}`).join(" ").toLowerCase();
   const kind = lanes.has("talent")
-    ? "candidate"
+    ? looksLikeIndividualCandidate(text) ? "candidate" : "talent_signal"
     : lanes.has("community") && lanes.size === 1
       ? "community_signal"
       : text.includes("aba") || text.includes("applied behavior")
@@ -126,6 +126,13 @@ function cleanName(value: string) {
 
 function slug(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 100);
+}
+
+function looksLikeIndividualCandidate(text: string) {
+  const credential = ["rbt", "bcba", "behavior technician", "behavior analyst"].some((term) => text.includes(term));
+  const seeking = ["seeking", "looking for work", "available for", "resume", "curriculum vitae", "open to work"].some((term) => text.includes(term));
+  const employerPosting = ["we are hiring", "now hiring", "job opening", "apply now", "careers"].some((term) => text.includes(term));
+  return credential && seeking && !employerPosting;
 }
 
 function signalTerms(text: string) {

@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { ArrowUp, Check, ChevronRight, Database, Filter, Globe2, MapPinned, Save, Search, Users, X } from "lucide-react";
 import type { ResolvedLead } from "@/lib/intelligence/source-types";
-import { saveCrmLead } from "@/lib/crm/local-store";
+import { canSaveToCrm, saveCrmLead } from "@/lib/crm/local-store";
 
 type SourceState = { source: string; status: "working" | "complete" | "unavailable"; detail?: string };
 
@@ -63,6 +63,7 @@ export function ScoutWorkbench() {
   }
 
   function saveLead(lead: ResolvedLead) {
+    if (!canSaveToCrm(lead)) return;
     saveCrmLead(lead);
     setSavedIds((current) => new Set(current).add(lead.id));
   }
@@ -159,9 +160,13 @@ export function ScoutWorkbench() {
                   </div>
                   <ChevronRight size={19} className="chevron" />
                 </button>
-                <button type="button" className="saveLeadButton" onClick={() => saveLead(lead)}>
-                  {savedIds.has(lead.id) ? <><Check size={15} /> Saved</> : <><Save size={15} /> CRM</>}
-                </button>
+                {canSaveToCrm(lead) ? (
+                  <button type="button" className="saveLeadButton" onClick={() => saveLead(lead)}>
+                    {savedIds.has(lead.id) ? <><Check size={15} /> Saved</> : <><Save size={15} /> CRM</>}
+                  </button>
+                ) : (
+                  <span className="saveLeadButton">Signal only</span>
+                )}
               </article>
             ))}
           </div>
@@ -214,7 +219,7 @@ function LeadDossier({ lead, onClose, onSave, saved }: { lead: ResolvedLead; onC
         </div>
 
         <section className="dossierSection">
-          <div className="sectionTitleRow"><h3>Public contact & qualification</h3><button className="miniPrimary" onClick={onSave}>{saved ? <><Check size={14}/> Saved</> : <><Save size={14}/> Save to CRM</>}</button></div>
+          <div className="sectionTitleRow"><h3>Public contact & qualification</h3>{canSaveToCrm(lead) ? <button className="miniPrimary" onClick={onSave}>{saved ? <><Check size={14}/> Saved</> : <><Save size={14}/> Save to CRM</>}</button> : <span className="statusChip">Territory signal only</span>}</div>
           <div className="factCard">
             <div><span>Lead type</span><b>{lead.kind.replace("_", " ")}</b></div>
             <div><span>Evidence confidence</span><b>{lead.confidence}%</b></div>

@@ -5,6 +5,7 @@ export type EntityKind =
   | "organization"
   | "professional"
   | "candidate"
+  | "talent_signal"
   | "referral"
   | "community_signal"
   | "competitor_signal";
