@@ -5,6 +5,7 @@ import {
   missouriChildCareToSearchHits,
 } from "../lib/intelligence/official/mo-child-care-gis";
 import { stateSourceSelection } from "../lib/intelligence/official/state-source-selection";
+import { buildStateSourceContribution } from "../lib/intelligence/official/state-source-contribution";
 import { resolveSearchHits } from "../lib/intelligence/entity-resolution";
 
 const payload = {
@@ -109,5 +110,28 @@ const resolvedFacilities = resolveSearchHits(
 );
 assert.equal(resolvedFacilities.length, 2, "state GIS evidence host must not collapse distinct facilities into one entity");
 assert.deepEqual(resolvedFacilities.map((lead) => lead.name).sort(), ["Purple Steps Preschool", "Second Steps Preschool"]);
+
+const clientContribution = buildStateSourceContribution({
+  state: "MO",
+  engine: "client",
+  location: "Kansas City, MO",
+  under18Population: 10_000,
+  missouriChildCare: twoProviders,
+});
+assert.equal(clientContribution.referralHits.length, 2, "Missouri Client research should contribute official child-care referral hits");
+assert.equal(clientContribution.observations.length, 1, "Missouri Client research should contribute child-care density evidence when population is known");
+assert.equal(clientContribution.observations[0].indicatorId, "referral-ecosystem.07");
+assert.equal(clientContribution.sourceDetail, "2 official Missouri DHSS child-care facilities");
+
+assert.deepEqual(
+  buildStateSourceContribution({ state: "MO", engine: "rbt", location: "Kansas City, MO", under18Population: 10_000, missouriChildCare: twoProviders }),
+  { referralHits: [], observations: [], sourceDetail: null },
+  "Missouri RBT research must not inject child-care leads",
+);
+assert.deepEqual(
+  buildStateSourceContribution({ state: "KS", engine: "client", location: "Kansas", under18Population: 10_000, missouriChildCare: twoProviders }),
+  { referralHits: [], observations: [], sourceDetail: null },
+  "Kansas research must not consume Missouri child-care records",
+);
 
 console.log("Missouri/Kansas state source verification passed.");
