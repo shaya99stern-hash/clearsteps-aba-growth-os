@@ -1,6 +1,7 @@
 "use client";
 
 import type { ResolvedLead } from "@/lib/intelligence/source-types";
+import { reconcileTimestampedRecords } from "@/lib/sync/reconcile";
 
 export type PipelineStage =
   | "Discovered"
@@ -24,6 +25,7 @@ export type TalentStage =
 
 export interface SavedCrmLead extends ResolvedLead {
   savedAt: string;
+  updatedAt: string;
   pipeline: "referral" | "talent";
   stage: PipelineStage | TalentStage;
 }
@@ -41,7 +43,9 @@ export function loadCrmLeads(): SavedCrmLead[] {
   if (raw === cachedRaw) return cachedLeads;
   try {
     const parsed = JSON.parse(raw);
-    cachedLeads = Array.isArray(parsed) ? parsed.filter(isSavedCrmLead) : EMPTY_LEADS;
+    cachedLeads = Array.isArray(parsed)
+      ? parsed.map(normalizeSavedCrmLead).filter((lead): lead is SavedCrmLead => Boolean(lead))
+      : EMPTY_LEADS;
   } catch {
     cachedLeads = EMPTY_LEADS;
   }
@@ -78,9 +82,11 @@ export function saveCrmLead(lead: ResolvedLead): SavedCrmLead {
     throw new Error("Area-level signals are intelligence only and cannot be saved as outreach contacts.");
   }
   const pipeline = lead.kind === "candidate" ? "talent" : "referral";
+  const now = new Date().toISOString();
   const saved: SavedCrmLead = {
     ...lead,
-    savedAt: new Date().toISOString(),
+    savedAt: now,
+    updatedAt: now,
     pipeline,
     stage: "Discovered",
   };
@@ -92,7 +98,8 @@ export function saveCrmLead(lead: ResolvedLead): SavedCrmLead {
 }
 
 export function updateCrmStage(id: string, stage: PipelineStage | TalentStage) {
-  const next = loadCrmLeads().map((lead) => lead.id === id ? { ...lead, stage } : lead);
+  const now = new Date().toISOString();
+  const next = loadCrmLeads().map((lead) => lead.id === id ? { ...lead, stage, updatedAt: now } : lead);
   writeCrmLeads(next);
   void persistStage(id, stage);
   return next;
@@ -101,23 +108,25 @@ export function updateCrmStage(id: string, stage: PipelineStage | TalentStage) {
 export function syncDurableCrmLeads() {
   if (typeof window === "undefined") return Promise.resolve();
   if (syncInFlight) return syncInFlight;
-  syncInFlight = fetch("/api/crm/leads", { cache: "no-store" })
-    .then(async (response) => {
-      if (!response.ok) return;
-      const json = await response.json() as { leads?: unknown };
-      if (!Array.isArray(json.leads)) return;
-      const durable = json.leads.filter(isSavedCrmLead);
-      if (durable.length === 0) return;
-      const merged = new Map(loadCrmLeads().map((lead) => [lead.id, lead]));
-      for (const lead of durable) {
-        const local = merged.get(lead.id);
-        if (!local || Date.parse(lead.savedAt) >= Date.parse(local.savedAt)) merged.set(lead.id, lead);
-      }
-      writeCrmLeads(Array.from(merged.values()));
-    })
-    .catch(() => undefined)
-    .finally(() => { syncInFlight = null; });
+  syncInFlight = reconcileDurableCrmLeads().finally(() => { syncInFlight = null; });
   return syncInFlight;
+}
+
+async function reconcileDurableCrmLeads() {
+  try {
+    const response = await fetch("/api/crm/leads", { cache: "no-store" });
+    if (!response.ok) return;
+    const json = await response.json() as { leads?: unknown };
+    if (!Array.isArray(json.leads)) return;
+    const durable = json.leads
+      .map(normalizeSavedCrmLead)
+      .filter((lead): lead is SavedCrmLead => Boolean(lead));
+    const result = reconcileTimestampedRecords(loadCrmLeads(), durable);
+    writeCrmLeads(result.merged.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)));
+    await Promise.allSettled(result.backfill.map((lead) => persistCrmLead(lead)));
+  } catch {
+    // Browser storage remains authoritative until the durable service returns.
+  }
 }
 
 async function persistCrmLead(lead: SavedCrmLead) {
@@ -155,19 +164,21 @@ function writeCrmLeads(leads: SavedCrmLead[]) {
   window.dispatchEvent(new Event(CHANGE_EVENT));
 }
 
-function isSavedCrmLead(value: unknown): value is SavedCrmLead {
-  if (!value || typeof value !== "object") return false;
+function normalizeSavedCrmLead(value: unknown): SavedCrmLead | null {
+  if (!value || typeof value !== "object") return null;
   const lead = value as Partial<SavedCrmLead>;
-  return typeof lead.id === "string"
-    && typeof lead.name === "string"
-    && ["organization", "referral", "professional", "candidate"].includes(String(lead.kind))
-    && (lead.pipeline === "referral" || lead.pipeline === "talent")
-    && typeof lead.stage === "string"
-    && typeof lead.savedAt === "string"
-    && Array.isArray(lead.evidence)
-    && Array.isArray(lead.reasons)
-    && Array.isArray(lead.unknowns)
-    && Array.isArray(lead.emails)
-    && Array.isArray(lead.phones)
-    && Array.isArray(lead.signals);
+  if (typeof lead.id !== "string"
+    || typeof lead.name !== "string"
+    || !["organization", "referral", "professional", "candidate"].includes(String(lead.kind))
+    || (lead.pipeline !== "referral" && lead.pipeline !== "talent")
+    || typeof lead.stage !== "string"
+    || typeof lead.savedAt !== "string"
+    || (lead.updatedAt !== undefined && typeof lead.updatedAt !== "string")
+    || !Array.isArray(lead.evidence)
+    || !Array.isArray(lead.reasons)
+    || !Array.isArray(lead.unknowns)
+    || !Array.isArray(lead.emails)
+    || !Array.isArray(lead.phones)
+    || !Array.isArray(lead.signals)) return null;
+  return { ...lead, updatedAt: lead.updatedAt ?? lead.savedAt } as SavedCrmLead;
 }
