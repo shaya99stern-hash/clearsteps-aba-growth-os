@@ -1,0 +1,49 @@
+name: Refresh Postgres dependencies once
+
+on:
+  push:
+    branches:
+      - feat/clearsteps-intelligence-os-v1
+    paths:
+      - .github/db-deps-trigger
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/clearsteps-intelligence-os-v1
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Generate package and lockfile changes
+        run: |
+          npm pkg set type=module
+          npm pkg set scripts.postinstall="prisma generate"
+          npm install @prisma/adapter-pg@7.8.0 pg@8 --save
+          npm install @types/pg@8 --save-dev
+
+      - name: Commit dependency files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          if git diff --cached --quiet; then
+            echo "Dependency files already current."
+            exit 0
+          fi
+          git commit -m "Add Prisma Postgres driver adapter"
+          git push origin HEAD:feat/clearsteps-intelligence-os-v1
