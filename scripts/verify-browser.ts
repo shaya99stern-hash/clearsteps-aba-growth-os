@@ -77,7 +77,12 @@ async function verifyDesktopCrm(baseUrl: string) {
     const seededRecord = page.getByText("Browser Test Pediatrics", { exact: true }).first();
     await seededRecord.waitFor({ state: "visible", timeout: 10_000 });
     assert.equal(await seededRecord.innerText(), "Browser Test Pediatrics", "seeded CRM record should render after hydration");
-    await assertVisibleKeyboardFocus(page, page.getByPlaceholder("Search name, stage, location, contact…"), "CRM search");
+    await assertVisibleKeyboardFocus(
+      page,
+      page.getByPlaceholder("Search name, stage, location, contact…"),
+      "CRM search",
+      page.locator(".crmSearchField"),
+    );
 
     await page.getByPlaceholder("Search name, stage, location, contact…").fill("pediatrics");
     assert.equal(await page.getByText("1 shown", { exact: true }).innerText(), "1 shown");
@@ -155,9 +160,14 @@ async function assertNoBodyOverflow(page: Page, label: string) {
   );
 }
 
-async function assertVisibleKeyboardFocus(_page: Page, locator: Locator, label: string) {
-  await locator.focus();
-  const focus = await locator.evaluate((element) => {
+async function assertVisibleKeyboardFocus(
+  _page: Page,
+  focusLocator: Locator,
+  label: string,
+  indicatorLocator: Locator = focusLocator,
+) {
+  await focusLocator.focus();
+  const focus = await indicatorLocator.evaluate((element) => {
     const style = getComputedStyle(element);
     return {
       outlineStyle: style.outlineStyle,
