@@ -1,3 +1,5 @@
+import { validatePublicHttpUrl } from "./network-safety";
+import { robotsAllows } from "./robots";
 import type { EnrichedWebsite } from "./source-types";
 
 type BrowserModule = {
@@ -30,6 +32,8 @@ export async function playwrightAvailable() {
 }
 
 export async function collectPublicPageWithPlaywright(url: string): Promise<EnrichedWebsite> {
+  const safeUrl = await validatePublicHttpUrl(url);
+  if (!safeUrl || !(await robotsAllows(safeUrl))) throw new Error("Public crawl policy blocked this URL.");
   const playwright = await loadPlaywright();
   if (!playwright) {
     throw new Error("Playwright runtime is not installed. Fetch-based collectors remain available.");
@@ -40,14 +44,14 @@ export async function collectPublicPageWithPlaywright(url: string): Promise<Enri
     const page = await browser.newPage({
       userAgent: "ClearStepsResearch/1.0 (+public-data; contact=internal)",
     });
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 20_000 });
+    await page.goto(safeUrl, { waitUntil: "domcontentloaded", timeout: 20_000 });
     const [title, bodyText] = await Promise.all([
       page.title(),
       page.locator("body").innerText({ timeout: 5_000 }).catch(() => ""),
     ]);
     const html = await page.content();
     return {
-      url,
+      url: safeUrl,
       finalUrl: page.url(),
       title,
       emails: extractEmails(`${bodyText}\n${html}`),

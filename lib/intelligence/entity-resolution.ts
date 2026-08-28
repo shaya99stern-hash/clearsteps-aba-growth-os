@@ -7,7 +7,7 @@ export function resolveSearchHits(
 ): ResolvedLead[] {
   const buckets = new Map<string, Array<(typeof rows)[number]>>();
   for (const row of rows) {
-    const key = entityKey(row.hit);
+    const key = entityKey(row.hit, row.lane);
     const current = buckets.get(key) ?? [];
     current.push(row);
     buckets.set(key, current);
@@ -28,7 +28,7 @@ function toLead(
   const evidence: SearchEvidence[] = matches.map(({ hit, lane }, index) => ({
     id: `${key}-${index + 1}`,
     sourceId: hit.sourceId,
-    title: hit.title,
+    title: lane === "community" ? "Public community discussion" : hit.title,
     url: hit.url,
     snippet: redactCommunityIdentity(hit.snippet, lane),
     query: hit.query,
@@ -75,7 +75,7 @@ function toLead(
 
   return {
     id: key,
-    name: cleanName(first.hit.title),
+    name: kind === "community_signal" ? "Area-level public community demand signal" : cleanName(first.hit.title),
     kind,
     domain,
     website: first.hit.url,
@@ -99,10 +99,17 @@ function toLead(
   };
 }
 
-function entityKey(hit: PublicSearchHit) {
+function entityKey(hit: PublicSearchHit, lane: SearchLane) {
+  if (lane === "community") return `community-${slug(hit.url)}`;
   const domain = getDomain(hit.url);
-  if (domain) return `domain-${slug(domain)}`;
-  return `name-${slug(hit.title)}`;
+  if (domain && !isAggregatorDomain(domain)) return `domain-${slug(domain)}`;
+  return `name-${slug(hit.title)}-${slug(domain ?? "")}`;
+}
+
+function isAggregatorDomain(domain: string) {
+  return ["reddit.com", "facebook.com", "linkedin.com", "youtube.com", "yelp.com", "google.com"].some(
+    (item) => domain === item || domain.endsWith(`.${item}`),
+  );
 }
 
 function getDomain(value: string) {

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { buildSearchPlan } from "@/lib/intelligence/query-planner";
 import { getSourceRegistry } from "@/lib/intelligence/source-registry";
 
@@ -6,12 +7,14 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => ({}))) as { query?: string; location?: string };
-  const query = body.query?.trim();
-  const location = body.location?.trim() ?? "";
-  if (!query || query.length < 3) {
-    return NextResponse.json({ ok: false, error: "Enter a research request." }, { status: 400 });
+  const parsed = z.object({
+    query: z.string().trim().min(3).max(1_000),
+    location: z.string().trim().max(160).optional().default(""),
+  }).safeParse(await request.json().catch(() => ({})));
+  if (!parsed.success) {
+    return NextResponse.json({ ok: false, error: "Enter a valid research request." }, { status: 400 });
   }
+  const { query, location } = parsed.data;
 
   return NextResponse.json({
     ok: true,

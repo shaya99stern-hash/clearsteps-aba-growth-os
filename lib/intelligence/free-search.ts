@@ -1,3 +1,5 @@
+import { isObviouslyPublicHttpUrl, validatePublicHttpUrl } from "./network-safety";
+import { robotsAllows } from "./robots";
 import type { EnrichedWebsite, PublicSearchHit } from "./source-types";
 
 const SEARCH_ENDPOINT = "https://html.duckduckgo.com/html/";
@@ -26,8 +28,8 @@ export async function searchPublicWeb(query: string, limit = 8): Promise<PublicS
 }
 
 export async function enrichPublicWebsite(url: string): Promise<EnrichedWebsite | null> {
-  const safeUrl = safeHttpUrl(url);
-  if (!safeUrl) return null;
+  const safeUrl = await validatePublicHttpUrl(url);
+  if (!safeUrl || !(await robotsAllows(safeUrl))) return null;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 9_000);
@@ -65,7 +67,7 @@ function parseDuckDuckGo(html: string, query: string): PublicSearchHit[] {
   while ((match = resultPattern.exec(html)) && hits.length < 20) {
     const rawUrl = decodeHtml(match[1]);
     const resolvedUrl = unwrapDuckDuckGoUrl(rawUrl);
-    if (!safeHttpUrl(resolvedUrl)) continue;
+    if (!isObviouslyPublicHttpUrl(resolvedUrl)) continue;
     hits.push({
       title: htmlToText(match[2]).slice(0, 240),
       url: resolvedUrl,
@@ -89,28 +91,6 @@ function unwrapDuckDuckGoUrl(value: string) {
     return target ? decodeURIComponent(target) : url.toString();
   } catch {
     return value;
-  }
-}
-
-function safeHttpUrl(value: string) {
-  try {
-    const url = new URL(value);
-    if (!["http:", "https:"].includes(url.protocol)) return null;
-    const host = url.hostname.toLowerCase();
-    if (
-      host === "localhost" ||
-      host.endsWith(".local") ||
-      host === "0.0.0.0" ||
-      host === "::1" ||
-      /^127\./.test(host) ||
-      /^10\./.test(host) ||
-      /^192\.168\./.test(host) ||
-      /^169\.254\./.test(host) ||
-      /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)
-    ) return null;
-    return url.toString();
-  } catch {
-    return null;
   }
 }
 

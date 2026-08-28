@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { buildSearchPlan } from "@/lib/intelligence/query-planner";
 import { enrichPublicWebsite, searchPublicWeb } from "@/lib/intelligence/free-search";
 import { resolveSearchHits } from "@/lib/intelligence/entity-resolution";
@@ -10,18 +11,15 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => ({}))) as {
-    query?: string;
-    location?: string;
-    maxResults?: number;
-  };
-  const query = body.query?.trim();
-  const location = body.location?.trim() ?? "";
-  const maxResults = Math.max(3, Math.min(Number(body.maxResults ?? 18), 40));
-  if (!query || query.length < 3) {
-    return NextResponse.json({ ok: false, error: "Enter a research request." }, { status: 400 });
+  const parsed = z.object({
+    query: z.string().trim().min(3).max(1_000),
+    location: z.string().trim().max(160).optional().default(""),
+    maxResults: z.coerce.number().int().min(3).max(40).optional().default(18),
+  }).safeParse(await request.json().catch(() => ({})));
+  if (!parsed.success) {
+    return NextResponse.json({ ok: false, error: "Enter a valid research request and location." }, { status: 400 });
   }
-
+  const { query, location, maxResults } = parsed.data;
   const plan = buildSearchPlan(query, location);
   const sourceStatus = [
     { source: "Public Web Search", status: "working" as const, detail: "API-key-free HTML search" },
@@ -36,19 +34,26 @@ export async function POST(request: Request) {
   }> = [];
   const errors: string[] = [];
 
-  for (const planQuery of plan.queries) {
-    try {
-      const hits = await searchPublicWeb(planQuery.query, 5);
-      rows.push(...hits.map((hit) => ({ lane: planQuery.lane, hit })));
-      if (rows.length >= maxResults * 3) break;
-    } catch (error) {
-      errors.push(`${planQuery.lane}: ${error instanceof Error ? error.message : "search failed"}`);
+  const searchQueries = plan.queries.slice(0, 10);
+  for (let index = 0; index < searchQueries.length; index += 3) {
+    const batch = searchQueries.slice(index, index + 3);
+    const results = await Promise.all(batch.map(async (planQuery) => {
+      try {
+        return { planQuery, hits: await searchPublicWeb(planQuery.query, 5), error: null as string | null };
+      } catch (error) {
+        return { planQuery, hits: [], error: error instanceof Error ? error.message : "search failed" };
+      }
+    }));
+    for (const result of results) {
+      if (result.error) errors.push(`${result.planQuery.lane}: ${result.error}`);
+      rows.push(...result.hits.map((hit) => ({ lane: result.planQuery.lane, hit })));
     }
+    if (rows.length >= maxResults * 3) break;
   }
 
   const uniqueForEnrichment = Array.from(
     new Map(rows.map((row) => [safeDomain(row.hit.url) ?? row.hit.url, row])).values(),
-  ).slice(0, 10);
+  ).slice(0, 6);
 
   await Promise.all(uniqueForEnrichment.map(async (row) => {
     row.enrichment = await enrichPublicWebsite(row.hit.url);

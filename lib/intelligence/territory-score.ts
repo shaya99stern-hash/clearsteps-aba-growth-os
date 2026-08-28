@@ -46,19 +46,20 @@ export function inferTerritorySignals(leads: ResolvedLead[]): TerritorySignalInp
   const talent = leads.filter((lead) => lead.kind === "candidate");
   const waitlistMentions = leads.filter((lead) => lead.signals.includes("waitlist") || lead.signals.includes("wait list"));
   const abaProviders = organizations.filter((lead) => lead.signals.includes("aba") || lead.signals.includes("applied behavior"));
+  const providerEvidenceSufficient = organizations.length >= 3;
   const evidenceConfidence = leads.length ? average(leads.map((lead) => lead.confidence)) : 0;
 
   return {
     communityDemand: scaled(community.length, 12),
-    childPopulation: 40,
+    childPopulation: 0,
     referralDensity: scaled(referral.length, 18),
     developmentalProviderDensity: scaled(leads.filter((lead) =>
       ["psychologist", "evaluation", "pediatric", "speech", "occupational", "early intervention"].some((signal) => lead.signals.includes(signal)),
     ).length, 16),
-    abaProviderScarcity: Math.max(15, 100 - scaled(abaProviders.length, 14)),
+    abaProviderScarcity: providerEvidenceSufficient ? Math.max(15, 100 - scaled(abaProviders.length, 14)) : 0,
     waitlistCapacity: scaled(waitlistMentions.length, 8),
     talentPressure: scaled(talent.length + leads.filter((lead) => lead.signals.includes("hiring")).length, 12),
-    trend: 50,
+    trend: 0,
     evidenceConfidence,
   };
 }
