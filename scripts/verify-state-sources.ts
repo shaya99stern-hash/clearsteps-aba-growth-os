@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import {
   parseMissouriChildCareFeatures,
   buildMissouriChildCareObservations,
+  missouriChildCareToSearchHits,
 } from "../lib/intelligence/official/mo-child-care-gis";
 import { stateSourceSelection } from "../lib/intelligence/official/state-source-selection";
+import { resolveSearchHits } from "../lib/intelligence/entity-resolution";
 
 const payload = {
   features: [
@@ -96,5 +98,16 @@ assert.deepEqual(
 assert.equal(stateSourceSelection("MO", "rbt").missouriChildCare, false, "RBT recruiting should not run the child-care collector");
 assert.equal(stateSourceSelection("MO", "bcba").missouriChildCare, false, "BCBA recruiting should not run the child-care collector");
 assert.equal(stateSourceSelection("KS", "client").missouriChildCare, false, "Kansas research must never call the Missouri collector");
+
+const twoProviders = [
+  providers[0],
+  { ...providers[0], id: "001234568", licenseId: "001234568", name: "Second Steps Preschool", address: "101 Main St" },
+];
+const resolvedFacilities = resolveSearchHits(
+  missouriChildCareToSearchHits(twoProviders, "Kansas City, MO").map((hit) => ({ lane: "referral" as const, hit, enrichment: null })),
+  "Kansas City, MO",
+);
+assert.equal(resolvedFacilities.length, 2, "state GIS evidence host must not collapse distinct facilities into one entity");
+assert.deepEqual(resolvedFacilities.map((lead) => lead.name).sort(), ["Purple Steps Preschool", "Second Steps Preschool"]);
 
 console.log("Missouri/Kansas state source verification passed.");
