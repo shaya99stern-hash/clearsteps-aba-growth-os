@@ -26,6 +26,7 @@ type SearchResponse = {
 };
 
 const DEFAULT_QUERY = "Find underserved ABA territories and the strongest daycare, psychologist, pediatric and community referral opportunities.";
+const FOCUS_RING = "focus:ring-2 focus:ring-[#d77a59] focus:ring-inset";
 
 export function ScoutWorkbench() {
   const [query, setQuery] = useState(DEFAULT_QUERY);
@@ -80,6 +81,7 @@ export function ScoutWorkbench() {
 
         <div className="scoutComposer">
           <textarea
+            className={FOCUS_RING}
             aria-label="Research request"
             rows={4}
             value={query}
@@ -89,7 +91,13 @@ export function ScoutWorkbench() {
           <div className="composerMeta">
             <label className="locationField">
               <MapPinned size={15} />
-              <input aria-label="Target location" value={location} onChange={(event) => setLocation(event.target.value)} placeholder="City, ZIP, county or state" />
+              <input
+                className={FOCUS_RING}
+                aria-label="Target location"
+                value={location}
+                onChange={(event) => setLocation(event.target.value)}
+                placeholder="City, ZIP, county or state"
+              />
             </label>
             <div className="composerActions">
               <button type="button" className="quietButton"><Filter size={15} /> Filters</button>
