@@ -166,9 +166,10 @@ async function persistDraft(draft: SavedOutreachDraft) {
     }
     if (!response.ok) return;
     const json = await response.json() as { draft?: unknown };
-    if (!isSavedDraft(json.draft)) return;
+    const durableDraft = json.draft;
+    if (!isSavedDraft(durableDraft)) return;
     const current = loadOutreachWorkspace();
-    writeState({ ...current, drafts: [json.draft, ...current.drafts.filter((item) => item.id !== json.draft!.id)] });
+    writeState({ ...current, drafts: [durableDraft, ...current.drafts.filter((item) => item.id !== durableDraft.id)] });
   } catch {
     // Browser storage remains the operational fallback until a later sync.
   }
