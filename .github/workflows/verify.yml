@@ -35,6 +35,9 @@ jobs:
       - name: Verify task rules
         run: npx tsx scripts/verify-tasks.ts
 
+      - name: Verify outreach rules
+        run: npx tsx scripts/verify-outreach.ts
+
       - name: Validate Prisma schema
         run: npx prisma validate
 
