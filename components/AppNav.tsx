@@ -2,9 +2,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Database, KanbanSquare, Mail, Map, Search, Settings, SquareCheckBig, Users } from "lucide-react";
+import { Activity, Database, KanbanSquare, Mail, Map, Search, Settings, SquareCheckBig, Users, type LucideIcon } from "lucide-react";
 
-const navGroups = [
+type WorkspaceNavItem = {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+};
+
+type WorkspaceNavGroup = {
+  label: string;
+  items: WorkspaceNavItem[];
+};
+
+const navGroups: WorkspaceNavGroup[] = [
   {
     label: "Discover",
     items: [
@@ -29,7 +40,7 @@ const navGroups = [
       { label: "Settings", href: "/settings", icon: Settings },
     ],
   },
-] as const;
+];
 
 export const navItems = navGroups.flatMap((group) => group.items);
 
