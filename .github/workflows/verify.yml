@@ -32,6 +32,9 @@ jobs:
       - name: Verify intelligence rules
         run: npm run verify:intelligence
 
+      - name: Verify task rules
+        run: npx tsx scripts/verify-tasks.ts
+
       - name: Validate Prisma schema
         run: npx prisma validate
 
