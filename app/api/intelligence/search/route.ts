@@ -6,6 +6,7 @@ import { enrichPublicWebsite, searchPublicWeb } from "@/lib/intelligence/free-se
 import { resolveSearchHits } from "@/lib/intelligence/entity-resolution";
 import { inferTerritorySignals, scoreTerritory } from "@/lib/intelligence/territory-score";
 import { playwrightAvailable } from "@/lib/intelligence/browser-collector";
+import { searchNjChildCare } from "@/lib/intelligence/official/nj-childcare";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,10 +25,10 @@ export async function POST(request: Request) {
   const policy = evaluateResearchRequest(query);
   if (!policy.allowed) return NextResponse.json({ ok: false, error: policy.reason }, { status: 400 });
   const plan = buildSearchPlan(query, location);
-  const sourceStatus = [
-    { source: "Public Web Search", status: "working" as const, detail: "API-key-free HTML search" },
-    { source: "Public Website Enrichment", status: "working" as const, detail: "contact/service cross-reference" },
-    { source: "Community Signal Scan", status: "working" as const, detail: "territory-level public signals only" },
+  const sourceStatus: Array<{ source: string; status: "working" | "complete" | "unavailable"; detail: string }> = [
+    { source: "Public Web Search", status: "working", detail: "API-key-free HTML search" },
+    { source: "Public Website Enrichment", status: "working", detail: "contact/service cross-reference" },
+    { source: "Community Signal Scan", status: "working", detail: "territory-level public signals only" },
   ];
 
   const rows: Array<{
@@ -36,6 +37,22 @@ export async function POST(request: Request) {
     enrichment?: Awaited<ReturnType<typeof enrichPublicWebsite>>;
   }> = [];
   const errors: string[] = [];
+
+  if (isNewJerseyTarget(query, location)) {
+    try {
+      const childcareHits = await searchNjChildCare(location || query, Math.min(maxResults, 30));
+      rows.push(...childcareHits.map((hit) => ({ lane: "referral" as const, hit })));
+      sourceStatus.push({
+        source: "NJ Licensed Child Care",
+        status: "complete",
+        detail: `${childcareHits.length} official DCF open-data matches`,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "NJ licensed child-care source failed";
+      errors.push(`referral: ${message}`);
+      sourceStatus.push({ source: "NJ Licensed Child Care", status: "unavailable", detail: message });
+    }
+  }
 
   const searchQueries = plan.queries.slice(0, 10);
   for (let index = 0; index < searchQueries.length; index += 3) {
@@ -78,7 +95,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     ok: true,
     plan,
-    sourceStatus: sourceStatus.map((source) => ({ ...source, status: "complete" })),
+    sourceStatus: sourceStatus.map((source) => source.status === "working" ? { ...source, status: "complete" as const } : source),
     browser: {
       source: "Playwright Public Browser",
       status: browserReady ? "complete" : "unavailable",
@@ -97,4 +114,8 @@ function safeDomain(value: string) {
   } catch {
     return undefined;
   }
+}
+
+function isNewJerseyTarget(query: string, location: string) {
+  return /\b(NJ|New Jersey)\b/i.test(`${location} ${query}`);
 }
