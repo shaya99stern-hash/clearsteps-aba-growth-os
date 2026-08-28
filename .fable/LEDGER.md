@@ -17,20 +17,30 @@
 
 ## Card CS-004 — Playwright browser acquisition
 **Goal:** Enable public JS-rendered forms/pages as an optional acquisition method.
-**Acceptance:** runtime reports Playwright availability and browser collector works when dependency/browser are installed.
-**Status:** adapter implemented; package/browser installation remains a follow-up deployment concern.
+**Acceptance:** runtime reports real browser availability and the browser collector can launch installed Chromium, while blocking private-network requests and revalidating final navigation targets.
+**Status:** implemented and verified with real chromium-headless-shell launch in GitHub Actions run `33150961118`.
 
 ## Card CS-005 — Official source adapters
 **Goal:** Add free authoritative sources that improve referral/provider evidence beyond general web search.
 **Acceptance:** NJ licensed child-care records can join Scout referral discovery; CMS/NPPES current download files are discoverable without hardcoded dated URLs; parsers have deterministic fixture tests.
-**Status:** implemented and verified in GitHub Actions run `33142651757`.
+**Status:** implemented and verified in GitHub Actions.
 
 ## Card CS-006 — Operational Sources surface
 **Goal:** Expose live source capability/health inside Clear Steps rather than hiding connector state in code.
 **Acceptance:** app route/API reports source purpose, method, availability, official-source freshness/details, and optional browser readiness without requiring paid keys.
-**Status:** active.
+**Status:** implemented and build-verified.
 
 ## Card CS-007 — Durable CRM persistence
-**Goal:** Move CRM/research history from browser-only storage to durable server persistence while preserving a usable fallback.
-**Acceptance:** production-capable repository adapter and server routes persist eligible CRM records without placing intelligence-only community/talent signals into outreach records.
-**Status:** planned; production database provider/driver still unresolved in this tool surface.
+**Goal:** Move CRM from browser-only storage to durable server persistence while preserving a usable fallback.
+**Acceptance:** production-capable PostgreSQL/Prisma repository and server routes persist only eligible CRM records; browser storage remains functional when `DATABASE_URL` is absent.
+**Status:** implemented and build-verified; initial PostgreSQL migration exists. Production database attachment remains deployment configuration, not an application-code blocker.
+
+## Card CS-008 — Operational Tasks workspace
+**Goal:** Replace the Tasks placeholder with a ClickUp-style local-first operational board linked to CRM records.
+**Acceptance:** user can create tasks with priority/due date, optionally link a saved CRM record, move tasks through Open → In Progress → Done, retain them in browser storage, and automatically sync/merge PostgreSQL tasks when durable storage is configured.
+**Status:** active. Durable repository/API are implemented; client board and local-first sync are next.
+
+## Card CS-009 — Outreach preparation OS
+**Goal:** Replace the Outreach placeholder with a compliant campaign/draft preparation workflow for eligible organization/professional contacts.
+**Acceptance:** user can build a segment from outreach-eligible CRM records, prepare reviewed message drafts, and preserve suppression/manual-review boundaries without enabling uncontrolled bulk sending.
+**Status:** planned after CS-008 verification.
