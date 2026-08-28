@@ -1,8 +1,6 @@
 import { getPrisma } from "@/lib/db/prisma";
 import {
   normalizeOutreachEmail,
-  outreachDraftInputSchema,
-  outreachSuppressionInputSchema,
   prepareReferralRecipient,
   type OutreachDraftInput,
   type OutreachSuppressionInput,
