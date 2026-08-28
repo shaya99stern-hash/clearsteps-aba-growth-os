@@ -4,7 +4,14 @@ import { useEffect, useMemo, useState, useSyncExternalStore, type FormEvent } fr
 import { Check, ChevronRight, Mail, Plus, ShieldCheck, UserRoundCheck } from "lucide-react";
 import { getServerCrmLeads, loadCrmLeads, subscribeCrmLeads, syncDurableCrmLeads } from "@/lib/crm/local-store";
 import { prepareReferralRecipient, renderOutreachTemplate, type PreparedReferralRecipient } from "@/lib/outreach/model";
-import { addOutreachSuppression, getServerOutreachWorkspace, loadOutreachWorkspace, saveOutreachDraft, subscribeOutreachWorkspace } from "@/lib/outreach/local-store";
+import {
+  addOutreachSuppression,
+  getServerOutreachWorkspace,
+  loadOutreachWorkspace,
+  saveOutreachDraft,
+  subscribeOutreachWorkspace,
+  syncDurableOutreachWorkspace,
+} from "@/lib/outreach/local-store";
 import styles from "./OutreachWorkbench.module.css";
 
 const PRESETS = [
@@ -47,6 +54,7 @@ export function OutreachWorkbench() {
 
   useEffect(() => {
     void syncDurableCrmLeads();
+    void syncDurableOutreachWorkspace();
   }, []);
 
   const suppressions = useMemo(() => new Set(workspace.suppressions), [workspace.suppressions]);
@@ -240,7 +248,7 @@ export function OutreachWorkbench() {
       <section className={styles.savedDrafts}>
         <header className={styles.panelHeader}>
           <div>
-            <span className={styles.eyebrow}>Saved locally</span>
+            <span className={styles.eyebrow}>Local-first · durable when PostgreSQL is connected</span>
             <h2>Reviewed campaign drafts</h2>
           </div>
           <strong>{workspace.drafts.length}</strong>
