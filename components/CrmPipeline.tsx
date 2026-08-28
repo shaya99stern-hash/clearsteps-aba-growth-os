@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowRight, Columns3, ExternalLink, List, Mail, Phone, Search, X } from "lucide-react";
 import {
   getServerCrmLeads,
@@ -17,12 +17,15 @@ import { crmStageProgress, filterCrmWorkspace, summarizeCrmWorkspace } from "@/l
 const REFERRAL_STAGES: PipelineStage[] = ["Discovered", "Researched", "Qualified", "Contact Ready", "Outreach", "Engaged", "Referral Partner", "Referral Received"];
 const TALENT_STAGES: TalentStage[] = ["Discovered", "Verified", "Contacted", "Replied", "Screen", "Interview", "Credentialing", "Hired"];
 const dateFormatter = new Intl.DateTimeFormat("en", { month: "short", day: "numeric" });
+const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export function CrmPipeline({ mode }: { mode: "referral" | "talent" }) {
   const leads = useSyncExternalStore(subscribeCrmLeads, loadCrmLeads, getServerCrmLeads);
   const [view, setView] = useState<"board" | "list">("board");
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const drawerRef = useRef<HTMLElement | null>(null);
+  const openerRef = useRef<HTMLButtonElement | null>(null);
   const filtered = useMemo(() => filterCrmWorkspace(leads, mode, query), [leads, mode, query]);
   const summary = useMemo(() => summarizeCrmWorkspace(leads, mode), [leads, mode]);
   const selected = useMemo(() => leads.find((lead) => lead.id === selectedId && lead.pipeline === mode) ?? null, [leads, mode, selectedId]);
@@ -36,18 +39,69 @@ export function CrmPipeline({ mode }: { mode: "referral" | "talent" }) {
   }, []);
 
   useEffect(() => {
-    if (!selected) return;
+    if (!selectedId) return;
+    const dialog = drawerRef.current;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const initialFocus = dialog?.querySelector<HTMLElement>("[data-crm-initial-focus]") ?? dialog;
+    requestAnimationFrame(() => initialFocus?.focus());
+
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setSelectedId(null);
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setSelectedId(null);
+        return;
+      }
+      if (event.key !== "Tab" || !dialog) return;
+
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+        .filter((element) => !element.hasAttribute("disabled") && element.getAttribute("aria-hidden") !== "true");
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (!dialog.contains(active)) {
+        event.preventDefault();
+        first.focus();
+      } else if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
+
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [selected]);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      const opener = openerRef.current;
+      requestAnimationFrame(() => {
+        if (opener?.isConnected) opener.focus();
+      });
+    };
+  }, [selectedId]);
 
   function advance(lead: SavedCrmLead) {
     const index = stages.indexOf(lead.stage);
     if (index < 0 || index >= stages.length - 1) return;
     updateCrmStage(lead.id, stages[index + 1]);
+  }
+
+  function openDetails(id: string, trigger: HTMLButtonElement) {
+    openerRef.current = trigger;
+    setSelectedId(id);
+  }
+
+  function closeDetails() {
+    setSelectedId(null);
   }
 
   return (
@@ -89,7 +143,7 @@ export function CrmPipeline({ mode }: { mode: "referral" | "talent" }) {
                   <div className="boardCards">
                     {stageLeads.map((lead) => (
                       <article className="crmCard" key={lead.id}>
-                        <button type="button" className="crmCardOpen" onClick={() => setSelectedId(lead.id)} aria-label={`Open ${lead.name} details`}>
+                        <button type="button" className="crmCardOpen" onClick={(event) => openDetails(lead.id, event.currentTarget)} aria-label={`Open ${lead.name} details`}>
                           <div className="crmCardTopline">
                             <div className="crmScore">{lead.score}</div>
                             <span>{lead.confidence}% conf.</span>
@@ -122,7 +176,7 @@ export function CrmPipeline({ mode }: { mode: "referral" | "talent" }) {
             <tbody>
               {filtered.map((lead) => (
                 <tr key={lead.id}>
-                  <td><button type="button" className="crmNameButton" onClick={() => setSelectedId(lead.id)}><strong>{lead.name}</strong><span>{lead.location || lead.domain || lead.kind}</span></button></td>
+                  <td><button type="button" className="crmNameButton" onClick={(event) => openDetails(lead.id, event.currentTarget)}><strong>{lead.name}</strong><span>{lead.location || lead.domain || lead.kind}</span></button></td>
                   <td><span className="crmStagePill">{lead.stage}</span></td>
                   <td><b className="crmListScore">{lead.score}</b></td>
                   <td><span className="crmContactValue">{lead.emails[0] || lead.phones[0] || "—"}</span></td>
@@ -137,15 +191,15 @@ export function CrmPipeline({ mode }: { mode: "referral" | "talent" }) {
       )}
 
       {selected && (
-        <div className="crmDrawerBackdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) setSelectedId(null); }}>
-          <aside className="crmDrawer" role="dialog" aria-modal="true" aria-labelledby="crm-drawer-title">
+        <div className="crmDrawerBackdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) closeDetails(); }}>
+          <aside ref={drawerRef} tabIndex={-1} className="crmDrawer" role="dialog" aria-modal="true" aria-labelledby="crm-drawer-title">
             <header className="crmDrawerHeader">
               <div>
                 <span className="eyebrow">{selected.pipeline === "referral" ? "Referral relationship" : "Talent relationship"}</span>
                 <h2 id="crm-drawer-title">{selected.name}</h2>
                 <p>{selected.location || selected.domain || selected.kind}</p>
               </div>
-              <button type="button" className="iconButton" onClick={() => setSelectedId(null)} aria-label="Close CRM details"><X size={17} /></button>
+              <button type="button" className="iconButton" data-crm-initial-focus onClick={closeDetails} aria-label="Close CRM details"><X size={17} /></button>
             </header>
 
             <div className="crmDrawerScore">
