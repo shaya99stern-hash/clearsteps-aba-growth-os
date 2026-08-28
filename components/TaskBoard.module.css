@@ -71,6 +71,16 @@
   outline: 0;
 }
 
+.composerLead input:focus-visible,
+.composer textarea:focus-visible,
+.composerMeta select:focus-visible,
+.composerMeta input:focus-visible,
+.addButton:focus-visible,
+.cardFooter button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .composerLead input {
   width: 100%;
   font-size: 16px;
