@@ -1,0 +1,381 @@
+.workspace {
+  display: grid;
+  gap: 16px;
+}
+
+.summaryStrip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--border);
+}
+
+.summaryStrip > div {
+  background: var(--surface);
+  padding: 13px 15px;
+}
+
+.summaryStrip span {
+  display: block;
+  color: var(--tertiary);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: .09em;
+}
+
+.summaryStrip strong {
+  display: block;
+  margin-top: 5px;
+  font-family: ui-serif, "New York", Georgia, serif;
+  font-size: 24px;
+  font-weight: 560;
+}
+
+.composer {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: var(--card);
+  box-shadow: 0 18px 52px rgba(0,0,0,.22);
+}
+
+.composerLead {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 14px 14px 0;
+}
+
+.composerIcon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  background: var(--soft);
+  color: var(--accent);
+  border: 1px solid var(--border);
+}
+
+.composerLead input,
+.composer textarea,
+.composerMeta select,
+.composerMeta input {
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  outline: 0;
+}
+
+.composerLead input {
+  width: 100%;
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.composerLead input::placeholder,
+.composer textarea::placeholder {
+  color: #77736b;
+}
+
+.composer textarea {
+  width: calc(100% - 60px);
+  margin: 8px 14px 0 60px;
+  padding: 0 0 10px;
+  resize: vertical;
+  min-height: 52px;
+  color: var(--secondary);
+  line-height: 1.45;
+  font-size: 12px;
+}
+
+.composerMeta {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  padding: 11px 12px 12px;
+  border-top: 1px solid var(--border);
+  background: rgba(0,0,0,.08);
+}
+
+.composerMeta label {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.composerMeta label > span {
+  color: var(--tertiary);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.composerMeta select,
+.composerMeta input {
+  width: 100%;
+  min-width: 0;
+  color-scheme: dark;
+  font-size: 11px;
+}
+
+.linkField {
+  flex: 1;
+}
+
+.addButton {
+  min-height: 48px;
+  padding: 0 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--text);
+  color: #111;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.addButton:disabled {
+  opacity: .35;
+  cursor: default;
+}
+
+.boardScroller {
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scrollbar-width: thin;
+}
+
+.board {
+  min-width: 880px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(280px, 1fr));
+  gap: 10px;
+}
+
+.column {
+  min-height: 420px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.columnHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+.columnHeader span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.columnHeader b {
+  min-width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--soft);
+  color: var(--tertiary);
+  font-size: 9px;
+}
+
+.cards {
+  display: grid;
+  gap: 8px;
+  padding: 9px;
+}
+
+.card {
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: var(--card);
+  box-shadow: 0 10px 28px rgba(0,0,0,.12);
+}
+
+.cardTopline,
+.cardFooter,
+.metaList {
+  display: flex;
+  align-items: center;
+}
+
+.cardTopline {
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.priority,
+.overdue {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 5px 7px;
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+}
+
+.priority {
+  background: var(--soft);
+  border: 1px solid var(--border);
+  color: var(--secondary);
+}
+
+.priority_urgent {
+  color: #ffc5c2;
+  border-color: rgba(255,116,112,.22);
+  background: rgba(255,116,112,.08);
+}
+
+.priority_high {
+  color: #ffd4b6;
+  border-color: rgba(215,122,89,.24);
+  background: rgba(215,122,89,.09);
+}
+
+.priority_low {
+  color: var(--tertiary);
+}
+
+.overdue {
+  color: #ffc5c2;
+  background: rgba(255,116,112,.08);
+}
+
+.card h3 {
+  margin: 11px 0 5px;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.card > p {
+  margin: 0;
+  color: var(--tertiary);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.metaList {
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 11px;
+}
+
+.metaList span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 6px 7px;
+  border-radius: 9px;
+  background: var(--soft);
+  color: var(--secondary);
+  font-size: 9px;
+}
+
+.cardFooter {
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.cardFooter > span {
+  color: var(--tertiary);
+  font-size: 8px;
+}
+
+.cardFooter button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--soft);
+  color: var(--secondary);
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.cardFooter button:disabled {
+  color: var(--tertiary);
+  cursor: default;
+  opacity: .65;
+}
+
+.emptyColumn {
+  min-height: 126px;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  color: var(--tertiary);
+  text-align: center;
+  font-size: 10px;
+}
+
+@media (max-width: 720px) {
+  .summaryStrip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .composerLead {
+    grid-template-columns: 30px minmax(0, 1fr);
+  }
+
+  .composerIcon {
+    width: 30px;
+    height: 30px;
+    border-radius: 10px;
+  }
+
+  .composer textarea {
+    width: calc(100% - 54px);
+    margin-left: 54px;
+  }
+
+  .composerMeta {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .linkField,
+  .addButton {
+    grid-column: 1 / -1;
+  }
+
+  .addButton {
+    width: 100%;
+  }
+
+  .board {
+    min-width: 820px;
+  }
+}
