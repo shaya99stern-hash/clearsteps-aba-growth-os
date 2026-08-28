@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { ArrowRight, ExternalLink } from "lucide-react";
-import { getServerCrmLeads, loadCrmLeads, subscribeCrmLeads, updateCrmStage, type PipelineStage, type SavedCrmLead, type TalentStage } from "@/lib/crm/local-store";
+import { getServerCrmLeads, loadCrmLeads, subscribeCrmLeads, syncDurableCrmLeads, updateCrmStage, type PipelineStage, type SavedCrmLead, type TalentStage } from "@/lib/crm/local-store";
 
 const REFERRAL_STAGES: PipelineStage[] = ["Discovered", "Researched", "Qualified", "Contact Ready", "Outreach", "Engaged", "Referral Partner", "Referral Received"];
 const TALENT_STAGES: TalentStage[] = ["Discovered", "Verified", "Contacted", "Replied", "Screen", "Interview", "Credentialing", "Hired"];
@@ -11,6 +11,10 @@ export function CrmPipeline({ mode }: { mode: "referral" | "talent" }) {
   const leads = useSyncExternalStore(subscribeCrmLeads, loadCrmLeads, getServerCrmLeads);
   const filtered = useMemo(() => leads.filter((lead) => lead.pipeline === mode), [leads, mode]);
   const stages: Array<PipelineStage | TalentStage> = mode === "referral" ? REFERRAL_STAGES : TALENT_STAGES;
+
+  useEffect(() => {
+    void syncDurableCrmLeads();
+  }, []);
 
   function advance(lead: SavedCrmLead) {
     const index = stages.indexOf(lead.stage);
