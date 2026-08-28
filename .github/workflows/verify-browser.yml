@@ -5,7 +5,10 @@ on:
     paths:
       - "lib/intelligence/browser-collector.ts"
       - "lib/intelligence/network-safety.ts"
-      - "app/api/intelligence/search/route.ts"
+      - "app/**/*.tsx"
+      - "app/globals.css"
+      - "components/**/*.tsx"
+      - "components/**/*.css"
       - "scripts/verify-browser.ts"
       - "package.json"
       - "package-lock.json"
@@ -16,7 +19,10 @@ on:
     paths:
       - "lib/intelligence/browser-collector.ts"
       - "lib/intelligence/network-safety.ts"
-      - "app/api/intelligence/search/route.ts"
+      - "app/**/*.tsx"
+      - "app/globals.css"
+      - "components/**/*.tsx"
+      - "components/**/*.css"
       - "scripts/verify-browser.ts"
       - "package.json"
       - "package-lock.json"
@@ -28,6 +34,7 @@ jobs:
     timeout-minutes: 15
     env:
       DATABASE_URL: postgresql://clearsteps:clearsteps@127.0.0.1:5432/clearsteps
+      CLEARSTEPS_UI_URL: http://127.0.0.1:3000
 
     steps:
       - name: Checkout
@@ -45,5 +52,22 @@ jobs:
       - name: Install Chromium shell
         run: npm run browser:install
 
-      - name: Launch Chromium smoke test
+      - name: Start Clear Steps
+        run: |
+          npm run dev -- --hostname 127.0.0.1 > /tmp/clearsteps-next.log 2>&1 &
+          echo $! > /tmp/clearsteps-next.pid
+          for i in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:3000/outreach > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/clearsteps-next.log
+          exit 1
+
+      - name: Launch Chromium and verify Clear Steps UI
         run: npm run verify:browser
+
+      - name: Show app log on failure
+        if: failure()
+        run: cat /tmp/clearsteps-next.log || true
