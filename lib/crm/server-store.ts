@@ -31,6 +31,7 @@ export const durableCrmLeadSchema = z.object({
   pipeline: z.enum(["referral", "talent"]),
   stage: z.string().trim().min(1).max(80),
   savedAt: z.string().datetime().optional(),
+  updatedAt: z.string().datetime().optional(),
 });
 
 export type DurableCrmLeadInput = z.infer<typeof durableCrmLeadSchema>;
@@ -125,6 +126,7 @@ function toClientLead(row: {
   unknownsJson: unknown;
   signalsJson: unknown;
   savedAt: Date;
+  updatedAt: Date;
 }) {
   return {
     id: row.sourceKey,
@@ -144,6 +146,7 @@ function toClientLead(row: {
     unknowns: asStringArray(row.unknownsJson),
     signals: asStringArray(row.signalsJson),
     savedAt: row.savedAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
   };
 }
 
