@@ -95,13 +95,25 @@ async function verifyDesktopCrm(baseUrl: string) {
     assert.equal(await page.locator(".crmTable").count(), 1, "List view should render the dense CRM table");
     await page.getByRole("button", { name: "Board", exact: true }).click();
 
-    await page.getByRole("button", { name: "Open Browser Test Pediatrics details" }).click();
-    await page.getByRole("dialog").waitFor({ state: "visible" });
-    assert.equal(await page.getByRole("dialog").count(), 1, "CRM record should open a detail drawer");
-    assert.equal(await page.getByRole("heading", { name: "Browser Test Pediatrics" }).innerText(), "Browser Test Pediatrics");
+    const opener = page.getByRole("button", { name: "Open Browser Test Pediatrics details" });
+    await opener.click();
+    const dialog = page.getByRole("dialog");
+    await dialog.waitFor({ state: "visible" });
+    assert.equal(await dialog.count(), 1, "CRM record should open a detail drawer");
+    assert.equal(
+      await dialog.getByRole("heading", { name: "Browser Test Pediatrics" }).innerText(),
+      "Browser Test Pediatrics",
+      "CRM drawer should expose the selected record heading",
+    );
+    assert.equal(
+      await dialog.evaluate((element) => element.contains(document.activeElement)),
+      true,
+      "opening a CRM drawer should move keyboard focus into the dialog",
+    );
     await page.keyboard.press("Escape");
-    await page.getByRole("dialog").waitFor({ state: "detached" });
+    await dialog.waitFor({ state: "detached" });
     assert.equal(await page.getByRole("dialog").count(), 0, "Escape should close the CRM detail drawer");
+    assert.equal(await opener.evaluate((element) => element === document.activeElement), true, "closing the CRM drawer should restore focus to its trigger");
   } finally {
     await context.close();
   }
