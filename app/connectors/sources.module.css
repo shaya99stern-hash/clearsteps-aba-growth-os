@@ -1,0 +1,35 @@
+.ops { display: grid; gap: 16px; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.stat { min-width: 0; display: flex; align-items: center; gap: 11px; padding: 14px; border: 1px solid var(--border); border-radius: 17px; background: var(--surface); }
+.stat > span { width: 34px; height: 34px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 11px; color: var(--accent); background: var(--soft); }
+.stat div { min-width: 0; display: grid; }
+.stat b { font-family: ui-serif, "New York", Georgia, serif; font-size: 25px; line-height: 1; }
+.stat small { margin-top: 4px; color: var(--tertiary); font-size: 9px; text-transform: uppercase; letter-spacing: .08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mesh { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.card { display: flex; flex-direction: column; gap: 13px; min-width: 0; padding: 16px; border: 1px solid var(--border); border-radius: 19px; background: var(--surface); }
+.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.top > div { min-width: 0; }
+.nameRow { display: flex; align-items: center; gap: 8px; }
+.nameRow h2 { margin: 0; font-size: 15px; line-height: 1.2; }
+.top p { margin: 7px 0 0; color: var(--tertiary); font-size: 10px; line-height: 1.5; }
+.health { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 999px; background: #666; }
+.health[data-health="ready"] { background: var(--ok); box-shadow: 0 0 0 4px rgba(140,207,149,.08); }
+.health[data-health="degraded"] { background: var(--accent); box-shadow: 0 0 0 4px rgba(215,122,89,.08); }
+.health[data-health="unavailable"] { background: var(--danger); }
+.stateBadge { flex: 0 0 auto; padding: 6px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--secondary); background: var(--soft); font-size: 8px; text-transform: uppercase; letter-spacing: .08em; }
+.policy { display: flex; flex-wrap: wrap; gap: 5px; }
+.policy span { padding: 5px 7px; border-radius: 999px; color: var(--secondary); background: var(--soft); font-size: 8px; text-transform: uppercase; letter-spacing: .06em; }
+.facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; border: 1px solid var(--border); border-radius: 13px; overflow: hidden; background: var(--border); gap: 1px; }
+.facts div { min-width: 0; padding: 10px; background: var(--soft); }
+.facts dt { color: var(--tertiary); font-size: 8px; text-transform: uppercase; letter-spacing: .07em; }
+.facts dd { margin: 4px 0 0; color: var(--secondary); font-size: 10px; overflow: hidden; text-overflow: ellipsis; }
+.runtime { margin: auto 0 0; padding-top: 1px; color: var(--secondary); font-size: 10px; line-height: 1.5; }
+.manifest { display: grid; grid-template-columns: 46px 1fr; gap: 13px; align-items: start; padding: 17px; border: 1px solid rgba(215,122,89,.18); border-radius: 19px; background: linear-gradient(135deg, rgba(215,122,89,.09), rgba(255,255,255,.02)); }
+.manifestIcon { width: 46px; height: 46px; display: grid; place-items: center; border-radius: 14px; color: var(--accent); background: var(--soft); border: 1px solid var(--border); }
+.manifest h2 { margin: 5px 0 5px; font-family: ui-serif, "New York", Georgia, serif; font-size: 21px; }
+.manifest p { margin: 0; color: var(--secondary); font-size: 11px; line-height: 1.45; }
+.manifestMeta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.manifestMeta span { padding: 6px 8px; border-radius: 999px; color: var(--tertiary); background: rgba(0,0,0,.14); border: 1px solid var(--border); font-size: 8px; }
+.checked { margin: -2px 2px 0; color: var(--tertiary); font-size: 9px; }
+@media (max-width: 760px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .mesh { grid-template-columns: 1fr; } }
+@media (max-width: 430px) { .facts { grid-template-columns: 1fr; } .top { gap: 7px; } }
