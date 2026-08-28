@@ -18,6 +18,7 @@ on:
       - feat/clearsteps-intelligence-os-v1
       - feat/clearsteps-intelligence-os-v2
       - feat/clearsteps-aba-engine-v3
+      - feat/clearsteps-aba-engine-v4
     paths:
       - "lib/intelligence/browser-collector.ts"
       - "lib/intelligence/network-safety.ts"
