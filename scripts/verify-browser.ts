@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chromium, type Page } from "playwright";
+import { chromium, type Locator, type Page } from "playwright";
 import { getPlaywrightRuntimeStatus } from "../lib/intelligence/browser-collector";
 
 const runtime = await getPlaywrightRuntimeStatus();
@@ -38,17 +38,29 @@ async function verifyClearStepsUi(baseUrl: string) {
       "activating the skip link should move focus to the main content landmark",
     );
 
-    const activeNav = page.locator('nav[aria-label="Clear Steps navigation"] a[aria-current="page"]');
-    assert.equal(await activeNav.count(), 1, "exactly one navigation item should expose aria-current=page");
-    assert.equal((await activeNav.innerText()).trim(), "Outreach");
+    await assertActiveNavigation(page, "Outreach");
+    await assertVisibleKeyboardFocus(page, page.getByLabel("Campaign name"), "Outreach campaign name");
+    await assertVisibleKeyboardFocus(page, page.getByLabel("Suppress an email"), "Outreach suppression email");
+
+    await page.goto(`${baseUrl}/tasks`, { waitUntil: "domcontentloaded" });
+    await assertNoBodyOverflow(page, "Tasks");
+    await assertActiveNavigation(page, "Tasks");
+    await assertVisibleKeyboardFocus(page, page.getByLabel("Task title"), "Task title");
 
     await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
     await assertNoBodyOverflow(page, "Scout");
+    await assertActiveNavigation(page, "Scout");
     await assertVisibleKeyboardFocus(page, page.locator('textarea[aria-label="Research request"]'), "Scout research request");
     await assertVisibleKeyboardFocus(page, page.locator('input[aria-label="Target location"]'), "Scout target location");
   } finally {
     await context.close();
   }
+}
+
+async function assertActiveNavigation(page: Page, expected: string) {
+  const activeNav = page.locator('nav[aria-label="Clear Steps navigation"] a[aria-current="page"]');
+  assert.equal(await activeNav.count(), 1, "exactly one navigation item should expose aria-current=page");
+  assert.equal((await activeNav.innerText()).trim(), expected);
 }
 
 async function assertNoBodyOverflow(page: Page, label: string) {
@@ -62,7 +74,7 @@ async function assertNoBodyOverflow(page: Page, label: string) {
   );
 }
 
-async function assertVisibleKeyboardFocus(page: Page, locator: ReturnType<Page["locator"]>, label: string) {
+async function assertVisibleKeyboardFocus(_page: Page, locator: Locator, label: string) {
   await locator.focus();
   const focus = await locator.evaluate((element) => {
     const style = getComputedStyle(element);
