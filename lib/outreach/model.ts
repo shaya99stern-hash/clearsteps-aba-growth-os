@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export const REFERRAL_OUTREACH_STAGES = [
   "Qualified",
   "Contact Ready",
@@ -30,6 +32,27 @@ export interface PreparedReferralRecipient {
 export function normalizeOutreachEmail(value: string) {
   return value.trim().toLowerCase();
 }
+
+const normalizedEmailSchema = z.string()
+  .transform(normalizeOutreachEmail)
+  .pipe(z.string().email().max(320));
+
+export const outreachDraftInputSchema = z.object({
+  id: z.string().min(1).max(300),
+  name: z.string().trim().min(1).max(200),
+  subject: z.string().trim().min(1).max(240),
+  body: z.string().trim().min(1).max(8_000),
+  recipientIds: z.array(z.string().min(1).max(300)).min(1).max(1_000)
+    .transform((ids) => Array.from(new Set(ids))),
+  reviewed: z.literal(true),
+  createdAt: z.string().datetime().optional(),
+  updatedAt: z.string().datetime().optional(),
+});
+
+export const outreachSuppressionInputSchema = z.object({ email: normalizedEmailSchema });
+
+export type OutreachDraftInput = z.infer<typeof outreachDraftInputSchema>;
+export type OutreachSuppressionInput = z.infer<typeof outreachSuppressionInputSchema>;
 
 export function prepareReferralRecipient(
   lead: ReferralOutreachLead,
