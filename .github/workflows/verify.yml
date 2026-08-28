@@ -59,6 +59,9 @@ jobs:
       - name: Verify outreach rules
         run: npx tsx scripts/verify-outreach.ts
 
+      - name: Verify local-first reconciliation
+        run: npx tsx scripts/verify-local-first-sync.ts
+
       - name: Validate Prisma schema
         run: npx prisma validate
 
