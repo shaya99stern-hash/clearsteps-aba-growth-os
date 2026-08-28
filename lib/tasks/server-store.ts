@@ -1,19 +1,8 @@
-import { z } from "zod";
 import { getPrisma } from "@/lib/db/prisma";
+import { taskInputSchema, type TaskInput, type TaskStatus } from "@/lib/tasks/model";
 
-export const taskInputSchema = z.object({
-  id: z.string().min(1).max(300),
-  title: z.string().trim().min(1).max(300),
-  description: z.string().trim().max(4_000).optional().default(""),
-  status: z.enum(["open", "in_progress", "done"]),
-  priority: z.enum(["low", "normal", "high", "urgent"]),
-  dueAt: z.string().datetime().optional(),
-  entityType: z.string().trim().max(80).optional(),
-  entityId: z.string().trim().max(300).optional(),
-  createdAt: z.string().datetime().optional(),
-});
-
-export type TaskInput = z.infer<typeof taskInputSchema>;
+export { taskInputSchema } from "@/lib/tasks/model";
+export type { TaskInput } from "@/lib/tasks/model";
 
 export async function listDurableTasks() {
   const prisma = getPrisma();
@@ -51,7 +40,7 @@ export async function upsertDurableTask(input: TaskInput) {
   return toTask(row);
 }
 
-export async function updateDurableTaskStatus(id: string, status: "open" | "in_progress" | "done") {
+export async function updateDurableTaskStatus(id: string, status: TaskStatus) {
   const prisma = getPrisma();
   if (!prisma) return null;
   return toTask(await prisma.task.update({ where: { id }, data: { status } }));
