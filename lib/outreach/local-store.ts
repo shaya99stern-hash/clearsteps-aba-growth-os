@@ -34,6 +34,7 @@ const CHANGE_EVENT = "clearsteps:outreach-change";
 const EMPTY_STATE: OutreachWorkspaceState = { drafts: [], suppressions: [] };
 let cachedRaw: string | undefined;
 let cachedState: OutreachWorkspaceState = EMPTY_STATE;
+let syncInFlight: Promise<void> | null = null;
 
 export function loadOutreachWorkspace(): OutreachWorkspaceState {
   if (typeof window === "undefined") return EMPTY_STATE;
@@ -95,6 +96,7 @@ export function saveOutreachDraft(input: SaveOutreachDraftInput) {
   };
   const drafts = [draft, ...current.drafts.filter((item) => item.id !== draft.id)];
   writeState({ ...current, drafts });
+  if (draft.status === "reviewed") void persistDraft(draft);
   return draft;
 }
 
@@ -105,7 +107,93 @@ export function addOutreachSuppression(value: string) {
   if (current.suppressions.includes(normalized)) return current;
   const next = { ...current, suppressions: [normalized, ...current.suppressions] };
   writeState(next);
+  void persistSuppression(normalized);
   return next;
+}
+
+export function syncDurableOutreachWorkspace() {
+  if (typeof window === "undefined") return Promise.resolve();
+  if (syncInFlight) return syncInFlight;
+  syncInFlight = fetch("/api/outreach/workspace", { cache: "no-store" })
+    .then(async (response) => {
+      if (!response.ok) return;
+      const json = await response.json() as { workspace?: unknown };
+      if (!json.workspace || typeof json.workspace !== "object") return;
+      const durable = json.workspace as Partial<OutreachWorkspaceState>;
+      const durableDrafts = Array.isArray(durable.drafts) ? durable.drafts.filter(isSavedDraft) : [];
+      const durableSuppressions = Array.isArray(durable.suppressions)
+        ? durable.suppressions.filter((value): value is string => typeof value === "string").map(normalizeOutreachEmail).filter(Boolean)
+        : [];
+      const current = loadOutreachWorkspace();
+      const mergedDrafts = new Map(current.drafts.map((draft) => [draft.id, draft]));
+      for (const draft of durableDrafts) {
+        const local = mergedDrafts.get(draft.id);
+        if (!local || Date.parse(draft.updatedAt) >= Date.parse(local.updatedAt)) mergedDrafts.set(draft.id, draft);
+      }
+      writeState({
+        drafts: Array.from(mergedDrafts.values()).sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)),
+        suppressions: Array.from(new Set([...current.suppressions, ...durableSuppressions])),
+      });
+    })
+    .catch(() => undefined)
+    .finally(() => { syncInFlight = null; });
+  return syncInFlight;
+}
+
+async function persistDraft(draft: SavedOutreachDraft) {
+  try {
+    const response = await fetch("/api/outreach/workspace", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        action: "save_draft",
+        draft: {
+          id: draft.id,
+          name: draft.name,
+          subject: draft.subject,
+          body: draft.body,
+          recipientIds: draft.recipientIds,
+          reviewed: true,
+          createdAt: draft.createdAt,
+          updatedAt: draft.updatedAt,
+        },
+      }),
+      keepalive: true,
+    });
+    if (response.status === 400) {
+      markDraftNeedsReview(draft.id);
+      return;
+    }
+    if (!response.ok) return;
+    const json = await response.json() as { draft?: unknown };
+    if (!isSavedDraft(json.draft)) return;
+    const current = loadOutreachWorkspace();
+    writeState({ ...current, drafts: [json.draft, ...current.drafts.filter((item) => item.id !== json.draft!.id)] });
+  } catch {
+    // Browser storage remains the operational fallback until a later sync.
+  }
+}
+
+async function persistSuppression(email: string) {
+  try {
+    await fetch("/api/outreach/workspace", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "suppress", suppression: { email } }),
+      keepalive: true,
+    });
+  } catch {
+    // Browser storage remains the operational fallback until a later sync.
+  }
+}
+
+function markDraftNeedsReview(id: string) {
+  const current = loadOutreachWorkspace();
+  const now = new Date().toISOString();
+  writeState({
+    ...current,
+    drafts: current.drafts.map((draft) => draft.id === id ? { ...draft, status: "needs_review", updatedAt: now } : draft),
+  });
 }
 
 function writeState(state: OutreachWorkspaceState) {
