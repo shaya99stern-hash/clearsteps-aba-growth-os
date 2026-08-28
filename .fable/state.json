@@ -5,9 +5,17 @@
   "evidence": {
     "base_commit": "d7f715fe927871d356f64c724724d5228cf58e31",
     "branch": "feat/clearsteps-intelligence-os-v1",
+    "draft_pr": 2,
     "api_free_core": true,
-    "playwright_runtime": "adapter-ready-package-unavailable-in-current-environment",
-    "syntax_check": "23 TypeScript/TSX files, 0 syntax errors",
-    "acceptance_check": "passed query planning, unknown-safe territory scoring, community de-identification, talent-signal classification, household-targeting request guard"
+    "playwright_runtime": "installed-and-real-chromium-launch-verified",
+    "production_database": "Neon Postgres main schema applied and verified with 19 Clear Steps tables",
+    "durable_crm": true,
+    "durable_tasks": true,
+    "durable_outreach": true,
+    "latest_full_verification_run": 33163044505,
+    "latest_browser_verification_run": 33163044540,
+    "acceptance_check": "passed intelligence, task, and outreach persistence rules; Prisma validate/generate; changed-source ESLint; full Next.js production build; real Chromium launch",
+    "deployment_blocker": "Vercel project is resolved but current connector exposes no environment-variable write action, so DATABASE_URL has not been attached without a secure secret-write surface",
+    "accessibility": "WCAG 2.2 AA code audit in progress; skip-to-content landmark and aria-current navigation fixes applied"
   }
 }
