@@ -24,8 +24,13 @@ export function AppNav() {
         const Icon = item.icon;
         const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
         return (
-          <Link key={item.href} href={item.href} className={active ? "navItem active" : "navItem"}>
-            <Icon size={15} />
+          <Link
+            key={item.href}
+            href={item.href}
+            className={active ? "navItem active" : "navItem"}
+            aria-current={active ? "page" : undefined}
+          >
+            <Icon size={15} aria-hidden="true" focusable="false" />
             <span>{item.label}</span>
           </Link>
         );
