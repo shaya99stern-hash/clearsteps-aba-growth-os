@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      DATABASE_URL: file:./dev.db
+      DATABASE_URL: postgresql://clearsteps:clearsteps@127.0.0.1:5432/clearsteps
       NEXT_TELEMETRY_DISABLED: "1"
 
     steps:
