@@ -40,8 +40,8 @@ export function OutreachWorkbench() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [campaignName, setCampaignName] = useState("Referral partner outreach");
   const [presetId, setPresetId] = useState<(typeof PRESETS)[number]["id"]>(PRESETS[0].id);
-  const [subject, setSubject] = useState(PRESETS[0].subject);
-  const [body, setBody] = useState(PRESETS[0].body);
+  const [subject, setSubject] = useState<string>(PRESETS[0].subject);
+  const [body, setBody] = useState<string>(PRESETS[0].body);
   const [reviewed, setReviewed] = useState(false);
   const [suppressionEmail, setSuppressionEmail] = useState("");
 
