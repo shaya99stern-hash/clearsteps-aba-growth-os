@@ -4,7 +4,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 model Territory {
@@ -131,6 +131,32 @@ model ReferralOpportunity {
   @@index([stage, score])
   @@index([organizationId])
   @@index([territoryId])
+}
+
+model CrmLead {
+  id           String   @id @default(cuid())
+  sourceKey    String   @unique
+  name         String
+  kind         String
+  pipeline     String
+  stage        String   @default("Discovered")
+  score        Int      @default(0)
+  confidence   Int      @default(0)
+  website      String?
+  domain       String?
+  location     String?
+  primaryEmail String?
+  primaryPhone String?
+  evidenceJson Json     @default("[]")
+  reasonsJson  Json     @default("[]")
+  unknownsJson Json     @default("[]")
+  signalsJson  Json     @default("[]")
+  savedAt      DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([pipeline, stage])
+  @@index([kind, score])
+  @@index([domain])
 }
 
 model Contact {
