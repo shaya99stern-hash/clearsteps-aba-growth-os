@@ -6,6 +6,7 @@ on:
     branches:
       - feat/clearsteps-intelligence-os-v1
       - feat/clearsteps-intelligence-os-v2
+      - feat/clearsteps-aba-engine-v3
 
 jobs:
   verify:
@@ -53,6 +54,9 @@ jobs:
 
       - name: Verify intelligence rules
         run: npm run verify:intelligence
+
+      - name: Verify Phase 3 ABA Engine rules
+        run: npm run verify:aba-engine
 
       - name: Verify task rules
         run: npx tsx scripts/verify-tasks.ts

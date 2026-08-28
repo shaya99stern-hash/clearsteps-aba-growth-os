@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "verify:intelligence": "tsx scripts/verify-intelligence.ts",
+    "verify:aba-engine": "tsx scripts/verify-aba-engine.ts",
     "postinstall": "prisma generate",
     "browser:install": "playwright install --with-deps --only-shell chromium",
     "verify:browser": "tsx scripts/verify-browser.ts"

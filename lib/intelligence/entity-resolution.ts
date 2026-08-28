@@ -107,9 +107,15 @@ function entityKey(hit: PublicSearchHit, lane: SearchLane) {
 }
 
 function isAggregatorDomain(domain: string) {
-  return ["reddit.com", "facebook.com", "linkedin.com", "youtube.com", "yelp.com", "google.com"].some(
-    (item) => domain === item || domain.endsWith(`.${item}`),
-  );
+  return [
+    "reddit.com",
+    "facebook.com",
+    "linkedin.com",
+    "youtube.com",
+    "yelp.com",
+    "google.com",
+    "npiregistry.cms.hhs.gov",
+  ].some((item) => domain === item || domain.endsWith(`.${item}`));
 }
 
 function getDomain(value: string) {
