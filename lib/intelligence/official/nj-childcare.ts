@@ -41,7 +41,7 @@ async function loadRows() {
     if (!response.ok) throw new Error(`NJ child-care download returned ${response.status}`);
     const text = await response.text();
     if (text.length > 12_000_000) throw new Error("NJ child-care download exceeded safety limit");
-    const parsed = csvToRows(text);
+    const parsed = parseNjChildCareCsv(text);
     cache = { expiresAt: Date.now() + CACHE_MS, rows: parsed };
     return parsed;
   } finally {
@@ -106,7 +106,7 @@ function firstUrl(value: string) {
   return value.match(/https?:\/\/[^\s"'<>]+/i)?.[0];
 }
 
-function csvToRows(input: string): Row[] {
+export function parseNjChildCareCsv(input: string): Row[] {
   const records: string[][] = [];
   let row: string[] = [];
   let field = "";
