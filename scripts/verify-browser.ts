@@ -113,6 +113,11 @@ async function verifyDesktopCrm(baseUrl: string) {
     await page.keyboard.press("Escape");
     await dialog.waitFor({ state: "detached" });
     assert.equal(await page.getByRole("dialog").count(), 0, "Escape should close the CRM detail drawer");
+    await page.waitForFunction(
+      () => document.activeElement?.getAttribute("aria-label") === "Open Browser Test Pediatrics details",
+      undefined,
+      { timeout: 1_500 },
+    );
     assert.equal(await opener.evaluate((element) => element === document.activeElement), true, "closing the CRM drawer should restore focus to its trigger");
   } finally {
     await context.close();
