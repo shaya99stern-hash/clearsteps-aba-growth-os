@@ -14,7 +14,13 @@ export function PageShell({
   compact?: boolean;
 }) {
   return (
-    <main className="appFrame">
+    <div className="appFrame">
+      <a
+        href="#page-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-full focus:bg-white focus:px-4 focus:py-3 focus:text-sm focus:font-bold focus:text-black focus:outline-none focus:ring-4 focus:ring-orange-300"
+      >
+        Skip to main content
+      </a>
       <header className="appHeader">
         <div className="headerInner">
           <div className="brandRow">
@@ -34,8 +40,8 @@ export function PageShell({
           <AppNav />
         </div>
       </header>
-      <div className={compact ? "pageContent compact" : "pageContent"}>{children}</div>
-    </main>
+      <main id="page-content" tabIndex={-1} className={compact ? "pageContent compact" : "pageContent"}>{children}</main>
+    </div>
   );
 }
 
