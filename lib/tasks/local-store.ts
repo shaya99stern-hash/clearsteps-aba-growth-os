@@ -1,5 +1,6 @@
 "use client";
 
+import { reconcileTimestampedRecords } from "@/lib/sync/reconcile";
 import type { TaskPriority, TaskStatus } from "@/lib/tasks/model";
 
 export interface SavedTask {
@@ -96,23 +97,23 @@ export function updateTaskStatus(id: string, status: TaskStatus) {
 export function syncDurableTasks() {
   if (typeof window === "undefined") return Promise.resolve();
   if (syncInFlight) return syncInFlight;
-  syncInFlight = fetch("/api/tasks", { cache: "no-store" })
-    .then(async (response) => {
-      if (!response.ok) return;
-      const json = await response.json() as { tasks?: unknown };
-      if (!Array.isArray(json.tasks)) return;
-      const durable = json.tasks.filter(isSavedTask);
-      if (durable.length === 0) return;
-      const merged = new Map(loadTasks().map((task) => [task.id, task]));
-      for (const task of durable) {
-        const local = merged.get(task.id);
-        if (!local || Date.parse(task.updatedAt) >= Date.parse(local.updatedAt)) merged.set(task.id, task);
-      }
-      writeTasks(Array.from(merged.values()));
-    })
-    .catch(() => undefined)
-    .finally(() => { syncInFlight = null; });
+  syncInFlight = reconcileDurableTasks().finally(() => { syncInFlight = null; });
   return syncInFlight;
+}
+
+async function reconcileDurableTasks() {
+  try {
+    const response = await fetch("/api/tasks", { cache: "no-store" });
+    if (!response.ok) return;
+    const json = await response.json() as { tasks?: unknown };
+    if (!Array.isArray(json.tasks)) return;
+    const durable = json.tasks.filter(isSavedTask);
+    const result = reconcileTimestampedRecords(loadTasks(), durable);
+    writeTasks(result.merged.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)));
+    await Promise.allSettled(result.backfill.map((task) => persistTask(task)));
+  } catch {
+    // Browser storage remains the operational fallback until a later sync.
+  }
 }
 
 async function persistTask(task: SavedTask) {
