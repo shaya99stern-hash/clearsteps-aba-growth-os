@@ -12,6 +12,26 @@ export interface KansasEarlyInterventionProgram {
   sourceUrl: string;
 }
 
+export async function searchKansasEarlyIntervention(
+  location: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<KansasEarlyInterventionProgram[]> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 9_000);
+  try {
+    const response = await fetchImpl(KANSAS_EARLY_INTERVENTION_SOURCE_URL, {
+      signal: controller.signal,
+      headers: { "user-agent": "ClearStepsResearch/1.0 (+public Kansas KDHE roster)" },
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(`Kansas KDHE early-intervention roster returned ${response.status}`);
+    const html = await response.text();
+    return filterKansasEarlyInterventionPrograms(parseKansasEarlyInterventionPrograms(html), location);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function parseKansasEarlyInterventionPrograms(html: string): KansasEarlyInterventionProgram[] {
   const programs: KansasEarlyInterventionProgram[] = [];
   const seen = new Set<string>();
