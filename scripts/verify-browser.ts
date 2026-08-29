@@ -19,7 +19,7 @@ try {
   await browser.close();
 }
 
-console.log("Clear Steps Playwright Chromium + Phase 2 UI smoke passed.");
+console.log("Clear Steps Playwright Chromium + Phase 4 UI acceptance passed.");
 
 async function verifyClearStepsUi(baseUrl: string) {
   await verifyDesktopCrm(baseUrl);
@@ -37,7 +37,7 @@ async function verifyDesktopCrm(baseUrl: string) {
       kind: "organization",
       score: 88,
       confidence: 92,
-      location: "Lakewood, NJ",
+      location: "Kansas City, MO",
       domain: "browser-test.example",
       website: "https://example.com",
       reasons: ["Public pediatric referral signal"],
@@ -71,8 +71,8 @@ async function verifyDesktopCrm(baseUrl: string) {
     const railBox = await rail.boundingBox();
     assert.ok(railBox && railBox.width >= 220, "desktop workspace rail should retain operator-console width");
 
-    const brandImage = page.locator('.brandLockup img[src*="brand-mark"]');
-    assert.equal(await brandImage.count(), 1, "workspace should render the Navi-derived Clear Steps brand mark");
+    const brandImage = page.locator('.brandLockup img[src*="app-icon"]');
+    assert.equal(await brandImage.count(), 1, "workspace should render the ABA Engine app icon");
 
     const seededRecord = page.getByText("Browser Test Pediatrics", { exact: true }).first();
     await seededRecord.waitFor({ state: "visible", timeout: 10_000 });
@@ -113,6 +113,11 @@ async function verifyDesktopCrm(baseUrl: string) {
     await page.keyboard.press("Escape");
     await dialog.waitFor({ state: "detached" });
     assert.equal(await page.getByRole("dialog").count(), 0, "Escape should close the CRM detail drawer");
+    await page.waitForFunction(
+      () => document.activeElement?.getAttribute("aria-label") === "Open Browser Test Pediatrics details",
+      undefined,
+      { timeout: 1_500 },
+    );
     assert.equal(await opener.evaluate((element) => element === document.activeElement), true, "closing the CRM drawer should restore focus to its trigger");
   } finally {
     await context.close();
@@ -120,11 +125,12 @@ async function verifyDesktopCrm(baseUrl: string) {
 }
 
 async function verifyMobilePwa(baseUrl: string) {
-  const context = await browser.newContext({ viewport: { width: 320, height: 800 } });
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
   try {
     await page.goto(`${baseUrl}/outreach`, { waitUntil: "domcontentloaded" });
     await assertNoBodyOverflow(page, "Outreach");
+    await assertNativeMobileChrome(page, "More");
 
     await page.keyboard.press("Tab");
     const firstFocusText = await page.evaluate(() => document.activeElement?.textContent?.trim() ?? "");
@@ -135,21 +141,45 @@ async function verifyMobilePwa(baseUrl: string) {
       "page-content",
       "activating the skip link should move focus to the main content landmark",
     );
-
-    await assertActiveNavigation(page, "Outreach");
     await assertVisibleKeyboardFocus(page, page.getByLabel("Campaign name"), "Outreach campaign name");
     await assertVisibleKeyboardFocus(page, page.getByLabel("Suppress an email"), "Outreach suppression email");
 
     await page.goto(`${baseUrl}/tasks`, { waitUntil: "domcontentloaded" });
     await assertNoBodyOverflow(page, "Tasks");
-    await assertActiveNavigation(page, "Tasks");
+    await assertNativeMobileChrome(page, "Tasks");
     await assertVisibleKeyboardFocus(page, page.getByLabel("Task title"), "Task title");
 
     await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
     await assertNoBodyOverflow(page, "Scout");
-    await assertActiveNavigation(page, "Scout");
+    await assertNativeMobileChrome(page, "Scout");
+
+    const bodyText = await page.locator("body").innerText();
+    assert.equal(/Lakewood|New Jersey|\bNJ\b/.test(bodyText), false, "Scout mobile should not expose the retired New Jersey default");
+
+    const engineButtons = page.locator('[aria-label="Lead engine"] button');
+    assert.equal(await engineButtons.count(), 3, "Scout should expose exactly Clients, RBTs, and BCBAs engines");
+    assert.deepEqual(await engineButtons.allInnerTexts(), ["Clients", "RBTs", "BCBAs"]);
+    assert.equal(await page.getByRole("button", { name: "Clients", exact: true }).getAttribute("aria-pressed"), "true");
+
+    const stateButtons = page.locator('[aria-label="Target state"] button');
+    assert.equal(await stateButtons.count(), 2, "Scout should expose exactly Missouri and Kansas state controls");
+    assert.deepEqual(await stateButtons.allInnerTexts(), ["Missouri", "Kansas"]);
+    assert.equal(await page.getByRole("button", { name: "Missouri", exact: true }).getAttribute("aria-pressed"), "true");
+
+    const locationInput = page.getByLabel("Target city, ZIP, county or state");
+    assert.equal(await locationInput.inputValue(), "Missouri", "Scout should default new research to Missouri");
+
+    const composer = page.locator(".scoutComposerV3");
+    const composerBox = await composer.boundingBox();
+    assert.ok(composerBox && composerBox.y < 500, "Scout composer should appear in the first mobile viewport without scrolling through oversized chrome");
+
     await assertVisibleKeyboardFocus(page, page.locator('textarea[aria-label="Research request"]'), "Scout research request");
-    await assertVisibleKeyboardFocus(page, page.locator('input[aria-label="Target location"]'), "Scout target location");
+    await assertVisibleKeyboardFocus(page, locationInput, "Scout target location");
+
+    await page.getByRole("button", { name: "Kansas", exact: true }).click();
+    assert.equal(await locationInput.inputValue(), "Kansas", "switching state should move a state-only target to Kansas");
+    await page.getByRole("button", { name: "RBTs", exact: true }).click();
+    assert.equal(await page.getByRole("button", { name: "RBTs", exact: true }).getAttribute("aria-pressed"), "true");
   } finally {
     await context.close();
   }
@@ -157,8 +187,20 @@ async function verifyMobilePwa(baseUrl: string) {
 
 async function assertActiveNavigation(page: Page, expected: string) {
   const activeNav = page.locator('nav[aria-label="Clear Steps workspace"] a[aria-current="page"]');
-  assert.equal(await activeNav.count(), 1, "exactly one navigation item should expose aria-current=page");
+  assert.equal(await activeNav.count(), 1, "exactly one desktop navigation item should expose aria-current=page");
   assert.equal((await activeNav.innerText()).trim(), expected);
+}
+
+async function assertNativeMobileChrome(page: Page, expected: string) {
+  assert.equal(await page.locator(".workspaceRail").isVisible(), false, "mobile should not render the desktop workspace rail");
+  assert.equal(await page.locator(".workspaceTopbar").isVisible(), false, "mobile should not render the desktop workspace topbar");
+
+  const mobileNav = page.locator('nav[aria-label="ABA Engine primary navigation"]');
+  await mobileNav.waitFor({ state: "visible" });
+  assert.equal(await mobileNav.getByRole("link").count(), 5, "mobile should expose exactly five primary destinations");
+  const active = mobileNav.locator('a[aria-current="page"]');
+  assert.equal(await active.count(), 1, "mobile should expose one active primary destination");
+  assert.equal((await active.innerText()).trim(), expected);
 }
 
 async function assertNoBodyOverflow(page: Page, label: string) {

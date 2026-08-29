@@ -4,6 +4,7 @@ import "./globals.css";
 import "./workspace-v2.css";
 import "./crm-v2.css";
 import "./phase3.css";
+import "./phase4.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });

@@ -1,0 +1,32 @@
+/* Phase 4 mobile contract: iPhone gets one navigation system only. */
+@media (max-width: 900px) {
+  .appFrame {
+    display: block;
+    min-height: 100dvh;
+  }
+
+  .workspaceRail,
+  .workspaceTopbar {
+    display: none !important;
+  }
+
+  .workspaceSurface {
+    min-height: 100dvh;
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .pageIntroWrap,
+  .pageContent {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .pageIntroWrap {
+    padding-top: 10px;
+  }
+
+  .pageContent,
+  .pageContent.compact {
+    padding-bottom: calc(92px + env(safe-area-inset-bottom));
+  }
+}
