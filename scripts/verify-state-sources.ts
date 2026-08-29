@@ -5,7 +5,10 @@ import {
   missouriChildCareToSearchHits,
 } from "../lib/intelligence/official/mo-child-care-gis";
 import { stateSourceSelection } from "../lib/intelligence/official/state-source-selection";
-import { buildStateSourceContribution } from "../lib/intelligence/official/state-source-contribution";
+import {
+  buildStateSourceContribution,
+  collectStateSourceContribution,
+} from "../lib/intelligence/official/state-source-contribution";
 import { resolveSearchHits } from "../lib/intelligence/entity-resolution";
 
 const payload = {
@@ -133,5 +136,32 @@ assert.deepEqual(
   { referralHits: [], observations: [], sourceDetail: null },
   "Kansas research must not consume Missouri child-care records",
 );
+
+let missouriCollectorCalls = 0;
+const runtimeContribution = await collectStateSourceContribution(
+  { state: "MO", engine: "client", location: "Kansas City, MO", under18Population: 10_000 },
+  {
+    searchMissouriChildCare: async (location) => {
+      missouriCollectorCalls += 1;
+      assert.equal(location, "Kansas City, MO");
+      return twoProviders;
+    },
+  },
+);
+assert.equal(missouriCollectorCalls, 1, "Missouri Client runtime should call the official child-care collector once");
+assert.equal(runtimeContribution.referralHits.length, 2);
+assert.equal(runtimeContribution.observations[0].indicatorId, "referral-ecosystem.07");
+
+const skippedRuntimeContribution = await collectStateSourceContribution(
+  { state: "MO", engine: "rbt", location: "Kansas City, MO", under18Population: 10_000 },
+  {
+    searchMissouriChildCare: async () => {
+      missouriCollectorCalls += 1;
+      return twoProviders;
+    },
+  },
+);
+assert.equal(missouriCollectorCalls, 1, "RBT runtime must not call the Missouri child-care collector");
+assert.deepEqual(skippedRuntimeContribution, { referralHits: [], observations: [], sourceDetail: null });
 
 console.log("Missouri/Kansas state source verification passed.");
