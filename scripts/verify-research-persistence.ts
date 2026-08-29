@@ -45,9 +45,9 @@ const input = {
     },
   ],
   engineScores: {
-    client: { score: 74, confidence: 82, coverage: 55, observedIndicators: 11, applicableIndicators: 20, pillarBreakdown: [] },
-    rbt: { score: 25, confidence: 30, coverage: 10, observedIndicators: 2, applicableIndicators: 20, pillarBreakdown: [] },
-    bcba: { score: 20, confidence: 28, coverage: 10, observedIndicators: 2, applicableIndicators: 20, pillarBreakdown: [] },
+    client: { engine: "client" as const, score: 74, confidence: 82, coverage: 55, observedIndicators: 11, applicableIndicators: 20, pillarBreakdown: [] },
+    rbt: { engine: "rbt" as const, score: 25, confidence: 30, coverage: 10, observedIndicators: 2, applicableIndicators: 20, pillarBreakdown: [] },
+    bcba: { engine: "bcba" as const, score: 20, confidence: 28, coverage: 10, observedIndicators: 2, applicableIndicators: 20, pillarBreakdown: [] },
   },
   territory: {
     location: "Johnson County, KS",
