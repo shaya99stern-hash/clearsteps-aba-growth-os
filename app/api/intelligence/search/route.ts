@@ -5,6 +5,7 @@ import { buildSearchPlan, type SearchLane } from "@/lib/intelligence/query-plann
 import { enrichPublicWebsite, searchPublicWeb } from "@/lib/intelligence/free-search";
 import { resolveSearchHits } from "@/lib/intelligence/entity-resolution";
 import { collectPublicPageWithPlaywright, playwrightAvailable } from "@/lib/intelligence/browser-collector";
+import { withScoutResearchPersistence } from "@/lib/intelligence/research-persistence";
 import { fetchCensusDemographics } from "@/lib/intelligence/official/census-demographics";
 import { searchNppesLive, type NppesSearchResult } from "@/lib/intelligence/official/nppes-live";
 import {
@@ -197,55 +198,74 @@ export async function POST(request: Request) {
   };
   const selectedScore = engineScores[engine];
   const rules = REGULATORY_RULES.filter((rule) => rule.state === state && rule.roles.includes(roleForEngine(engine)));
+  const screened = rows.length + stateContribution.referralHits.length;
+  const territory = {
+    location: census?.geographyName ?? targetLocation,
+    total: selectedScore.score,
+    label: scoreLabel(selectedScore.score),
+    confidence: selectedScore.confidence,
+    coverage: selectedScore.coverage,
+    reasoning: selectedScore.pillarBreakdown
+      .filter((pillar) => pillar.observed > 0)
+      .sort((a, b) => (b.score * b.weight) - (a.score * a.weight))
+      .slice(0, 4)
+      .map((pillar) => `${pillar.title}: ${pillar.score}/100 from ${pillar.observed}/${pillar.applicable} indicators`),
+  };
 
-  return NextResponse.json({
-    ok: true,
-    state,
-    engine,
-    plan,
-    sourceStatus,
-    browser: {
-      source: "Playwright Public Browser",
-      status: browserReady ? "complete" : "unavailable",
-      detail: browserReady
-        ? `${browserEnrichments} weak fetch result(s) upgraded with browser rendering`
-        : "browser binary unavailable; direct public-source collectors remained active",
+  const response = await withScoutResearchPersistence(
+    {
+      ok: true as const,
+      state,
+      engine,
+      plan,
+      sourceStatus,
+      browser: {
+        source: "Playwright Public Browser",
+        status: browserReady ? "complete" : "unavailable",
+        detail: browserReady
+          ? `${browserEnrichments} weak fetch result(s) upgraded with browser rendering`
+          : "browser binary unavailable; direct public-source collectors remained active",
+      },
+      screened,
+      leads: resolved,
+      demographics: census ? { geographyName: census.geographyName, geographyKind: census.geographyKind, year: census.year, metrics: census.metrics } : null,
+      indicatorSummary: {
+        modelTotal: INDICATOR_CATALOG.length,
+        observed: dedupedObservations.length,
+        selectedApplicable: selectedScore.applicableIndicators,
+        selectedObserved: selectedScore.observedIndicators,
+        coverage: selectedScore.coverage,
+      },
+      engineScores,
+      regulatoryRules: rules.map((rule) => ({
+        id: rule.id,
+        domain: rule.domain,
+        title: rule.title,
+        summary: rule.summary,
+        posture: rule.posture,
+        effectiveDate: rule.effectiveDate,
+        sourceUrl: rule.sourceUrl,
+        sourceLabel: rule.sourceLabel,
+      })),
+      territory,
+      errors,
     },
-    screened: rows.length + stateContribution.referralHits.length,
-    leads: resolved,
-    demographics: census ? { geographyName: census.geographyName, geographyKind: census.geographyKind, year: census.year, metrics: census.metrics } : null,
-    indicatorSummary: {
-      modelTotal: INDICATOR_CATALOG.length,
-      observed: dedupedObservations.length,
-      selectedApplicable: selectedScore.applicableIndicators,
-      selectedObserved: selectedScore.observedIndicators,
-      coverage: selectedScore.coverage,
+    {
+      query,
+      location: targetLocation,
+      state,
+      engine,
+      plan,
+      sourceStatus,
+      screened,
+      leads: resolved,
+      engineScores,
+      territory,
+      errors,
     },
-    engineScores,
-    regulatoryRules: rules.map((rule) => ({
-      id: rule.id,
-      domain: rule.domain,
-      title: rule.title,
-      summary: rule.summary,
-      posture: rule.posture,
-      effectiveDate: rule.effectiveDate,
-      sourceUrl: rule.sourceUrl,
-      sourceLabel: rule.sourceLabel,
-    })),
-    territory: {
-      location: census?.geographyName ?? targetLocation,
-      total: selectedScore.score,
-      label: scoreLabel(selectedScore.score),
-      confidence: selectedScore.confidence,
-      coverage: selectedScore.coverage,
-      reasoning: selectedScore.pillarBreakdown
-        .filter((pillar) => pillar.observed > 0)
-        .sort((a, b) => (b.score * b.weight) - (a.score * a.weight))
-        .slice(0, 4)
-        .map((pillar) => `${pillar.title}: ${pillar.score}/100 from ${pillar.observed}/${pillar.applicable} indicators`),
-    },
-    errors,
-  });
+  );
+
+  return NextResponse.json(response);
 }
 
 function observationsFromNppes(nppes: NppesSearchResult): IndicatorObservation[] {
