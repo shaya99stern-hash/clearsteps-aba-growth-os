@@ -48,7 +48,10 @@ export function buildStateSourceContribution(input: StateSourceContributionInput
   }
 
   if (selection.kansasEarlyIntervention) {
-    const programs = input.kansasEarlyIntervention ?? [];
+    if (input.kansasEarlyIntervention === undefined) {
+      return { referralHits: [], observations: [], sourceDetail: null };
+    }
+    const programs = input.kansasEarlyIntervention;
     return {
       referralHits: kansasEarlyInterventionToSearchHits(programs, input.location),
       observations: buildKansasEarlyInterventionObservations(programs, input.under18Population),
