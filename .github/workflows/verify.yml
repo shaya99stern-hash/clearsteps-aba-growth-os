@@ -69,6 +69,9 @@ jobs:
       - name: Verify Scout state-source routing
         run: npx tsx scripts/verify-scout-state-routing.ts
 
+      - name: Verify Scout research persistence
+        run: npx tsx scripts/verify-research-persistence.ts
+
       - name: Verify task rules
         run: npx tsx scripts/verify-tasks.ts
 
