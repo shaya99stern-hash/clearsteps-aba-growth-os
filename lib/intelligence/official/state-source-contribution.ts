@@ -3,6 +3,7 @@ import type { PublicSearchHit } from "../source-types";
 import {
   buildMissouriChildCareObservations,
   missouriChildCareToSearchHits,
+  searchMissouriChildCare,
   type MissouriChildCareProvider,
 } from "./mo-child-care-gis";
 import { stateSourceSelection } from "./state-source-selection";
@@ -21,6 +22,10 @@ export interface StateSourceContribution {
   sourceDetail: string | null;
 }
 
+export interface StateSourceRuntimeDependencies {
+  searchMissouriChildCare: (location: string) => Promise<MissouriChildCareProvider[]>;
+}
+
 export function buildStateSourceContribution(input: StateSourceContributionInput): StateSourceContribution {
   const selection = stateSourceSelection(input.state, input.engine);
   if (!selection.missouriChildCare) {
@@ -33,4 +38,17 @@ export function buildStateSourceContribution(input: StateSourceContributionInput
     observations: buildMissouriChildCareObservations(providers, input.under18Population),
     sourceDetail: `${providers.length} official Missouri DHSS child-care facilities`,
   };
+}
+
+export async function collectStateSourceContribution(
+  input: Omit<StateSourceContributionInput, "missouriChildCare">,
+  dependencies: StateSourceRuntimeDependencies = { searchMissouriChildCare },
+): Promise<StateSourceContribution> {
+  const selection = stateSourceSelection(input.state, input.engine);
+  if (!selection.missouriChildCare) {
+    return { referralHits: [], observations: [], sourceDetail: null };
+  }
+
+  const providers = await dependencies.searchMissouriChildCare(input.location);
+  return buildStateSourceContribution({ ...input, missouriChildCare: providers });
 }
