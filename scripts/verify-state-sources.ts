@@ -4,6 +4,12 @@ import {
   buildMissouriChildCareObservations,
   missouriChildCareToSearchHits,
 } from "../lib/intelligence/official/mo-child-care-gis";
+import {
+  buildKansasEarlyInterventionObservations,
+  filterKansasEarlyInterventionPrograms,
+  kansasEarlyInterventionToSearchHits,
+  parseKansasEarlyInterventionPrograms,
+} from "../lib/intelligence/official/ks-early-intervention";
 import { stateSourceSelection } from "../lib/intelligence/official/state-source-selection";
 import {
   buildStateSourceContribution,
@@ -192,5 +198,40 @@ assert.equal(
   true,
   "merged official facilities should retain Missouri DHSS evidence",
 );
+
+const kansasReportHtml = `
+  <main>
+    <a href="/DocumentCenter/View/51016/KS16-Johnson-County-Infant-Toddler-Services-PDF">KS16 Johnson County Infant-Toddler Services (PDF)</a>
+    <a href="https://www.kdhe.ks.gov/DocumentCenter/View/51037/KS37-Wyandotte-County-Infant-Toddler-Services-PDF">KS37 Wyandotte County Infant-Toddler Services (PDF)</a>
+    <a href="/DocumentCenter/View/51010/KS10-Northeast-Kansas-Infant-Toddler-Services-PDF">KS10 Northeast Kansas Infant-Toddler Services (PDF)</a>
+    <a href="/other">Helpful documents</a>
+  </main>
+`;
+const kansasPrograms = parseKansasEarlyInterventionPrograms(kansasReportHtml);
+assert.equal(kansasPrograms.length, 3, "only current KS-numbered KDHE program report links should be parsed");
+assert.deepEqual(kansasPrograms.map((program) => program.id), ["KS16", "KS37", "KS10"]);
+assert.equal(kansasPrograms[0].name, "Johnson County Infant-Toddler Services");
+assert.equal(kansasPrograms[0].sourceId, "ks-kdhe-tiny-k-reports");
+assert.equal(
+  kansasPrograms[0].sourceUrl,
+  "https://www.kdhe.ks.gov/DocumentCenter/View/51016/KS16-Johnson-County-Infant-Toddler-Services-PDF",
+);
+
+const johnsonPrograms = filterKansasEarlyInterventionPrograms(kansasPrograms, "Johnson County, KS");
+assert.deepEqual(johnsonPrograms.map((program) => program.id), ["KS16"], "explicit county searches should match the current official program title");
+assert.equal(filterKansasEarlyInterventionPrograms(kansasPrograms, "Kansas").length, 3, "statewide Kansas research should retain the active program roster");
+assert.equal(filterKansasEarlyInterventionPrograms(kansasPrograms, "Overland Park, KS").length, 0, "city-to-county inference should not be guessed by this adapter");
+
+const kansasHits = kansasEarlyInterventionToSearchHits(johnsonPrograms, "Johnson County, KS");
+assert.equal(kansasHits.length, 1);
+assert.equal(kansasHits[0].sourceId, "ks-kdhe-tiny-k-reports");
+assert.equal(kansasHits[0].title, "Johnson County Infant-Toddler Services");
+
+const kansasObservations = buildKansasEarlyInterventionObservations(johnsonPrograms, 50_000);
+assert.equal(kansasObservations.length, 1);
+assert.equal(kansasObservations[0].indicatorId, "referral-ecosystem.09");
+assert.equal(kansasObservations[0].value, 50, "one program per 50,000 children should score 50/100 when four per 100k is strong coverage");
+assert.equal(kansasObservations[0].confidence, 90);
+assert.deepEqual(kansasObservations[0].sourceIds, ["ks-kdhe-tiny-k-reports"]);
 
 console.log("Missouri/Kansas state source verification passed.");
