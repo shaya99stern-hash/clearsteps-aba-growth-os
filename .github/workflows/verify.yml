@@ -66,6 +66,9 @@ jobs:
       - name: Verify Kansas KDHE runtime collector
         run: npx tsx scripts/verify-kansas-runtime.ts
 
+      - name: Verify Scout state-source routing
+        run: npx tsx scripts/verify-scout-state-routing.ts
+
       - name: Verify task rules
         run: npx tsx scripts/verify-tasks.ts
 
