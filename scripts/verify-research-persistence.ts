@@ -3,6 +3,7 @@ import {
   buildScoutResearchPersistence,
   persistScoutResearch,
   persistScoutResearchSafely,
+  withScoutResearchPersistence,
   type ScoutResearchPersistenceWriter,
 } from "../lib/intelligence/research-persistence";
 
@@ -121,11 +122,12 @@ assert.deepEqual(safelyPersisted, {
   scoreSnapshotCount: 2,
 });
 
-const failed = await persistScoutResearchSafely(input, {
+const failingWriter: ScoutResearchPersistenceWriter = {
   save: async () => {
     throw new Error("database offline");
   },
-});
+};
+const failed = await persistScoutResearchSafely(input, failingWriter);
 assert.deepEqual(failed, {
   persisted: false,
   reason: "write_failed",
@@ -134,5 +136,18 @@ assert.deepEqual(failed, {
 
 const safelySkipped = await persistScoutResearchSafely(input, null);
 assert.deepEqual(safelySkipped, { persisted: false, reason: "database_unavailable" });
+
+const completedResponse = await withScoutResearchPersistence(
+  { ok: true as const, leads: input.leads, territory: input.territory },
+  input,
+  failingWriter,
+);
+assert.equal(completedResponse.ok, true, "Scout success must survive a persistence write failure");
+assert.equal(completedResponse.leads.length, 1, "Scout result data must remain intact after persistence failure");
+assert.deepEqual(completedResponse.persistence, {
+  persisted: false,
+  reason: "write_failed",
+  detail: "database offline",
+});
 
 console.log("Scout research persistence verification passed.");
