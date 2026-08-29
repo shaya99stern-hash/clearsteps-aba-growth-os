@@ -8,6 +8,11 @@ import { collectPublicPageWithPlaywright, playwrightAvailable } from "@/lib/inte
 import { fetchCensusDemographics } from "@/lib/intelligence/official/census-demographics";
 import { searchNppesLive, type NppesSearchResult } from "@/lib/intelligence/official/nppes-live";
 import {
+  collectStateSourceContribution,
+  mergeStateSourceLeads,
+  type StateSourceContribution,
+} from "@/lib/intelligence/official/state-source-contribution";
+import {
   INDICATOR_CATALOG,
   scoreEngineFromObservations,
   type IndicatorObservation,
@@ -21,6 +26,13 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 type SourceState = { source: string; status: "working" | "complete" | "unavailable"; detail: string };
+
+const MISSOURI_CHILD_CARE_SOURCE = "Missouri DHSS Child Care";
+const EMPTY_STATE_CONTRIBUTION: StateSourceContribution = {
+  referralHits: [],
+  observations: [],
+  sourceDetail: null,
+};
 
 const requestSchema = z.object({
   query: z.string().trim().min(3).max(1_000),
@@ -48,6 +60,14 @@ export async function POST(request: Request) {
     { source: "Public Web Search", status: "working", detail: "fallback discovery and market/hiring signals" },
     { source: "Public Website Enrichment", status: "working", detail: "public contact/service cross-reference" },
   ];
+  if (state === "MO" && engine === "client") {
+    sourceStatus.splice(2, 0, {
+      source: MISSOURI_CHILD_CARE_SOURCE,
+      status: "working",
+      detail: "official Missouri DHSS child-care facility GIS evidence",
+    });
+  }
+
   const rows: Array<{
     lane: SearchLane;
     hit: Awaited<ReturnType<typeof searchPublicWeb>>[number];
@@ -91,6 +111,28 @@ export async function POST(request: Request) {
     errors.push(`nppes: ${detail}`);
   }
 
+  let stateContribution = EMPTY_STATE_CONTRIBUTION;
+  if (state === "MO" && engine === "client") {
+    try {
+      stateContribution = await collectStateSourceContribution({
+        state,
+        engine,
+        location: targetLocation,
+        under18Population: census?.metrics.under18 ?? 0,
+      });
+      observations.push(...stateContribution.observations);
+      completeSource(
+        sourceStatus,
+        MISSOURI_CHILD_CARE_SOURCE,
+        stateContribution.sourceDetail ?? "0 official Missouri DHSS child-care facilities matched",
+      );
+    } catch (error) {
+      const detail = errorMessage(error, "Missouri DHSS child-care source failed");
+      unavailableSource(sourceStatus, MISSOURI_CHILD_CARE_SOURCE, detail);
+      errors.push(`missouri child care: ${detail}`);
+    }
+  }
+
   const searchQueries = plan.queries.slice(0, 10);
   for (let index = 0; index < searchQueries.length; index += 3) {
     const batch = searchQueries.slice(index, index + 3);
@@ -130,13 +172,14 @@ export async function POST(request: Request) {
   completeSource(sourceStatus, "Public Website Enrichment", `${uniqueForEnrichment.filter((row) => row.enrichment).length} public website(s) enriched`);
 
   const enrichmentByDomain = new Map(uniqueForEnrichment.map((row) => [safeDomain(row.hit.url), row.enrichment]));
-  const resolved = resolveSearchHits(
+  const resolvedPublic = resolveSearchHits(
     rows.map((row) => ({
       ...row,
       enrichment: row.enrichment ?? enrichmentByDomain.get(safeDomain(row.hit.url)) ?? null,
     })),
     targetLocation,
   ).slice(0, maxResults);
+  const resolved = mergeStateSourceLeads(resolvedPublic, stateContribution, targetLocation, maxResults);
 
   observations.push(...observationsFromResolvedLeads(resolved, engine));
   observations.push(...evidenceQualityObservations(resolved, sourceStatus));
@@ -162,7 +205,7 @@ export async function POST(request: Request) {
         ? `${browserEnrichments} weak fetch result(s) upgraded with browser rendering`
         : "browser binary unavailable; direct public-source collectors remained active",
     },
-    screened: rows.length,
+    screened: rows.length + stateContribution.referralHits.length,
     leads: resolved,
     demographics: census ? { geographyName: census.geographyName, geographyKind: census.geographyKind, year: census.year, metrics: census.metrics } : null,
     indicatorSummary: {
