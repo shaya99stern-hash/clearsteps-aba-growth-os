@@ -95,10 +95,9 @@ assert.equal(leadSnapshot.entityType, "organization");
 assert.equal(leadSnapshot.score, 82);
 assert.equal(JSON.parse(leadSnapshot.breakdownJson).signals[0], "early-intervention");
 
-let savedPayload: typeof payload | null = null;
 const writer: ScoutResearchPersistenceWriter = {
   save: async (value) => {
-    savedPayload = value;
+    assert.equal(value.researchRun.qualifiedCount, 1, "writer should receive the normalized persistence payload");
     return { runId: "run-123" };
   },
 };
@@ -109,8 +108,6 @@ assert.deepEqual(persisted, {
   evidenceCount: 1,
   scoreSnapshotCount: 2,
 });
-assert(savedPayload, "writer should receive the normalized persistence payload");
-assert.equal(savedPayload.researchRun.qualifiedCount, 1);
 
 const skipped = await persistScoutResearch(input, null);
 assert.deepEqual(skipped, { persisted: false, reason: "database_unavailable" });
