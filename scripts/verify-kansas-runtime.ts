@@ -3,6 +3,7 @@ import {
   KANSAS_EARLY_INTERVENTION_SOURCE_URL,
   searchKansasEarlyIntervention,
 } from "../lib/intelligence/official/ks-early-intervention";
+import { collectStateSourceContribution } from "../lib/intelligence/official/state-source-contribution";
 
 const rosterHtml = `
   <main>
@@ -43,5 +44,46 @@ await assert.rejects(
   /503/,
   "non-success KDHE responses should fail explicitly so Scout can mark the source unavailable",
 );
+
+let kansasCollectorCalls = 0;
+let missouriCollectorCalls = 0;
+const contribution = await collectStateSourceContribution(
+  { state: "KS", engine: "client", location: "Johnson County, KS", under18Population: 50_000 },
+  {
+    searchMissouriChildCare: async () => {
+      missouriCollectorCalls += 1;
+      return [];
+    },
+    searchKansasEarlyIntervention: async (location) => {
+      kansasCollectorCalls += 1;
+      assert.equal(location, "Johnson County, KS");
+      return programs;
+    },
+  },
+);
+assert.equal(kansasCollectorCalls, 1, "Kansas Client runtime should call the KDHE collector exactly once");
+assert.equal(missouriCollectorCalls, 0, "Kansas runtime must never call the Missouri child-care collector");
+assert.equal(contribution.referralHits.length, 1, "Kansas Client runtime should contribute official early-intervention referral evidence");
+assert.equal(contribution.referralHits[0].sourceId, "ks-kdhe-tiny-k-reports");
+assert.equal(contribution.observations.length, 1);
+assert.equal(contribution.observations[0].indicatorId, "referral-ecosystem.09");
+assert.equal(contribution.sourceDetail, "1 current Kansas KDHE early-intervention program");
+
+const skippedContribution = await collectStateSourceContribution(
+  { state: "KS", engine: "rbt", location: "Johnson County, KS", under18Population: 50_000 },
+  {
+    searchMissouriChildCare: async () => {
+      missouriCollectorCalls += 1;
+      return [];
+    },
+    searchKansasEarlyIntervention: async () => {
+      kansasCollectorCalls += 1;
+      return programs;
+    },
+  },
+);
+assert.equal(kansasCollectorCalls, 1, "Kansas RBT runtime must not call the KDHE early-intervention collector");
+assert.equal(missouriCollectorCalls, 0, "Kansas RBT runtime must not call the Missouri collector");
+assert.deepEqual(skippedContribution, { referralHits: [], observations: [], sourceDetail: null });
 
 console.log("Kansas KDHE runtime verification passed.");
