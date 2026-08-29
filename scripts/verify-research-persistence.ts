@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   buildScoutResearchPersistence,
   persistScoutResearch,
+  persistScoutResearchSafely,
   type ScoutResearchPersistenceWriter,
 } from "../lib/intelligence/research-persistence";
 
@@ -111,5 +112,27 @@ assert.deepEqual(persisted, {
 
 const skipped = await persistScoutResearch(input, null);
 assert.deepEqual(skipped, { persisted: false, reason: "database_unavailable" });
+
+const safelyPersisted = await persistScoutResearchSafely(input, writer);
+assert.deepEqual(safelyPersisted, {
+  persisted: true,
+  runId: "run-123",
+  evidenceCount: 1,
+  scoreSnapshotCount: 2,
+});
+
+const failed = await persistScoutResearchSafely(input, {
+  save: async () => {
+    throw new Error("database offline");
+  },
+});
+assert.deepEqual(failed, {
+  persisted: false,
+  reason: "write_failed",
+  detail: "database offline",
+});
+
+const safelySkipped = await persistScoutResearchSafely(input, null);
+assert.deepEqual(safelySkipped, { persisted: false, reason: "database_unavailable" });
 
 console.log("Scout research persistence verification passed.");
