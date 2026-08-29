@@ -81,7 +81,8 @@ export type ScoutResearchPersistenceResult =
       evidenceCount: number;
       scoreSnapshotCount: number;
     }
-  | { persisted: false; reason: "database_unavailable" };
+  | { persisted: false; reason: "database_unavailable" }
+  | { persisted: false; reason: "write_failed"; detail: string };
 
 export function buildScoutResearchPersistence(
   input: ScoutResearchPersistenceInput,
@@ -150,6 +151,23 @@ export async function persistScoutResearch(
     evidenceCount: payload.evidence.length,
     scoreSnapshotCount: payload.scoreSnapshots.length,
   };
+}
+
+export async function persistScoutResearchSafely(
+  input: ScoutResearchPersistenceInput,
+  writer?: ScoutResearchPersistenceWriter | null,
+): Promise<ScoutResearchPersistenceResult> {
+  try {
+    return writer === undefined
+      ? await persistScoutResearch(input)
+      : await persistScoutResearch(input, writer);
+  } catch (error) {
+    return {
+      persisted: false,
+      reason: "write_failed",
+      detail: error instanceof Error ? error.message : "Research persistence failed",
+    };
+  }
 }
 
 function createPrismaResearchWriter(): ScoutResearchPersistenceWriter | null {
