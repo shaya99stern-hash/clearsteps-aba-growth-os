@@ -170,6 +170,15 @@ export async function persistScoutResearchSafely(
   }
 }
 
+export async function withScoutResearchPersistence<T extends { ok: true }>(
+  response: T,
+  input: ScoutResearchPersistenceInput,
+  writer?: ScoutResearchPersistenceWriter | null,
+): Promise<T & { persistence: ScoutResearchPersistenceResult }> {
+  const persistence = await persistScoutResearchSafely(input, writer);
+  return { ...response, persistence };
+}
+
 function createPrismaResearchWriter(): ScoutResearchPersistenceWriter | null {
   const prisma = getPrisma();
   if (!prisma) return null;
