@@ -1,5 +1,6 @@
+import { resolveSearchHits } from "../entity-resolution";
 import type { LeadEngine, IndicatorObservation } from "../phase3/indicator-catalog";
-import type { PublicSearchHit } from "../source-types";
+import type { PublicSearchHit, ResolvedLead } from "../source-types";
 import {
   buildMissouriChildCareObservations,
   missouriChildCareToSearchHits,
@@ -51,4 +52,28 @@ export async function collectStateSourceContribution(
 
   const providers = await dependencies.searchMissouriChildCare(input.location);
   return buildStateSourceContribution({ ...input, missouriChildCare: providers });
+}
+
+export function mergeStateSourceLeads(
+  existing: readonly ResolvedLead[],
+  contribution: StateSourceContribution,
+  location: string,
+  maxResults: number,
+): ResolvedLead[] {
+  const official = resolveSearchHits(
+    contribution.referralHits.map((hit) => ({ lane: "referral" as const, hit, enrichment: null })),
+    location,
+  );
+  const merged = new Map<string, ResolvedLead>();
+
+  for (const lead of [...official, ...existing]) {
+    const current = merged.get(lead.id);
+    if (!current || lead.score > current.score || (lead.score === current.score && lead.confidence > current.confidence)) {
+      merged.set(lead.id, lead);
+    }
+  }
+
+  return [...merged.values()]
+    .sort((a, b) => b.score - a.score || b.confidence - a.confidence)
+    .slice(0, Math.max(0, maxResults));
 }
