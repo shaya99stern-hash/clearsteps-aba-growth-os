@@ -8,10 +8,13 @@ import { collectPublicPageWithPlaywright, playwrightAvailable } from "@/lib/inte
 import { fetchCensusDemographics } from "@/lib/intelligence/official/census-demographics";
 import { searchNppesLive, type NppesSearchResult } from "@/lib/intelligence/official/nppes-live";
 import {
-  collectStateSourceContribution,
   mergeStateSourceLeads,
   type StateSourceContribution,
 } from "@/lib/intelligence/official/state-source-contribution";
+import {
+  collectScoutStateSource,
+  scoutStateSourceDescriptor,
+} from "@/lib/intelligence/official/scout-state-source";
 import {
   INDICATOR_CATALOG,
   scoreEngineFromObservations,
@@ -27,7 +30,6 @@ export const maxDuration = 60;
 
 type SourceState = { source: string; status: "working" | "complete" | "unavailable"; detail: string };
 
-const MISSOURI_CHILD_CARE_SOURCE = "Missouri DHSS Child Care";
 const EMPTY_STATE_CONTRIBUTION: StateSourceContribution = {
   referralHits: [],
   observations: [],
@@ -54,17 +56,18 @@ export async function POST(request: Request) {
 
   const targetLocation = normalizedTargetLocation(location, state);
   const plan = buildSearchPlan(query, targetLocation, engine);
+  const stateSourceDescriptor = scoutStateSourceDescriptor(state, engine);
   const sourceStatus: SourceState[] = [
     { source: "U.S. Census ACS", status: "working", detail: "child population + five-year demographic context" },
     { source: "CMS NPPES", status: "working", detail: "bounded provider/referral cross-reference; NPI is not licensure" },
     { source: "Public Web Search", status: "working", detail: "fallback discovery and market/hiring signals" },
     { source: "Public Website Enrichment", status: "working", detail: "public contact/service cross-reference" },
   ];
-  if (state === "MO" && engine === "client") {
+  if (stateSourceDescriptor) {
     sourceStatus.splice(2, 0, {
-      source: MISSOURI_CHILD_CARE_SOURCE,
+      source: stateSourceDescriptor.source,
       status: "working",
-      detail: "official Missouri DHSS child-care facility GIS evidence",
+      detail: stateSourceDescriptor.workingDetail,
     });
   }
 
@@ -112,24 +115,27 @@ export async function POST(request: Request) {
   }
 
   let stateContribution = EMPTY_STATE_CONTRIBUTION;
-  if (state === "MO" && engine === "client") {
+  if (stateSourceDescriptor) {
     try {
-      stateContribution = await collectStateSourceContribution({
+      const stateSource = await collectScoutStateSource({
         state,
         engine,
         location: targetLocation,
         under18Population: census?.metrics.under18 ?? 0,
       });
-      observations.push(...stateContribution.observations);
-      completeSource(
-        sourceStatus,
-        MISSOURI_CHILD_CARE_SOURCE,
-        stateContribution.sourceDetail ?? "0 official Missouri DHSS child-care facilities matched",
-      );
+      if (stateSource) {
+        stateContribution = stateSource.contribution;
+        observations.push(...stateContribution.observations);
+        completeSource(
+          sourceStatus,
+          stateSource.descriptor.source,
+          stateContribution.sourceDetail ?? stateSource.descriptor.emptyDetail,
+        );
+      }
     } catch (error) {
-      const detail = errorMessage(error, "Missouri DHSS child-care source failed");
-      unavailableSource(sourceStatus, MISSOURI_CHILD_CARE_SOURCE, detail);
-      errors.push(`missouri child care: ${detail}`);
+      const detail = errorMessage(error, stateSourceDescriptor.errorFallback);
+      unavailableSource(sourceStatus, stateSourceDescriptor.source, detail);
+      errors.push(`${stateSourceDescriptor.errorPrefix}: ${detail}`);
     }
   }
 
