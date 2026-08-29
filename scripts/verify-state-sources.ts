@@ -8,6 +8,7 @@ import { stateSourceSelection } from "../lib/intelligence/official/state-source-
 import {
   buildStateSourceContribution,
   collectStateSourceContribution,
+  mergeStateSourceLeads,
 } from "../lib/intelligence/official/state-source-contribution";
 import { resolveSearchHits } from "../lib/intelligence/entity-resolution";
 
@@ -163,5 +164,33 @@ const skippedRuntimeContribution = await collectStateSourceContribution(
 );
 assert.equal(missouriCollectorCalls, 1, "RBT runtime must not call the Missouri child-care collector");
 assert.deepEqual(skippedRuntimeContribution, { referralHits: [], observations: [], sourceDetail: null });
+
+const genericLead = resolveSearchHits([
+  {
+    lane: "referral" as const,
+    hit: {
+      title: "Community Pediatrics",
+      url: "https://community-pediatrics.example",
+      snippet: "Pediatric referral clinic serving Kansas City families",
+      query: "Kansas City pediatric referral clinic",
+      sourceId: "test-public-web",
+      rank: 1,
+    },
+    enrichment: null,
+  },
+], "Kansas City, MO")[0];
+const mergedLeads = mergeStateSourceLeads([genericLead], runtimeContribution, "Kansas City, MO", 10);
+assert.equal(mergedLeads.length, 3, "official state leads should merge alongside ordinary referral leads");
+assert.deepEqual(
+  mergedLeads.map((lead) => lead.name).sort(),
+  ["Community Pediatrics", "Purple Steps Preschool", "Second Steps Preschool"],
+);
+assert.equal(
+  mergedLeads.filter((lead) => lead.name.includes("Steps Preschool")).every((lead) =>
+    lead.evidence.some((evidence) => evidence.sourceId === "mo-dhss-child-care-gis")
+  ),
+  true,
+  "merged official facilities should retain Missouri DHSS evidence",
+);
 
 console.log("Missouri/Kansas state source verification passed.");
