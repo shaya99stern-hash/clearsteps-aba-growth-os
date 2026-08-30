@@ -5,8 +5,17 @@ import { buildSearchPlan, type SearchLane } from "@/lib/intelligence/query-plann
 import { enrichPublicWebsite, searchPublicWeb } from "@/lib/intelligence/free-search";
 import { resolveSearchHits } from "@/lib/intelligence/entity-resolution";
 import { collectPublicPageWithPlaywright, playwrightAvailable } from "@/lib/intelligence/browser-collector";
+import { withScoutResearchPersistence } from "@/lib/intelligence/research-persistence";
 import { fetchCensusDemographics } from "@/lib/intelligence/official/census-demographics";
 import { searchNppesLive, type NppesSearchResult } from "@/lib/intelligence/official/nppes-live";
+import {
+  mergeStateSourceLeads,
+  type StateSourceContribution,
+} from "@/lib/intelligence/official/state-source-contribution";
+import {
+  collectScoutStateSource,
+  scoutStateSourceDescriptor,
+} from "@/lib/intelligence/official/scout-state-source";
 import {
   INDICATOR_CATALOG,
   scoreEngineFromObservations,
@@ -21,6 +30,12 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 type SourceState = { source: string; status: "working" | "complete" | "unavailable"; detail: string };
+
+const EMPTY_STATE_CONTRIBUTION: StateSourceContribution = {
+  referralHits: [],
+  observations: [],
+  sourceDetail: null,
+};
 
 const requestSchema = z.object({
   query: z.string().trim().min(3).max(1_000),
@@ -42,12 +57,21 @@ export async function POST(request: Request) {
 
   const targetLocation = normalizedTargetLocation(location, state);
   const plan = buildSearchPlan(query, targetLocation, engine);
+  const stateSourceDescriptor = scoutStateSourceDescriptor(state, engine);
   const sourceStatus: SourceState[] = [
     { source: "U.S. Census ACS", status: "working", detail: "child population + five-year demographic context" },
     { source: "CMS NPPES", status: "working", detail: "bounded provider/referral cross-reference; NPI is not licensure" },
     { source: "Public Web Search", status: "working", detail: "fallback discovery and market/hiring signals" },
     { source: "Public Website Enrichment", status: "working", detail: "public contact/service cross-reference" },
   ];
+  if (stateSourceDescriptor) {
+    sourceStatus.splice(2, 0, {
+      source: stateSourceDescriptor.source,
+      status: "working",
+      detail: stateSourceDescriptor.workingDetail,
+    });
+  }
+
   const rows: Array<{
     lane: SearchLane;
     hit: Awaited<ReturnType<typeof searchPublicWeb>>[number];
@@ -91,6 +115,31 @@ export async function POST(request: Request) {
     errors.push(`nppes: ${detail}`);
   }
 
+  let stateContribution = EMPTY_STATE_CONTRIBUTION;
+  if (stateSourceDescriptor) {
+    try {
+      const stateSource = await collectScoutStateSource({
+        state,
+        engine,
+        location: targetLocation,
+        under18Population: census?.metrics.under18 ?? 0,
+      });
+      if (stateSource) {
+        stateContribution = stateSource.contribution;
+        observations.push(...stateContribution.observations);
+        completeSource(
+          sourceStatus,
+          stateSource.descriptor.source,
+          stateContribution.sourceDetail ?? stateSource.descriptor.emptyDetail,
+        );
+      }
+    } catch (error) {
+      const detail = errorMessage(error, stateSourceDescriptor.errorFallback);
+      unavailableSource(sourceStatus, stateSourceDescriptor.source, detail);
+      errors.push(`${stateSourceDescriptor.errorPrefix}: ${detail}`);
+    }
+  }
+
   const searchQueries = plan.queries.slice(0, 10);
   for (let index = 0; index < searchQueries.length; index += 3) {
     const batch = searchQueries.slice(index, index + 3);
@@ -130,13 +179,14 @@ export async function POST(request: Request) {
   completeSource(sourceStatus, "Public Website Enrichment", `${uniqueForEnrichment.filter((row) => row.enrichment).length} public website(s) enriched`);
 
   const enrichmentByDomain = new Map(uniqueForEnrichment.map((row) => [safeDomain(row.hit.url), row.enrichment]));
-  const resolved = resolveSearchHits(
+  const resolvedPublic = resolveSearchHits(
     rows.map((row) => ({
       ...row,
       enrichment: row.enrichment ?? enrichmentByDomain.get(safeDomain(row.hit.url)) ?? null,
     })),
     targetLocation,
   ).slice(0, maxResults);
+  const resolved = mergeStateSourceLeads(resolvedPublic, stateContribution, targetLocation, maxResults);
 
   observations.push(...observationsFromResolvedLeads(resolved, engine));
   observations.push(...evidenceQualityObservations(resolved, sourceStatus));
@@ -148,55 +198,74 @@ export async function POST(request: Request) {
   };
   const selectedScore = engineScores[engine];
   const rules = REGULATORY_RULES.filter((rule) => rule.state === state && rule.roles.includes(roleForEngine(engine)));
+  const screened = rows.length + stateContribution.referralHits.length;
+  const territory = {
+    location: census?.geographyName ?? targetLocation,
+    total: selectedScore.score,
+    label: scoreLabel(selectedScore.score),
+    confidence: selectedScore.confidence,
+    coverage: selectedScore.coverage,
+    reasoning: selectedScore.pillarBreakdown
+      .filter((pillar) => pillar.observed > 0)
+      .sort((a, b) => (b.score * b.weight) - (a.score * a.weight))
+      .slice(0, 4)
+      .map((pillar) => `${pillar.title}: ${pillar.score}/100 from ${pillar.observed}/${pillar.applicable} indicators`),
+  };
 
-  return NextResponse.json({
-    ok: true,
-    state,
-    engine,
-    plan,
-    sourceStatus,
-    browser: {
-      source: "Playwright Public Browser",
-      status: browserReady ? "complete" : "unavailable",
-      detail: browserReady
-        ? `${browserEnrichments} weak fetch result(s) upgraded with browser rendering`
-        : "browser binary unavailable; direct public-source collectors remained active",
+  const response = await withScoutResearchPersistence(
+    {
+      ok: true as const,
+      state,
+      engine,
+      plan,
+      sourceStatus,
+      browser: {
+        source: "Playwright Public Browser",
+        status: browserReady ? "complete" : "unavailable",
+        detail: browserReady
+          ? `${browserEnrichments} weak fetch result(s) upgraded with browser rendering`
+          : "browser binary unavailable; direct public-source collectors remained active",
+      },
+      screened,
+      leads: resolved,
+      demographics: census ? { geographyName: census.geographyName, geographyKind: census.geographyKind, year: census.year, metrics: census.metrics } : null,
+      indicatorSummary: {
+        modelTotal: INDICATOR_CATALOG.length,
+        observed: dedupedObservations.length,
+        selectedApplicable: selectedScore.applicableIndicators,
+        selectedObserved: selectedScore.observedIndicators,
+        coverage: selectedScore.coverage,
+      },
+      engineScores,
+      regulatoryRules: rules.map((rule) => ({
+        id: rule.id,
+        domain: rule.domain,
+        title: rule.title,
+        summary: rule.summary,
+        posture: rule.posture,
+        effectiveDate: rule.effectiveDate,
+        sourceUrl: rule.sourceUrl,
+        sourceLabel: rule.sourceLabel,
+      })),
+      territory,
+      errors,
     },
-    screened: rows.length,
-    leads: resolved,
-    demographics: census ? { geographyName: census.geographyName, geographyKind: census.geographyKind, year: census.year, metrics: census.metrics } : null,
-    indicatorSummary: {
-      modelTotal: INDICATOR_CATALOG.length,
-      observed: dedupedObservations.length,
-      selectedApplicable: selectedScore.applicableIndicators,
-      selectedObserved: selectedScore.observedIndicators,
-      coverage: selectedScore.coverage,
+    {
+      query,
+      location: targetLocation,
+      state,
+      engine,
+      plan,
+      sourceStatus,
+      screened,
+      leads: resolved,
+      engineScores,
+      territory,
+      errors,
     },
-    engineScores,
-    regulatoryRules: rules.map((rule) => ({
-      id: rule.id,
-      domain: rule.domain,
-      title: rule.title,
-      summary: rule.summary,
-      posture: rule.posture,
-      effectiveDate: rule.effectiveDate,
-      sourceUrl: rule.sourceUrl,
-      sourceLabel: rule.sourceLabel,
-    })),
-    territory: {
-      location: census?.geographyName ?? targetLocation,
-      total: selectedScore.score,
-      label: scoreLabel(selectedScore.score),
-      confidence: selectedScore.confidence,
-      coverage: selectedScore.coverage,
-      reasoning: selectedScore.pillarBreakdown
-        .filter((pillar) => pillar.observed > 0)
-        .sort((a, b) => (b.score * b.weight) - (a.score * a.weight))
-        .slice(0, 4)
-        .map((pillar) => `${pillar.title}: ${pillar.score}/100 from ${pillar.observed}/${pillar.applicable} indicators`),
-    },
-    errors,
-  });
+  );
+
+  return NextResponse.json(response);
 }
 
 function observationsFromNppes(nppes: NppesSearchResult): IndicatorObservation[] {

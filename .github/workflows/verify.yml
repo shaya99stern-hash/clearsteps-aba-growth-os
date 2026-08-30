@@ -8,6 +8,7 @@ on:
       - feat/clearsteps-intelligence-os-v2
       - feat/clearsteps-aba-engine-v3
       - feat/clearsteps-aba-engine-v4
+      - feat/clearsteps-aba-engine-v5
 
 jobs:
   verify:
@@ -61,6 +62,15 @@ jobs:
 
       - name: Verify Missouri/Kansas state sources
         run: npx tsx scripts/verify-state-sources.ts
+
+      - name: Verify Kansas KDHE runtime collector
+        run: npx tsx scripts/verify-kansas-runtime.ts
+
+      - name: Verify Scout state-source routing
+        run: npx tsx scripts/verify-scout-state-routing.ts
+
+      - name: Verify Scout research persistence
+        run: npx tsx scripts/verify-research-persistence.ts
 
       - name: Verify task rules
         run: npx tsx scripts/verify-tasks.ts
