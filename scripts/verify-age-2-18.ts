@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { isRestrictedReviewPlatformUrl, candidateAbaCompetitors, summarizeCompanyReviewEvidence } from "../lib/intelligence/signals/competitor-reviews";
+import type { ResolvedLead } from "../lib/intelligence/source-types";
 import { parseSingleAgeCountyCsv, censusSingleAgeCsvUrl } from "../lib/intelligence/official/census-county-single-age";
 import { PUBLIC_SOURCE_CHANNELS, choosePublicSourceChannels } from "../lib/intelligence/signals/source-channel-catalog";
 import { PUBLIC_SIGNAL_RULES, CROSS_SOURCE_CHECKS } from "../lib/intelligence/signals/extended-catalog";
@@ -85,5 +87,36 @@ assert.equal(county.year,2025);
 assert.match(censusSingleAgeCsvUrl("CO"),/syasex-08\.csv$/);
 assert.throws(()=>parseSingleAgeCountyCsv(csv,"CO","Denver, CO"),/explicit County/);
 assert.throws(()=>parseSingleAgeCountyCsv([censusHeader,...censusRows.slice(0,70)].join("\n"),"CO","Denver County, CO"),/Missing Census age/);
+
+// Competitor review layer: research ONLY organizations. Google/Yelp are link-only.
+const competitor:ResolvedLead={
+  id:"clinic-1",name:"Clearview ABA Therapy",kind:"competitor_signal",domain:"clearviewaba.example",
+  website:"https://clearviewaba.example",score:40,confidence:35,location:"Denver",
+  reasons:[],unknowns:[],emails:[],phones:[],signals:[],evidence:[],
+};
+const preschool:ResolvedLead={...competitor,id:"school",name:"Example Inclusive Preschool",kind:"referral"};
+assert.equal(candidateAbaCompetitors([preschool,competitor]).length,1);
+assert(isRestrictedReviewPlatformUrl("https://www.yelp.com/biz/clearview"));
+assert(isRestrictedReviewPlatformUrl("https://maps.google.com/?cid=123"));
+const companyHit=(url:string,title:string,snippet:string):PublicSearchHit=>({
+  title,snippet,url,query:"ABA clinic Denver public reputation",sourceId:"bing-rss",rank:1,
+});
+const reputation=summarizeCompanyReviewEvidence(competitor,[
+  companyHit("https://www.yelp.com/biz/clearview","Clearview ABA Therapy - Reviews","Reviewer testimony not retained"),
+  companyHit("https://independentnews.com/story1","Clearview ABA Therapy staffing shortage","Clearview ABA Therapy clinic staffing shortage discussed in a city news report"),
+  companyHit("https://cityjournal.org/story2","Clearview ABA Therapy local investigation","Clearview ABA Therapy clinic staff turnover reported separately"),
+  companyHit("https://cityjournal.org/story3","Unrelated ABA Therapy","A different company's waitlist"),
+  companyHit("https://myblog.net/story4","Clearview ABA Therapy parent review","My child was diagnosed and waited for therapy"),
+],"Denver CO");
+assert.equal(reputation.status,"corroborated");
+assert(reputation.publicThemes.some((x)=>x.theme==="staffing" && x.independentlyCorroborated && x.publishers===2));
+assert(!JSON.stringify(reputation).includes("My child"),"Reviewer health and family narratives must not be retained");
+assert(reputation.reviewLinks.some((x)=>x.platform==="Yelp" && x.linkOnly));
+assert(reputation.reviewLinks.some((x)=>x.platform==="Google Maps" && x.linkOnly));
+const syndicated=summarizeCompanyReviewEvidence(competitor,[
+  companyHit("https://independentnews.com/one","Clearview ABA Therapy clinic staffing shortage","A public clinic staffing shortage was identified in Denver"),
+  companyHit("https://regionalnews.net/two","Clearview ABA Therapy clinic staffing shortage","A public clinic staffing shortage was identified in Denver"),
+],"Denver CO");
+assert.equal(syndicated.status,"unconfirmed","Cross-posted identical content is not independently corroborated");
 
 console.log("2–18 institutional intelligence: 274 candidate channels, 300 indicator definitions, 180 text rules, 60 checks, age/syndication/privacy safeguards.");
