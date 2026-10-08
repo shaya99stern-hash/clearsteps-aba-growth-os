@@ -25,6 +25,7 @@ assert(reviewBelongsToOrganization(references[0],company.name));
 assert(!reviewBelongsToOrganization(references[4],company.name));
 const dossier=buildProviderReviewDossier(company,references);
 assert.equal(dossier.organizationId,company.id);
+console.log("Reputation link publishers:", dossier.reviews.map((x)=>x.publisher));
 assert.equal(dossier.reviews.length,3,"No unrelated competitor, unknown site, or duplicate tracking links");
 assert.equal(dossier.reviews.find(x=>x.publisher==="Yelp")?.access,"link_only");
 assert.equal(dossier.reviews.find(x=>x.publisher==="Google Maps")?.access,"link_only");
