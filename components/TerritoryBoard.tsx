@@ -41,14 +41,14 @@ export function TerritoryBoard() {
       </div>
       <div className={styles.filterBar}>
         <label className={styles.filterField}><Search size={16} aria-hidden="true" /><input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Search city or region" aria-label="Filter territories" /></label>
-        <label className={styles.selectWrap}><span>State</span><select value={state} onChange={(event) => setState(event.target.value as "all" | ScoutState)}><option value="all">MO + KS</option><option value="MO">Missouri</option><option value="KS">Kansas</option></select></label>
+        <label className={styles.selectWrap}><span>State</span><select value={state} onChange={(event) => setState(event.target.value as "all" | ScoutState)}><option value="all">MO + KS + CO</option><option value="MO">Missouri</option><option value="KS">Kansas</option><option value="CO">Colorado</option></select></label>
         <label className={styles.selectWrap}><span>Engine</span><select value={engine} onChange={(event) => setEngine(event.target.value as "all" | ScoutEngine)}><option value="all">All engines</option><option value="client">Clients</option><option value="rbt">RBT</option><option value="bcba">BCBA</option></select></label>
       </div>
       {latest.length === 0 ? (
         <section className={styles.empty}>
           <MapPinned size={28} aria-hidden="true" />
           <h3>Your first market starts in Scout.</h3>
-          <p>Run a real Missouri or Kansas research scan. Its scores, evidence coverage, source status and warnings will appear here automatically—without entering the data twice.</p>
+          <p>Run a real Missouri, Kansas, or Colorado research scan. Its scores, evidence coverage, source status and warnings will appear here automatically—without entering the data twice.</p>
           <Link href="/" className={styles.primaryAction}>Research a market <ArrowUpRight size={15} /></Link>
         </section>
       ) : visible.length === 0 ? (
