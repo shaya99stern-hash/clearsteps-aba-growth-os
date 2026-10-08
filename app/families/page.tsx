@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { ArrowRight, CalendarCheck2, HeartHandshake, MapPin, Phone, ShieldCheck } from "lucide-react";
 import { familyContactSettings } from "@/lib/intelligence/family-contact";
 import styles from "./families.module.css";
@@ -62,7 +61,6 @@ export default function FamiliesPage() {
         <footer className={styles.footer}>
           <span><HeartHandshake size={16} aria-hidden="true"/> Clear Steps ABA</span>
           <p>No family contact, diagnoses or medical histories are collected on this page.</p>
-          <Link href="/">Agency workspace</Link>
         </footer>
       </div>
     </main>
