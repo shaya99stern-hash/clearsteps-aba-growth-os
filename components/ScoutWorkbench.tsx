@@ -20,7 +20,7 @@ import { canSaveToCrm, saveCrmLead } from "@/lib/crm/local-store";
 import { recordScoutRun } from "@/lib/intelligence/scout-history";
 
 type Engine = "client" | "rbt" | "bcba";
-type TargetState = "MO" | "KS";
+type TargetState = "MO" | "KS" | "CO";
 type SourceState = { source: string; status: "working" | "complete" | "unavailable"; detail?: string };
 
 type EngineScore = {
@@ -90,12 +90,12 @@ type SearchResponse = {
 
 const ENGINE_PROMPTS: Record<Engine, string> = {
   client: "Find the strongest client-growth territories and public referral organizations, and explain the evidence behind each opportunity.",
-  rbt: "Find RBT hiring pressure, talent supply, employers, training signals and recruiting opportunities, with Missouri/Kansas compliance context.",
+  rbt: "Find RBT hiring pressure, talent supply, employers, training signals and recruiting opportunities, with Missouri/Kansas/Colorado compliance context.",
   bcba: "Find BCBA/LBA hiring pressure, licensed analyst supply, employers and recruiting opportunities, with state licensure context.",
 };
 
 const ENGINE_LABELS: Record<Engine, string> = { client: "Clients", rbt: "RBTs", bcba: "BCBAs" };
-const STATE_NAMES: Record<TargetState, string> = { MO: "Missouri", KS: "Kansas" };
+const STATE_NAMES: Record<TargetState, string> = { MO: "Missouri", KS: "Kansas", CO: "Colorado" };
 const DEFAULT_SOURCE_STATES: SourceState[] = [
   { source: "U.S. Census ACS", status: "working", detail: "Child-population context" },
   { source: "CMS NPPES", status: "working", detail: "Public provider cross-reference" },
@@ -199,7 +199,7 @@ export function ScoutWorkbench({
   return (
     <div className="scoutShellV3">
       <section className="scoutHeroV3">
-        <span className="eyebrow">ABA Engine · Missouri + Kansas</span>
+        <span className="eyebrow">ABA Engine · Missouri + Kansas + Colorado</span>
         <div className="scoutHeadlineRow">
           <h1>Scout</h1>
           <p>Cross-reference public demand, providers, referral networks, workforce signals and current state/payer rules.</p>
@@ -220,7 +220,7 @@ export function ScoutWorkbench({
             ))}
           </div>
           <div className="segmentedControl stateControl" aria-label="Target state">
-            {(["MO", "KS"] as const).map((item) => (
+            {(["MO", "KS", "CO"] as const).map((item) => (
               <button
                 key={item}
                 type="button"
