@@ -43,7 +43,7 @@ export function buildSearchPlan(input: string, location: string, engine?: LeadEn
       "Community discussions are aggregated as territory demand signals; no parent/child profiles.",
       "Private groups, authenticated pages, CAPTCHA bypass, and household-level disability targeting are excluded.",
       "Verification-only registries are never treated as recruiting lists.",
-      "New Scout research is restricted to Missouri and Kansas.",
+      "New Scout research is restricted to Missouri, Kansas, and Colorado.",
     ],
   };
 }
@@ -76,11 +76,17 @@ function laneQueries(lane: SearchLane, input: string, location: string, engine?:
     { lane, query: `site:reddit.com autism evaluation waitlist children${place}` },
     { lane, query: `"ABA" "waitlist"${place}` },
     { lane, query: `autism developmental services shortage${place}` },
+    { lane, query: `site:facebook.com public resource community events${place}` },
+    { lane, query: `local paper child services capacity waitlist${place}` },
+    { lane, query: `municipal accessibility awareness campaign${place}` },
   ];
   return [
     { lane, query: `ABA therapy provider${place}` },
     { lane, query: `ABA therapy hiring RBT BCBA${place}` },
     { lane, query: `ABA therapy new location expansion closure${place}` },
+    { lane, query: `county health needs assessment child developmental services${place}` },
+    { lane, query: `special education school board meeting workforce${place}` },
+    { lane, query: `Medicaid provider network ABA update${place}` },
     { lane, query: `${input}${place}` },
   ];
 }
