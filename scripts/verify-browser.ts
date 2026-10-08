@@ -297,7 +297,7 @@ async function verifyClientGrowthOnIphone(baseUrl:string) {
     assert.equal(await page.getByRole("button",{name:"CRM",exact:true}).count(),0,
       "An official preschool is not a direct opt-in family client record");
     await page.getByRole("button",{name:"Create 5 tasks"}).click();
-    await page.getByText("Five tasks added").waitFor();
+    await page.getByText("Tasks in workspace").waitFor();
     const tasks=await page.evaluate(()=>{
       const value=window.localStorage.getItem("clearsteps.tasks.v1")??"[]";
       return JSON.parse(value) as Array<{title:string;entityType:string}>;
