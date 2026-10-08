@@ -62,7 +62,7 @@ export async function POST(request: Request) {
   const plan = buildSearchPlan(query, targetLocation, engine, state);
   const stateSourceDescriptor = scoutStateSourceDescriptor(state, engine);
   const sourceStatus: SourceState[] = [
-    { source: "U.S. Census ACS", status: "working", detail: "child population + five-year demographic context" },
+    { source: "U.S. Census population", status: "working", detail: "2025 official exact ages 2–18 county/state CSV, with limited ACS fallback" },
     { source: "CMS NPPES", status: "working", detail: "bounded provider/referral cross-reference; NPI is not licensure" },
     { source: "Public Web Search", status: "working", detail: "fallback discovery and market/hiring signals" },
     { source: "Public Website Enrichment", status: "working", detail: "public contact/service cross-reference" },
@@ -91,12 +91,14 @@ export async function POST(request: Request) {
   const census = censusSettled.status === "fulfilled" ? censusSettled.value : null;
   if (census) {
     observations.push(...census.observations);
-    completeSource(sourceStatus, "U.S. Census ACS", `${census.geographyName} · ${formatNumber(census.metrics.under18)} residents under 18 · ACS ${census.year}`);
+    completeSource(sourceStatus, "U.S. Census population", census.metrics.ages2to18 != null
+      ? census.geographyName + " · exact ages 2–18: " + formatNumber(census.metrics.ages2to18) + " · Census " + census.year
+      : census.geographyName + " · ages 3–17 measured; 2 and 18 unavailable · grouped ACS " + census.year);
   } else {
     const detail = censusSettled.status === "rejected"
       ? errorMessage(censusSettled.reason, "Census demographic source failed")
       : "Census demographic source failed";
-    unavailableSource(sourceStatus, "U.S. Census ACS", detail);
+    unavailableSource(sourceStatus, "U.S. Census population", detail);
     errors.push(`census: ${detail}`);
   }
 
