@@ -98,7 +98,15 @@ export function scanPublicSignals(hits: readonly PublicSearchHit[], capturedAt =
     if (!matched.length) continue;
     // Multiple search hits from a single website are one source, not corroboration.
     const hosts = new Map(matched.map((item) => [item.host, item]));
-    const independent = [...hosts.values()];
+    // A syndicated, byte-identical press release is ONE narrative even across several domains.
+    // One source cannot be its own independent corroboration by repeated search indexing.
+    const seenContent = new Set<string>();
+    const independent = [...hosts.values()].filter((item) => {
+      const fingerprint = item.text.replace(/\s+/g, " ").trim();
+      if (seenContent.has(fingerprint)) return false;
+      seenContent.add(fingerprint);
+      return true;
+    });
     const localized = independent.filter((item) => matchesPublicTerritory(item.text, targetLocation) &&
       (ageMode !== "2-18" || isAgeAlignedPublicProgram(item.text)));
     // Published source content, not search query text, must establish an applicable age cohort.
