@@ -27,6 +27,7 @@ import type { ResolvedLead } from "@/lib/intelligence/source-types";
 import { scanPublicSignals } from "@/lib/intelligence/signals/public-signal-scan";
 import { assessPublicAgeFit } from "@/lib/intelligence/signals/target-ages";
 import { buildProviderReviewDossier, providerReviewQuery, providerReviewQueries, isRestrictedReviewSite } from "@/lib/intelligence/signals/provider-reputation";
+import { summarizeCompanyReviewEvidence } from "@/lib/intelligence/signals/competitor-reviews";
 import { assessOpportunityReliability } from "@/lib/intelligence/score-reliability";
 import { PUBLIC_SOURCE_CHANNELS, matchedPublicSourceChannels } from "@/lib/intelligence/signals/source-channel-catalog";
 
@@ -253,9 +254,15 @@ export async function POST(request: Request) {
       const queries = providerReviewQueries(lead,targetLocation);
       const gathered = await Promise.allSettled(queries.map((query) => searchPublicWeb(query,4)));
       const hits = gathered.flatMap((result) => result.status === "fulfilled" ? result.value : []);
-      return [lead.id,buildProviderReviewDossier(lead,hits)] as const;
+      return [lead.id,{
+        ...buildProviderReviewDossier(lead,hits),
+        independentThemes:summarizeCompanyReviewEvidence(lead,hits,targetLocation),
+      }] as const;
     } catch {
-      return [lead.id,buildProviderReviewDossier(lead,[])] as const;
+      return [lead.id,{
+        ...buildProviderReviewDossier(lead,[]),
+        independentThemes:summarizeCompanyReviewEvidence(lead,[],targetLocation),
+      }] as const;
     }
   }));
   const providerReputation = Object.fromEntries(reputationEntries);
@@ -264,7 +271,9 @@ export async function POST(request: Request) {
     status: reputationEntries.some(([,summary]) => summary.reviews.length > 0) ? "complete" : "unavailable",
     detail: competitors.length + " named organizations queried; " +
       reputationEntries.reduce((sum,[,summary]) => sum + summary.reviews.length,0) +
-      " review/press page links discovered (not scraped, not independently verified)",
+      " review/press URLs indexed, " +
+      reputationEntries.filter(([,entry])=>entry.independentThemes.status==="corroborated").length +
+      " independent cross-publisher themes (Google/Yelp link-only)",
   });
 
   const publicSignals = scanPublicSignals(rows.map((item) => item.hit), new Date().toISOString(), targetLocation, engine === "client" ? "2-18" : "all");
