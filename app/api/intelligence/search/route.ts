@@ -26,6 +26,7 @@ import {
 import { REGULATORY_RULES, type AbaRole } from "@/lib/intelligence/phase3/regulatory-rules";
 import type { ResolvedLead } from "@/lib/intelligence/source-types";
 import { scanPublicSignals } from "@/lib/intelligence/signals/public-signal-scan";
+import { planWeakSignalFollowups } from "@/lib/intelligence/signals/adaptive-followup";
 import { qualifyYouthLead, youthLeadPriority, ageBandSearchQueries, type YouthAgeBand } from "@/lib/intelligence/signals/youth-qualification";
 import { buildProviderReviewDossier, providerReviewQuery, providerReviewQueries, isRestrictedReviewSite } from "@/lib/intelligence/signals/provider-reputation";
 import { summarizeCompanyReviewEvidence } from "@/lib/intelligence/signals/competitor-reviews";
@@ -329,7 +330,36 @@ export async function POST(request: Request) {
       " independent cross-publisher themes (Google/Yelp link-only)",
   });
 
-  const publicSignals = scanPublicSignals(rows.map((item) => item.hit), new Date().toISOString(), targetLocation, engine === "client" ? ageBand : "all");
+  // First pass exposes weak institutional clues even if only a single publication exists.
+  // Pursue independent cross-checks before computing final market evidence.
+  // This does not search for or build dossiers on identifiable children or households.
+  const initialSignals = scanPublicSignals(
+    rows.map((item)=>item.hit),new Date().toISOString(),targetLocation,
+    engine === "client" ? ageBand : "all",
+  );
+  const followupPlan = planWeakSignalFollowups(
+    initialSignals.clues,targetLocation,engine === "client" ? ageBand : "all",
+    5,Math.floor(Date.now()/86_400_000),
+  );
+  const followupResults = await Promise.allSettled(
+    followupPlan.map((probe)=>searchPublicWeb(probe.query,4)),
+  );
+  const followupHits = followupResults.flatMap((result)=>
+    result.status === "fulfilled"?result.value:[],
+  );
+  const followupUniqueUrls=new Set(followupHits.map((hit)=>hit.url)).size;
+  const publicSignals = scanPublicSignals(
+    [...rows.map((item)=>item.hit),...followupHits],
+    new Date().toISOString(),targetLocation,engine === "client" ? ageBand : "all",
+  );
+  if(followupPlan.length)sourceStatus.push({
+    source:"Adaptive weak-clue cross-reference",
+    status:followupUniqueUrls>0?"complete":"unavailable",
+    detail:followupPlan.length+" unconfirmed public signal hypotheses investigated; "+
+      followupUniqueUrls+" additional public result URLs; "+
+      (followupResults.filter((item)=>item.status==="rejected").length)+" failed follow-ups; "+
+      "independent publisher + published geography + target age still required before scoring",
+  });
   observations.push(...publicSignals.observations);
   const clientGrowth = engine === "client" ? buildClientGrowthPlan({
     state,location:targetLocation,ageBand,
