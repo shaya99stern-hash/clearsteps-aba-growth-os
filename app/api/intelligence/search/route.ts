@@ -211,7 +211,7 @@ export async function POST(request: Request) {
   ).slice(0, maxResults);
   const resolved = mergeStateSourceLeads(resolvedPublic, stateContribution, targetLocation, maxResults);
 
-  const publicSignals = scanPublicSignals(rows.map((item) => item.hit));
+  const publicSignals = scanPublicSignals(rows.map((item) => item.hit), new Date().toISOString(), targetLocation);
   observations.push(...publicSignals.observations);
   sourceStatus.push({
     source: "Public multi-source signal correlations",
