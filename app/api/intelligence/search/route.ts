@@ -26,7 +26,7 @@ import { REGULATORY_RULES, type AbaRole } from "@/lib/intelligence/phase3/regula
 import type { ResolvedLead } from "@/lib/intelligence/source-types";
 import { scanPublicSignals } from "@/lib/intelligence/signals/public-signal-scan";
 import { assessPublicAgeFit } from "@/lib/intelligence/signals/target-ages";
-import { buildProviderReviewDossier, providerReviewQuery, isRestrictedReviewSite } from "@/lib/intelligence/signals/provider-reputation";
+import { buildProviderReviewDossier, providerReviewQuery, providerReviewQueries, isRestrictedReviewSite } from "@/lib/intelligence/signals/provider-reputation";
 import { assessOpportunityReliability } from "@/lib/intelligence/score-reliability";
 import { PUBLIC_SOURCE_CHANNELS, matchedPublicSourceChannels } from "@/lib/intelligence/signals/source-channel-catalog";
 
@@ -250,8 +250,9 @@ export async function POST(request: Request) {
   const competitors = resolved.filter((lead) => providerReviewQuery(lead,targetLocation)).slice(0,3);
   const reputationEntries = await Promise.all(competitors.map(async (lead) => {
     try {
-      const query = providerReviewQuery(lead,targetLocation);
-      const hits = query ? await searchPublicWeb(query,6) : [];
+      const queries = providerReviewQueries(lead,targetLocation);
+      const gathered = await Promise.allSettled(queries.map((query) => searchPublicWeb(query,4)));
+      const hits = gathered.flatMap((result) => result.status === "fulfilled" ? result.value : []);
       return [lead.id,buildProviderReviewDossier(lead,hits)] as const;
     } catch {
       return [lead.id,buildProviderReviewDossier(lead,[])] as const;
