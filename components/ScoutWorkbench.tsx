@@ -559,7 +559,3 @@ function formatCount(value: number) {
   return new Intl.NumberFormat("en-US", { notation: value >= 100_000 ? "compact" : "standard", maximumFractionDigits: 1 }).format(value);
 }
 
-function formatGrowth(value: number | null) {
-  if (value === null || !Number.isFinite(value)) return "Needs history";
-  return `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
-}
