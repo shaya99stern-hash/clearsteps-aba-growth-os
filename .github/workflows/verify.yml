@@ -69,6 +69,9 @@ jobs:
       - name: Verify age 2–18 tripled source mesh
         run: npm run verify:age-2-18
 
+      - name: Verify independent provider review discovery
+        run: npm run verify:provider-reputation
+
       - name: Smoke real keyless upstream data feeds (non-gating)
         continue-on-error: true
         run: npm run smoke:live-acquisition
