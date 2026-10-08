@@ -24,6 +24,7 @@ import {
 } from "@/lib/intelligence/phase3/indicator-catalog";
 import { REGULATORY_RULES, type AbaRole } from "@/lib/intelligence/phase3/regulatory-rules";
 import type { ResolvedLead } from "@/lib/intelligence/source-types";
+import { scanPublicSignals } from "@/lib/intelligence/signals/public-signal-scan";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,7 +41,7 @@ const EMPTY_STATE_CONTRIBUTION: StateSourceContribution = {
 const requestSchema = z.object({
   query: z.string().trim().min(3).max(1_000),
   location: z.string().trim().max(160).optional().default(""),
-  state: z.enum(["MO", "KS"]).optional().default("MO"),
+  state: z.enum(["MO", "KS", "CO"]).optional().default("MO"),
   engine: z.enum(["client", "rbt", "bcba"]).optional().default("client"),
   maxResults: z.coerce.number().int().min(3).max(40).optional().default(18),
 });
@@ -140,7 +141,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const searchQueries = plan.queries.slice(0, 10);
+  const searchQueries = plan.queries.slice(0, 15);
   for (let index = 0; index < searchQueries.length; index += 3) {
     const batch = searchQueries.slice(index, index + 3);
     const results = await Promise.all(batch.map(async (planQuery) => {
@@ -188,6 +189,14 @@ export async function POST(request: Request) {
   ).slice(0, maxResults);
   const resolved = mergeStateSourceLeads(resolvedPublic, stateContribution, targetLocation, maxResults);
 
+  const publicSignals = scanPublicSignals(rows.map((item) => item.hit));
+  observations.push(...publicSignals.observations);
+  sourceStatus.push({
+    source: "Public multi-source signal correlations",
+    status: "complete",
+    detail: publicSignals.clues.length + " observed clues, " + publicSignals.observations.length +
+      " independently supported indicators, " + publicSignals.supportedChecks + "/20 cross-checks",
+  });
   observations.push(...observationsFromResolvedLeads(resolved, engine));
   observations.push(...evidenceQualityObservations(resolved, sourceStatus));
   const dedupedObservations = dedupeObservations(observations);
@@ -237,6 +246,7 @@ export async function POST(request: Request) {
         coverage: selectedScore.coverage,
       },
       engineScores,
+      publicSignals,
       regulatoryRules: rules.map((rule) => ({
         id: rule.id,
         domain: rule.domain,
@@ -346,9 +356,9 @@ function roleForEngine(engine: LeadEngine): AbaRole {
   return "client";
 }
 
-function normalizedTargetLocation(location: string, state: "MO" | "KS") {
+function normalizedTargetLocation(location: string, state: "MO" | "KS" | "CO") {
   const trimmed = location.trim();
-  if (!trimmed) return state === "MO" ? "Missouri" : "Kansas";
+  if (!trimmed) return state === "MO" ? "Missouri" : state === "KS" ? "Kansas" : "Colorado";
   if (/\b(MO|Missouri|KS|Kansas)\b/i.test(trimmed)) return trimmed;
   return `${trimmed}, ${state}`;
 }
