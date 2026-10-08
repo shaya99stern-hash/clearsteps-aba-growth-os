@@ -19,7 +19,7 @@ assert.equal(CROSS_SOURCE_CHECKS.length, 20);
 assert.equal(new Set(CROSS_SOURCE_CHECKS.map((x) => x.id)).size, 20);
 assert.equal(coloradoWhere("Denver, Colorado"), "state = 'CO' AND upper(city) = 'DENVER'");
 assert.equal(coloradoWhere("Boulder County, Colorado"), "state = 'CO' AND upper(county) = 'BOULDER'");
-assert.equal(coloradoWhere("80202"), "zip = 80202");
+assert.equal(coloradoWhere("80202"), "zip = '80202'");
 const providers = parseColoradoChildCare([
   {provider_id:1,provider_name:"Licensed Preschool",provider_service_type:"Preschool",state:"CO",city:"Denver",county:"Denver",total_licensed_capacity:100},
   {provider_id:2,provider_name:"Family Home",provider_service_type:"Family Child Care Home",state:"CO",city:"Denver",county:"Denver",total_licensed_capacity:6},
