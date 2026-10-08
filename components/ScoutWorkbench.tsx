@@ -18,6 +18,7 @@ import {
 import type { ResolvedLead } from "@/lib/intelligence/source-types";
 import { canSaveToCrm, saveCrmLead } from "@/lib/crm/local-store";
 import { recordScoutRun } from "@/lib/intelligence/scout-history";
+import { buildLeadEvidenceGraph } from "@/lib/intelligence/signals/lead-evidence-graph";
 
 type Engine = "client" | "rbt" | "bcba";
 type TargetState = "MO" | "KS" | "CO";
@@ -447,6 +448,7 @@ function SourceRow({ source }: { source: SourceState }) {
 }
 
 function LeadDossier({ lead, onClose, onSave, saved }: { lead: ResolvedLead; onClose: () => void; onSave: () => void; saved: boolean }) {
+  const evidenceGraph = buildLeadEvidenceGraph(lead);
   return (
     <div className="sheetBackdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <article className="sheet" role="dialog" aria-modal="true" aria-label={`${lead.name} evidence dossier`}>
@@ -469,6 +471,38 @@ function LeadDossier({ lead, onClose, onSave, saved }: { lead: ResolvedLead; onC
           <span className="statusChip"><Users size={12} /> {lead.emails.length + lead.phones.length} contacts</span>
           <span className="statusChip"><Database size={12} /> {lead.domain || "domain unresolved"}</span>
         </div>
+
+        <section className="dossierSection" aria-label="Independent evidence corroboration">
+          <h3>Independent evidence review</h3>
+          <div className="factCard">
+            <div><span>Independent publishers</span><b>{evidenceGraph.publishers}</b></div>
+            <div><span>Official/government</span><b>{evidenceGraph.governmentSources}</b></div>
+            <div><span>Confirmed claims</span><b>{evidenceGraph.claims.filter((item) => item.supported).length}</b></div>
+            <div><span>Evidence status</span><b>{evidenceGraph.posture.replaceAll("_", " ")}</b></div>
+          </div>
+          <p>{evidenceGraph.explanation}</p>
+          {evidenceGraph.observedAt && (
+            <p>Last collected {evidenceGraph.observedAt.slice(0, 10)}. Collection date is not the source publication date.</p>
+          )}
+          {evidenceGraph.contradictions.length > 0 && (
+            <div className="unknownCard">
+              <b>Conflicts requiring manual verification</b>
+              {evidenceGraph.contradictions.map((conflict) => <p key={conflict}>{conflict}</p>)}
+            </div>
+          )}
+          {evidenceGraph.claims.length > 0 && (
+            <div className="stackList">
+              {evidenceGraph.claims.map((item) => (
+                <div className="stackRow" key={item.claim}>
+                  <div>
+                    <b>{item.claim.replaceAll("_", " ")} · {item.supported ? "Independent confirmation" : "Needs confirmation"}</b>
+                    <span>{item.sourceCount} publisher{item.sourceCount === 1 ? "" : "s"} · {item.sourceDomains.join(", ")}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
         <section className="dossierSection">
           <div className="sectionTitleRow">
