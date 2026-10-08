@@ -89,7 +89,7 @@ export function ClientGrowthPanel({ plan }: { plan: ClientGrowthPlan }) {
               rel={item.url.startsWith("/")?undefined:"noopener noreferrer"}
               className="mt-3 inline-flex min-h-9 items-center gap-1.5 text-xs font-semibold text-orange-200 underline underline-offset-4">
               {item.id==="staff_capacity"?<SearchCheck size={15}/>:<ArrowUpRight size={15}/>}
-              {item.id==="staff_capacity"?"Open RBT recruiter":"Open source"}
+              {item.id==="staff_capacity"?"Open RBT recruiter":item.id==="activate_intake"?"Preview family contact page":"Open source"}
             </a>}
           </article>
         ))}
