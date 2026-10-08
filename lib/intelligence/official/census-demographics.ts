@@ -1,3 +1,4 @@
+import { fetchSingleAgeCountyPopulation } from "./census-county-single-age";
 import { safeMeasuredPopulation3To17 } from "../signals/target-ages";
 import { fetchCensusReporterDemographics } from "./census-reporter";
 import type { IndicatorObservation } from "../phase3/indicator-catalog";
@@ -35,7 +36,7 @@ export interface CensusDemographicsResult {
     under18Share: number;
     under18FiveYearGrowth: number | null;
     age3to17: number;
-    ages2to18: null;
+    ages2to18: number | null;
     ageCohortNote: string;
   };
   observations: IndicatorObservation[];
@@ -43,7 +44,19 @@ export interface CensusDemographicsResult {
 }
 
 export async function fetchCensusDemographics(input: { state: "MO" | "KS" | "CO"; location: string }): Promise<CensusDemographicsResult> {
-  if (!process.env.CENSUS_API_KEY?.trim()) return fetchCensusReporterDemographics(input);
+  if (!process.env.CENSUS_API_KEY?.trim()) {
+    try {
+      return await fetchSingleAgeCountyPopulation(input);
+    } catch (error) {
+      // County file access or geography resolution is sometimes blocked by upstream servers.
+      // In that case use age-banded ACS only as limited context, never manufacture an exact total.
+      return fetchCensusReporterDemographics(input).catch((acsError) => {
+        const primary = error instanceof Error ? error.message : "official Census file unavailable";
+        const fallback = acsError instanceof Error ? acsError.message : "ACS mirror unavailable";
+        throw new Error("Single-age Census: " + primary + "; ACS age-band fallback: " + fallback);
+      });
+    }
+  }
   const geography = await resolveGeography(input.state, input.location, CURRENT_YEAR);
   const current = await fetchRow(CURRENT_YEAR, geography);
   const prior = await fetchPriorUnder18(geography).catch(() => null);
