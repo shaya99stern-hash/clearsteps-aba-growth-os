@@ -183,6 +183,14 @@ async function verifyMobilePwa(baseUrl: string) {
     assert.deepEqual(await engineButtons.allInnerTexts(), ["Clients", "RBTs", "BCBAs"]);
     assert.equal(await page.getByRole("button", { name: "Clients", exact: true }).getAttribute("aria-pressed"), "true");
 
+    const ageFocus = page.getByLabel("Client age focus");
+    assert.equal(await ageFocus.inputValue(), "2-18", "Client Scout must default to ages 2–18");
+    await ageFocus.selectOption("6-11");
+    assert.equal(await ageFocus.inputValue(), "6-11", "Operator can narrow research to school-age 6–11");
+    await ageFocus.selectOption("12-18");
+    assert.equal(await ageFocus.inputValue(), "12-18", "Adolescent 12–18 focus must work");
+    await assertNoBodyOverflow(page, "Narrow youth cohorts");
+
     const stateButtons = page.locator('[aria-label="Target state"] button');
     assert.equal(await stateButtons.count(), 3, "Scout should expose Missouri, Kansas and Colorado state controls");
     assert.deepEqual(await stateButtons.allInnerTexts(), ["Missouri", "Kansas", "Colorado"]);
@@ -205,6 +213,7 @@ async function verifyMobilePwa(baseUrl: string) {
     await page.getByRole("button", { name: "Kansas", exact: true }).click();
     await page.getByRole("button", { name: "RBTs", exact: true }).click();
     assert.equal(await page.getByRole("button", { name: "RBTs", exact: true }).getAttribute("aria-pressed"), "true");
+    assert.equal(await page.getByLabel("Client age focus").count(), 0, "Professional recruiting is not age-filtered");
 
     await page.goto(baseUrl + "/territories", { waitUntil: "domcontentloaded" });
     await assertNoBodyOverflow(page, "Territories");
