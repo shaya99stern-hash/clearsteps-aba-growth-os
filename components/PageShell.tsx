@@ -34,8 +34,8 @@ export function PageShell({
         </div>
         <AppNav />
         <div className="railFooter">
-          <span className="livePill"><i /> MO + KS intelligence</span>
-          <p>Client · RBT · BCBA evidence engine + durable workspace</p>
+          <span className="livePill"><i /> MO + KS + CO intelligence</span>
+          <p>Client acquisition · RBT recruiting · public evidence</p>
         </div>
       </aside>
 

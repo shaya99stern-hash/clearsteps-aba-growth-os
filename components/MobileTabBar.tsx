@@ -14,7 +14,7 @@ type MobileTab = {
 const tabs: MobileTab[] = [
   { label: "Scout", href: "/", icon: Search, active: (pathname) => pathname === "/" },
   { label: "Territories", href: "/territories", icon: Map, active: (pathname) => pathname.startsWith("/territories") },
-  { label: "CRM", href: "/pipeline", icon: KanbanSquare, active: (pathname) => pathname.startsWith("/pipeline") || pathname.startsWith("/talent") },
+  { label: "Sources", href: "/pipeline", icon: KanbanSquare, active: (pathname) => pathname.startsWith("/pipeline") || pathname.startsWith("/talent") },
   { label: "Tasks", href: "/tasks", icon: SquareCheckBig, active: (pathname) => pathname.startsWith("/tasks") },
   {
     label: "More",

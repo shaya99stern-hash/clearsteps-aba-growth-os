@@ -5,7 +5,7 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
   const params = await searchParams;
   const search = typeof params.search === "string" ? params.search.slice(0, 160) : "";
   return (
-    <PageShell title="Referral Pipeline" description="Evidence-backed organization relationships from discovery through referrals.">
+    <PageShell title="Market Sources" description="Public organizational research. These are not families seeking ABA services or confirmed clients; competitor ABA providers are market intelligence only.">
       <CrmPipeline key={search} mode="referral" initialQuery={search} />
     </PageShell>
   );

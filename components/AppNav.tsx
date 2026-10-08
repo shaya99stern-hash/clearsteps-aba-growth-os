@@ -27,7 +27,7 @@ const navGroups: WorkspaceNavGroup[] = [
   {
     label: "Relationships",
     items: [
-      { label: "Referral CRM", href: "/pipeline", icon: KanbanSquare },
+      { label: "Market Sources", href: "/pipeline", icon: KanbanSquare },
       { label: "Talent CRM", href: "/talent", icon: Users },
       { label: "Outreach", href: "/outreach", icon: Mail },
     ],

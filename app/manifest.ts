@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "ABA Engine · Clear Steps",
     short_name: "ABA Engine",
-    description: "Missouri and Kansas ABA client, RBT, and BCBA intelligence with evidence-first CRM workflows.",
+    description: "Missouri, Kansas and Colorado public client-acquisition research and RBT recruiting.",
     start_url: "/",
     display: "standalone",
     background_color: "#0d0d0f",

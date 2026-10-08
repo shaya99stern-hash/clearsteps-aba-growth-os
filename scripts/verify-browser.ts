@@ -25,6 +25,7 @@ async function verifyClearStepsUi(baseUrl: string) {
   await verifyDesktopCrm(baseUrl);
   await verifyMobilePwa(baseUrl);
   await verifyClientGrowthOnIphone(baseUrl);
+  await verifyPublicFamilyEntry(baseUrl);
 }
 
 async function verifyDesktopCrm(baseUrl: string) {
@@ -65,7 +66,7 @@ async function verifyDesktopCrm(baseUrl: string) {
   try {
     await page.goto(`${baseUrl}/pipeline`, { waitUntil: "domcontentloaded" });
     await assertNoBodyOverflow(page, "Referral CRM desktop");
-    await assertActiveNavigation(page, "Referral CRM");
+    await assertActiveNavigation(page, "Market Sources");
 
     const rail = page.locator(".workspaceRail");
     assert.equal(await rail.count(), 1, "desktop CRM should expose one persistent workspace rail");
@@ -308,6 +309,30 @@ async function verifyClientGrowthOnIphone(baseUrl:string) {
     assert.equal(await page.getByRole("button",{name:"Save to CRM"}).count(),0);
   } finally {
     await context.close();
+  }
+}
+
+async function verifyPublicFamilyEntry(baseUrl:string) {
+  for(const width of [390,1280]) {
+    const page=await browser.newPage({viewport:{width,height:844}});
+    try {
+      await page.goto(baseUrl+"/families",{waitUntil:"domcontentloaded"});
+      await page.getByRole("heading",{name:"Find the next step toward ABA support."}).waitFor();
+      assert.equal(await page.locator("form, input, textarea, select").count(),0,
+        "Family-facing entry must not collect identifiable patient or medical details in unprotected app forms");
+      assert.equal(await page.getByText("No family contact, diagnoses or medical histories are collected on this page.").count(),1);
+      assert.equal(await page.getByRole("heading",{name:"What to expect"}).count(),1);
+      assert.equal(await page.getByRole("heading",{name:"Adolescents"}).count(),1);
+      await assertNoBodyOverflow(page,"Family entry at width "+width);
+      const inactive=await page.getByText("Intake contact is not yet activated.").count();
+      if(inactive>0){
+        const robots=await page.locator('meta[name="robots"]').getAttribute("content");
+        assert(robots?.includes("noindex"),"Unconfigured intake page must not be indexed as accepting inquiries");
+      } else {
+        const callOrIntake=await page.locator('a[href^="tel:"],a[target="_blank"]').count();
+        assert(callOrIntake>0,"A published service page must expose a verified agency contact destination");
+      }
+    } finally {await page.close();}
   }
 }
 

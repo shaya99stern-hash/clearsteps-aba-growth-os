@@ -75,6 +75,9 @@ jobs:
       - name: Verify family acquisition and staffing readiness
         run: npm run verify:client-growth
 
+      - name: Verify safe family contact activation
+        run: npm run verify:family-contact
+
       - name: Verify age 2–18 tripled source mesh
         run: npm run verify:age-2-18
 
