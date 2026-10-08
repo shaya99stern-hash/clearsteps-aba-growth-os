@@ -1,3 +1,4 @@
+import { safeMeasuredPopulation3To17 } from "../signals/target-ages";
 import { fetchCensusReporterDemographics } from "./census-reporter";
 import type { IndicatorObservation } from "../phase3/indicator-catalog";
 
@@ -33,6 +34,9 @@ export interface CensusDemographicsResult {
     age12to17: number;
     under18Share: number;
     under18FiveYearGrowth: number | null;
+    age3to17: number;
+    ages2to18: null;
+    ageCohortNote: string;
   };
   observations: IndicatorObservation[];
   sourceUrl: string;
@@ -53,22 +57,18 @@ export async function fetchCensusDemographics(input: { state: "MO" | "KS" | "CO"
   const under18Share = totalPopulation > 0 ? (under18 / totalPopulation) * 100 : 0;
   const under18FiveYearGrowth = prior && prior > 0 ? ((under18 - prior) / prior) * 100 : null;
 
+  const ageCohort = safeMeasuredPopulation3To17({age3to5,age6to11,age12to17});
   const observations: IndicatorObservation[] = [
-    observation("demographic-demand.01", absoluteDemandScore(age0to2, 7_500), 92, CURRENT_YEAR),
     observation("demographic-demand.02", absoluteDemandScore(age3to5, 7_500), 92, CURRENT_YEAR),
     observation("demographic-demand.03", absoluteDemandScore(age6to11, 15_000), 92, CURRENT_YEAR),
     observation("demographic-demand.04", absoluteDemandScore(age12to17, 15_000), 92, CURRENT_YEAR),
-    observation("demographic-demand.05", scaleRange(under18Share, 12, 30), 90, CURRENT_YEAR),
   ];
-  if (under18FiveYearGrowth !== null) {
-    observations.push(observation("demographic-demand.06", scaleRange(under18FiveYearGrowth, -10, 12), 82, CURRENT_YEAR));
-  }
 
   return {
     geographyName: current.NAME || geography.label,
     geographyKind: geography.kind,
     year: CURRENT_YEAR,
-    metrics: { totalPopulation, under18, age0to2, age3to5, age6to11, age12to17, under18Share, under18FiveYearGrowth },
+    metrics: { totalPopulation, under18, age0to2, age3to5, age6to11, age12to17, under18Share, under18FiveYearGrowth, age3to17:ageCohort.ages3to17, ages2to18:null, ageCohortNote:ageCohort.note },
     observations,
     sourceUrl: `https://api.census.gov/data/${CURRENT_YEAR}/acs/acs5/groups/B09001.html`,
   };
