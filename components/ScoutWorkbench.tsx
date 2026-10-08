@@ -100,7 +100,7 @@ type SearchResponse = {
     clues: Array<{
       indicatorId: string; name: string; group: string;
       sourceCount: number; corroborated: boolean;
-      sourceDomains: string[]; geographySupported: boolean;
+      sourceDomains: string[]; geographySupported: boolean; ageSupported: boolean;
     }>;
     crossChecks: Array<{
       id: string; title: string; status: "supported" | "partial" | "unobserved"; sourceCount: number;
@@ -109,7 +109,7 @@ type SearchResponse = {
 };
 
 const ENGINE_PROMPTS: Record<Engine, string> = {
-  client: "Find the strongest client-growth territories and public referral organizations, and explain the evidence behind each opportunity.",
+  client: "Find public organizational referral opportunities and programs serving ages 2–18, with evidence from independent sources.",
   rbt: "Find RBT hiring pressure, talent supply, employers, training signals and recruiting opportunities, with Missouri/Kansas/Colorado compliance context.",
   bcba: "Find BCBA/LBA hiring pressure, licensed analyst supply, employers and recruiting opportunities, with state licensure context.",
 };
@@ -357,8 +357,8 @@ export function ScoutWorkbench({
           {response?.publicSignals && (
             <details className="sourceDisclosure">
               <summary>
-                <span>60 public market indicators + 20 cross-checks</span>
-                <span>{response.publicSignals.observations.length} supported · {response.publicSignals.supportedChecks}/20 linked</span>
+                <span>180 public signal hypotheses + 60 cross-checks</span>
+                <span>{response.publicSignals.observations.length} supported · {response.publicSignals.supportedChecks}/60 linked</span>
               </summary>
               <div className="sourceRail">
                 <p>Every clue is screened against distinct public sources. Unconfirmed reports remain leads for additional research and do not add points to the market score. Personal residential details are excluded.</p>
@@ -367,7 +367,7 @@ export function ScoutWorkbench({
                     <i className={`sourceDot ${clue.corroborated ? "complete" : "unavailable"}`} />
                     <div>
                       <b>{clue.name} · {clue.corroborated ? "Corroborated" : "Needs independent evidence"}</b>
-                      <span>{clue.sourceCount} distinct domains · {clue.geographySupported ? "Area verified" : "Location not corroborated"} · {clue.sourceDomains.join(", ")}</span>
+                      <span>{clue.sourceCount} distinct domains · {clue.geographySupported ? "Area verified" : "Location not corroborated"} · {clue.ageSupported ? "Target ages supported" : "Age not confirmed"} · {clue.sourceDomains.join(", ")}</span>
                     </div>
                   </div>
                 ))}
