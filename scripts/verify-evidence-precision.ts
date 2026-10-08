@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import {publicPublisherId,samePublicNarrative,matchesPublishedArea} from "../lib/intelligence/signals/publisher-evidence";
 import {scanPublicSignals} from "../lib/intelligence/signals/public-signal-scan";
+import {buildLeadEvidenceGraph} from "../lib/intelligence/signals/lead-evidence-graph";
+import {summarizeCompanyReviewEvidence} from "../lib/intelligence/signals/competitor-reviews";
+import type {SearchEvidence} from "../lib/intelligence/source-types";
 import type {PublicSearchHit} from "../lib/intelligence/source-types";
 const hit=(host:string,text:string):PublicSearchHit=>({
   url:"https://"+host+"/institutional-report",title:text,snippet:"",query:"school-age services",
@@ -46,4 +49,60 @@ const valid=scanPublicSignals([
 assert(valid.observations.some((x)=>x.indicatorId==="service-capacity.01"),
   "Independent age-qualified reports from the same verified locality should qualify");
 assert.equal(valid.crossChecks.length,60);
+assert.notEqual(publicPublisherId("one.k12.mo.us"),publicPublisherId("two.k12.mo.us"),
+  "Separate school districts must be distinct publishers");
+const lateRelevant=scanPublicSignals([
+  hit("local.example.org","ABA waitlist for school age children in Boulder Colorado"),
+  hit("local.example.org","ABA waitlist for elementary school children in Denver Colorado"),
+  hit("district.edu","ABA waitlist in Denver CO preschool service program"),
+],"2026-10-08","Denver, CO","2-18");
+assert(lateRelevant.observations.some((x)=>x.indicatorId==="service-capacity.01"),
+  "A later eligible hit on the same publisher must not be discarded by an earlier off-area hit");
+
+function ev(url:string,snippet:string,sourceId="public-web"):SearchEvidence {
+  return {id:url,url,title:"Institution directory",snippet,sourceId,
+    capturedAt:"2026-10-08T01:00:00Z",query:"public organization",purpose:"discover"};
+}
+const rumors=buildLeadEvidenceGraph({
+  kind:"referral",domain:"clinic.example",emails:[],phones:[],
+  evidence:[
+    ev("https://unknown.net/first","Licensed child care facility present on directory"),
+    ev("https://randomsource.org/second","Public reports separately say licensed child care facility exists"),
+  ],
+});
+assert.equal(rumors.claims.find((x)=>x.claim==="institution_exists")?.supported,false,
+  "Unrelated .org domains must not be treated as institutional authorities");
+
+const realCorroboration=buildLeadEvidenceGraph({
+  kind:"referral",domain:"clinic.example",emails:[],phones:[],
+  evidence:[
+    ev("https://licensing.gov/record","State license report describes licensed child care facility","mo-dhss-child-care-gis"),
+    ev("https://clinic.example/license","Organization directory confirms licensed preschool facility in the service region","public-website"),
+  ],
+});
+assert.equal(realCorroboration.posture,"corroborated");
+assert(realCorroboration.claims.find((x)=>x.claim==="institution_exists")?.supported);
+
+const reposted=buildLeadEvidenceGraph({
+  kind:"referral",domain:"clinic.example",emails:[],phones:[],
+  evidence:[
+    ev("https://agency.gov/report","Official facility licensed child care is confirmed in this public report"),
+    ev("https://press.org/copy","Official facility licensed child care is confirmed in this public report"),
+  ],
+});
+assert.notEqual(reposted.posture,"corroborated","Syndicated primary-source story alone cannot confirm a claim");
+const conflicting=buildLeadEvidenceGraph({
+  kind:"organization",domain:"clinic.example",emails:[],phones:[],
+  evidence:[
+    ev("https://clinic.example/intake","Now accepting new patients at the service clinic"),
+    ev("https://localnews.org/report","Not accepting new patients at the service clinic"),
+  ],
+});
+assert.equal(conflicting.posture,"conflicting");
+assert(!conflicting.claims.find((x)=>x.claim==="service_available")?.supported);
+const review=summarizeCompanyReviewEvidence({id:"c",name:"Example ABA Therapy",domain:"clinic.example"},[],"Denver CO");
+assert.equal(review.status,"no_public_evidence");
+assert.equal(review.reviewLinks.length,2);
+assert(review.reviewLinks.every((link)=>link.linkOnly));
+
 console.log("Publisher precision passed: parent-domain dedupe, locality/state, syndication and age 2-18 corroboration.");
