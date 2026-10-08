@@ -6,16 +6,14 @@ const SEARCH_ENDPOINT = "https://html.duckduckgo.com/html/";
 
 export async function searchPublicWeb(query: string, limit = 8): Promise<PublicSearchHit[]> {
   const requested = Math.max(1, Math.min(limit, 20));
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 7500);
   const errors: string[] = [];
-  try {
+  {
     const body = new URLSearchParams({ q: query, kl: "us-en" });
     try {
       const response = await fetch(SEARCH_ENDPOINT, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded", "user-agent": "Mozilla/5.0 ClearStepsResearch/1.0" },
-        body, redirect: "follow", cache: "no-store", signal: controller.signal,
+        body, redirect: "follow", cache: "no-store", signal: AbortSignal.timeout(5000),
       });
       if (!response.ok) throw new Error("HTTP " + response.status);
       const results = parseDuckDuckGo(await response.text(), query);
@@ -39,7 +37,7 @@ export async function searchPublicWeb(query: string, limit = 8): Promise<PublicS
       errors.push("Bing RSS: " + (error instanceof Error ? error.message : "unavailable"));
     }
     throw new Error(errors.join("; "));
-  } finally { clearTimeout(timer); }
+  }
 }
 export function parseBingRss(xml: string, query: string): PublicSearchHit[] {
   const result: PublicSearchHit[]=[];
