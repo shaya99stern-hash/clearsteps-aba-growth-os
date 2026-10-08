@@ -13,7 +13,7 @@ import type { PublicSearchHit } from "../lib/intelligence/source-types";
 
 assert.equal(INDICATOR_PILLARS.length, 30);
 assert.equal(INDICATOR_CATALOG.length, 300);
-assert.equal(new Set(INDICATOR_CATALOG.map((x) => x.id)).size, 180);
+assert.equal(new Set(INDICATOR_CATALOG.map((x) => x.id)).size, 300);
 assert.equal(PUBLIC_SIGNAL_RULES.length, 60);
 assert.equal(CROSS_SOURCE_CHECKS.length, 20);
 assert.equal(new Set(CROSS_SOURCE_CHECKS.map((x) => x.id)).size, 20);
