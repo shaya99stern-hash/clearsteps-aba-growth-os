@@ -39,6 +39,20 @@ export interface RegulatoryDecision {
 
 export const REGULATORY_RULES: readonly RegulatoryRule[] = [
   {
+    id: "co-future-analyst-license",
+    state: "CO",
+    domain: "licensure",
+    title: "Colorado practitioner licensing begins July 1, 2028",
+    summary: "HB26-1425 was enacted June 2026. Its behavior analyst and assistant licensing requirement begins July 1, 2028, with applicable exceptions and implementation rules; it is not a current 2026 blanket license requirement.",
+    roles: ["bcba", "laba"],
+    payers: ["commercial", "medicaid", "self-funded", "unknown"],
+    effectiveDate: "2028-07-01",
+    lastVerifiedAt: "2026-10-08",
+    sourceUrl: "https://leg.colorado.gov/bills/HB26-1425",
+    sourceLabel: "Colorado General Assembly enacted HB26-1425",
+    posture: "REVIEW",
+  },
+  {
     id: "mo-lba-practice-337-315",
     state: "MO",
     domain: "licensure",
