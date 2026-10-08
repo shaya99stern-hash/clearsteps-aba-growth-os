@@ -75,6 +75,9 @@ jobs:
       - name: Verify youth age groups and organizational referral qualification
         run: npm run verify:youth-qualification
 
+      - name: Verify independent publisher and locality precision
+        run: npm run verify:evidence-precision
+
       - name: Smoke real keyless upstream data feeds (non-gating)
         continue-on-error: true
         run: npm run smoke:live-acquisition
