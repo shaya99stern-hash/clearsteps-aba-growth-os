@@ -352,7 +352,7 @@ export function ScoutWorkbench({
                     <i className={`sourceDot ${clue.corroborated ? "complete" : "unavailable"}`} />
                     <div>
                       <b>{clue.name} · {clue.corroborated ? "Corroborated" : "Needs independent evidence"}</b>
-                      <span>{clue.sourceCount} distinct domains · {clue.sourceDomains.join(", ")}</span>
+                      <span>{clue.sourceCount} distinct domains · {clue.geographySupported ? "Area verified" : "Location not corroborated"} · {clue.sourceDomains.join(", ")}</span>
                     </div>
                   </div>
                 ))}
