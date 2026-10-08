@@ -25,6 +25,7 @@ import {
 import { REGULATORY_RULES, type AbaRole } from "@/lib/intelligence/phase3/regulatory-rules";
 import type { ResolvedLead } from "@/lib/intelligence/source-types";
 import { scanPublicSignals } from "@/lib/intelligence/signals/public-signal-scan";
+import { assessOpportunityReliability } from "@/lib/intelligence/score-reliability";
 import { PUBLIC_SOURCE_CHANNELS, matchedPublicSourceChannels } from "@/lib/intelligence/signals/source-channel-catalog";
 
 export const runtime = "nodejs";
@@ -234,13 +235,22 @@ export async function POST(request: Request) {
     rbt: scoreEngineFromObservations("rbt", dedupedObservations),
     bcba: scoreEngineFromObservations("bcba", dedupedObservations),
   };
+  const independentPublishers = new Set([
+    ...rows.map((row) => safeDomain(row.hit.url)).filter((item): item is string => Boolean(item)),
+    ...stateContribution.referralHits.map((hit) => safeDomain(hit.url)).filter((item): item is string => Boolean(item)),
+  ]).size;
+  const scoreReliability = Object.fromEntries(
+    (["client", "rbt", "bcba"] as const).map((name) =>
+      [name, assessOpportunityReliability(engineScores[name], independentPublishers)]
+    )
+  ) as Record<LeadEngine, ReturnType<typeof assessOpportunityReliability>>;
   const selectedScore = engineScores[engine];
   const rules = REGULATORY_RULES.filter((rule) => rule.state === state && rule.roles.includes(roleForEngine(engine)));
   const screened = rows.length + stateContribution.referralHits.length;
   const territory = {
     location: census?.geographyName ?? targetLocation,
-    total: selectedScore.score,
-    label: scoreLabel(selectedScore.score),
+    total: scoreReliability[engine].displayScore ?? 0,
+    label: scoreReliability[engine].label,
     confidence: selectedScore.confidence,
     coverage: selectedScore.coverage,
     reasoning: selectedScore.pillarBreakdown
@@ -275,6 +285,7 @@ export async function POST(request: Request) {
         coverage: selectedScore.coverage,
       },
       engineScores,
+      scoreReliability,
       publicSignals,
       regulatoryRules: rules.map((rule) => ({
         id: rule.id,
