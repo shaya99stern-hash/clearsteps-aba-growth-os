@@ -25,6 +25,7 @@ import {
 import { REGULATORY_RULES, type AbaRole } from "@/lib/intelligence/phase3/regulatory-rules";
 import type { ResolvedLead } from "@/lib/intelligence/source-types";
 import { scanPublicSignals } from "@/lib/intelligence/signals/public-signal-scan";
+import { PUBLIC_SOURCE_CHANNELS, matchedPublicSourceChannels } from "@/lib/intelligence/signals/source-channel-catalog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,7 +50,7 @@ const requestSchema = z.object({
 export async function POST(request: Request) {
   const parsed = requestSchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) {
-    return NextResponse.json({ ok: false, error: "Enter a valid Missouri/Kansas research request." }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "Enter a valid Missouri, Kansas or Colorado research request." }, { status: 400 });
   }
 
   const { query, location, state, engine, maxResults } = parsed.data;
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
   if (!policy.allowed) return NextResponse.json({ ok: false, error: policy.reason }, { status: 400 });
 
   const targetLocation = normalizedTargetLocation(location, state);
-  const plan = buildSearchPlan(query, targetLocation, engine);
+  const plan = buildSearchPlan(query, targetLocation, engine, state);
   const stateSourceDescriptor = scoutStateSourceDescriptor(state, engine);
   const sourceStatus: SourceState[] = [
     { source: "U.S. Census ACS", status: "working", detail: "child population + five-year demographic context" },
@@ -157,7 +158,23 @@ export async function POST(request: Request) {
     }
     if (rows.length >= maxResults * 3) break;
   }
-  completeSource(sourceStatus, "Public Web Search", `${rows.filter((row) => row.hit.sourceId === "duckduckgo-html").length} fallback/search result(s) screened`);
+  const webHits = rows.filter((row) => row.hit.sourceId === "duckduckgo-html" || row.hit.sourceId === "bing-rss").length;
+  if (webHits === 0) {
+    unavailableSource(sourceStatus, "Public Web Search", "0 public web results. Search providers returned nothing or were unavailable; do not mistake this for evidence that no services exist.");
+    errors.push("public web search: no verified search results from keyless public search providers");
+  } else {
+    completeSource(sourceStatus, "Public Web Search", webHits + " real public search results from keyless DuckDuckGo or Bing RSS");
+  }
+  const matchedDomains = matchedPublicSourceChannels(rows.map((row) => row.hit.url));
+  sourceStatus.push({
+    source: "Public source channel coverage",
+    status: matchedDomains.length > 0 ? "complete" : "unavailable",
+    detail: PUBLIC_SOURCE_CHANNELS.length + " registered public-source channels; " +
+      plan.queries.filter((item) => item.query.startsWith("site:")).length +
+      " site searches scheduled; " + matchedDomains.length +
+      " channel domains actually returned results" +
+      (matchedDomains.length ? ": " + matchedDomains.slice(0, 7).join(", ") : ""),
+  });
 
   const uniqueForEnrichment = Array.from(
     new Map(rows
@@ -177,7 +194,12 @@ export async function POST(request: Request) {
       errors.push(`browser enrichment: ${error instanceof Error ? error.message : "failed"}`);
     }
   }));
-  completeSource(sourceStatus, "Public Website Enrichment", `${uniqueForEnrichment.filter((row) => row.enrichment).length} public website(s) enriched`);
+  const enrichedCount = uniqueForEnrichment.filter((row) => row.enrichment).length;
+  if (enrichedCount > 0) {
+    completeSource(sourceStatus, "Public Website Enrichment", enrichedCount + " actual public pages enriched");
+  } else {
+    unavailableSource(sourceStatus, "Public Website Enrichment", "No public pages could be independently enriched; contacts are not verified.");
+  }
 
   const enrichmentByDomain = new Map(uniqueForEnrichment.map((row) => [safeDomain(row.hit.url), row.enrichment]));
   const resolvedPublic = resolveSearchHits(
@@ -359,7 +381,7 @@ function roleForEngine(engine: LeadEngine): AbaRole {
 function normalizedTargetLocation(location: string, state: "MO" | "KS" | "CO") {
   const trimmed = location.trim();
   if (!trimmed) return state === "MO" ? "Missouri" : state === "KS" ? "Kansas" : "Colorado";
-  if (/\b(MO|Missouri|KS|Kansas)\b/i.test(trimmed)) return trimmed;
+  if (/\b(MO|Missouri|KS|Kansas|CO|Colorado)\b/i.test(trimmed)) return trimmed;
   return `${trimmed}, ${state}`;
 }
 
