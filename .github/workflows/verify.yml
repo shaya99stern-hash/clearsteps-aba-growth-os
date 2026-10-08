@@ -72,6 +72,9 @@ jobs:
       - name: Verify public organization contact follow-up
         run: npm run verify:institutional-followup
 
+      - name: Verify family acquisition and staffing readiness
+        run: npm run verify:client-growth
+
       - name: Verify age 2–18 tripled source mesh
         run: npm run verify:age-2-18
 
