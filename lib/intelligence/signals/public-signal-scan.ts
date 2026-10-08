@@ -11,6 +11,7 @@ export interface PublicSignalClue {
   evidenceTypes: string[];
   /** Sources are domains only; never provide direct links to family posts. */
   sourceDomains: string[];
+  geographySupported: boolean;
 }
 
 export interface PublicSignalCrossCheck {
@@ -65,8 +66,23 @@ function createCandidate(hit: PublicSearchHit): Candidate | null {
   return { text: text.toLowerCase(), host, sourceClass: classify(host) };
 }
 
+/** Search query terms never count as geography evidence. Require published place text. */
+export function matchesPublicTerritory(text: string, targetLocation: string): boolean {
+  const cleaned = targetLocation.trim().replace(/,\s*(missouri|kansas|colorado|mo|ks|co)$/i, "").trim();
+  if (!cleaned || /^statewide$/i.test(cleaned)) return true;
+  const postal = cleaned.match(/\b\d{5}\b/)?.[0];
+  if (postal) return new RegExp("\\b" + postal + "\\b").test(text);
+  const target = cleaned.replace(/\bcounty\b/gi, "").trim();
+  if (!target) return true;
+  const names: Record<string,string> = {MO:"Missouri",KS:"Kansas",CO:"Colorado"};
+  const region = names[target.toUpperCase()] ?? target;
+  const words = region.split(/\s+/).map((word) => word.replace(/[^a-z0-9]/gi, "")).filter(Boolean);
+  if (!words.length) return false;
+  return new RegExp("\\b" + words.join("\\s+") + "\\b", "i").test(text);
+}
+
 /** Pure, deterministic, bounded cross-reference stage. Uncorroborated signals never raise a score. */
-export function scanPublicSignals(hits: readonly PublicSearchHit[], capturedAt = new Date().toISOString()): PublicSignalScan {
+export function scanPublicSignals(hits: readonly PublicSearchHit[], capturedAt = new Date().toISOString(), targetLocation = ""): PublicSignalScan {
   const candidates = hits.slice(0, 250).map(createCandidate).filter((item): item is Candidate => Boolean(item));
   const clues: PublicSignalClue[] = [];
   const observations: IndicatorObservation[] = [];
@@ -78,11 +94,12 @@ export function scanPublicSignals(hits: readonly PublicSearchHit[], capturedAt =
     // Multiple search hits from a single website are one source, not corroboration.
     const hosts = new Map(matched.map((item) => [item.host, item]));
     const independent = [...hosts.values()];
+    const localized = independent.filter((item) => matchesPublicTerritory(item.text, targetLocation));
     const sourceTypes = [...new Set(independent.map((item) => item.sourceClass))];
-    const institutional = independent.some((item) => item.sourceClass !== "community" && item.sourceClass !== "other");
+    const institutional = localized.some((item) => item.sourceClass !== "community" && item.sourceClass !== "other");
     const corroborated = rule.community
-      ? independent.length >= 3 && institutional
-      : independent.length >= 2 && institutional;
+      ? localized.length >= 3 && institutional
+      : localized.length >= 2 && institutional;
     const hostSet = new Set(independent.map((item) => item.host));
     hostsByIndicator.set(rule.id, hostSet);
 
@@ -94,16 +111,17 @@ export function scanPublicSignals(hits: readonly PublicSearchHit[], capturedAt =
       sourceCount: independent.length,
       evidenceTypes: sourceTypes,
       sourceDomains: [...hostSet].slice(0, 8),
+      geographySupported: localized.length >= 2,
     });
 
     if (corroborated) {
-      const official = independent.some((item) => item.sourceClass === "official");
-      const confidence = Math.min(86, 48 + 7 * independent.length + (official ? 9 : 0));
+      const official = localized.some((item) => item.sourceClass === "official");
+      const confidence = Math.min(86, 48 + 7 * localized.length + (official ? 9 : 0));
       observations.push({
         indicatorId: rule.id,
-        value: Math.min(85, 50 + 7 * independent.length),
+        value: Math.min(85, 50 + 7 * localized.length),
         confidence,
-        sourceIds: [...hostSet].slice(0, 8),
+        sourceIds: localized.map((item) => item.host).slice(0, 8),
         capturedAt,
       });
     }
