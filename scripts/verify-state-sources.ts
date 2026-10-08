@@ -103,7 +103,7 @@ assert.deepEqual(density.sourceIds, ["mo-dhss-child-care-gis"]);
 
 assert.deepEqual(
   stateSourceSelection("MO", "client"),
-  { missouriChildCare: true, kansasEarlyIntervention: false },
+  { missouriChildCare: true, kansasEarlyIntervention: false, coloradoChildCare: false },
   "Missouri Client research should use the Missouri child-care source",
 );
 assert.equal(stateSourceSelection("MO", "rbt").missouriChildCare, false, "RBT recruiting should not run the child-care collector");
