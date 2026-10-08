@@ -7,14 +7,22 @@ export const COLORADO_CHILDCARE_SOURCE = "co-cdec-licensed-childcare";
 
 export interface ColoradoChildCareFacility {
   id: string; name: string; kind: string; city: string; county: string;
-  zip?: string; capacity?: number; sourceUrl: string;
+  zip?: string; capacity?: number; resourceReferral?: string; earlyChildhoodCouncil?: string; schoolDistrictOperated?: boolean; sourceUrl: string;
 }
 type SocrataRow = {
   provider_id?: string | number; provider_name?: string;
   provider_service_type?: string; city?: string; county?: string;
   state?: string; zip?: string | number; total_licensed_capacity?: string | number;
+  ccrr?: string; ecc?: string; school_district_operated_program?: boolean | string;
 };
 function norm(value: unknown) { return String(value ?? "").trim(); }
+/** Ignore missing/placeholder entries and any person-like or residential field. */
+function safePublicOrganization(value: unknown):string|undefined {
+  const text=norm(value).slice(0,130);
+  if(!text || /^(none|n\/a|not applicable|unknown|no ccrr|no ecc|not assigned|unavailable)$/i.test(text))return undefined;
+  if(/(?:@|https?:|\d{3}[- .]\d{3}[- .]\d{4}|\b\d+\s+(?:st|ave|road|drive|street)\b)/i.test(text))return undefined;
+  return text;
+}
 function safeLocation(value: string) {
   return value.replace(/\b(Colorado|CO)\b/gi, "").replace(/,/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -48,6 +56,10 @@ export function parseColoradoChildCare(rows: unknown): ColoradoChildCareFacility
       county: norm(row.county).slice(0, 100),
       zip: norm(row.zip).slice(0, 5) || undefined,
       capacity: Number.isFinite(capacity) && capacity >= 0 ? capacity : undefined,
+      resourceReferral: safePublicOrganization(row.ccrr),
+      earlyChildhoodCouncil: safePublicOrganization(row.ecc),
+      schoolDistrictOperated: row.school_district_operated_program === true ||
+        String(row.school_district_operated_program).toLowerCase() === "true",
       sourceUrl: COLORADO_CHILDCARE_DATASET,
     });
   }
@@ -58,7 +70,7 @@ export async function searchColoradoChildCare(location: string, limit = 120): Pr
     "$where": coloradoWhere(location),
     "$limit": String(Math.max(1, Math.min(limit, 200))),
     "$order": "provider_name ASC",
-    "$select": "provider_id,provider_name,provider_service_type,city,county,state,zip,total_licensed_capacity",
+    "$select": "provider_id,provider_name,provider_service_type,city,county,state,zip,total_licensed_capacity,ccrr,ecc,school_district_operated_program",
   });
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 9_000);
@@ -70,6 +82,37 @@ export async function searchColoradoChildCare(location: string, limit = 120): Pr
     if (!response.ok) throw new Error("Colorado CDEC dataset HTTP " + response.status);
     return parseColoradoChildCare(await response.json());
   } finally { clearTimeout(timer); }
+}
+/** Official agency relationship clues: CCRR and local councils, not patient-level referrals.
+ * Repeated affiliations count as ONE organization. All retain the same CDEC publisher.
+ */
+export function coloradoPublicReferralNetworkHits(providers: readonly ColoradoChildCareFacility[], location:string): PublicSearchHit[] {
+  const organizations=new Map<string,{name:string;category:"Child Care Resource & Referral"|"Early Childhood Council";cities:Set<string>;facilities:number}>();
+  for(const facility of providers) {
+    for(const entry of [
+      {name:facility.resourceReferral,category:"Child Care Resource & Referral" as const},
+      {name:facility.earlyChildhoodCouncil,category:"Early Childhood Council" as const},
+    ]) {
+      if(!entry.name)continue;
+      const key=entry.category+":"+entry.name.toLowerCase().replace(/[^a-z0-9]/g,"");
+      const existing=organizations.get(key)??{name:entry.name,category:entry.category,cities:new Set<string>(),facilities:0};
+      existing.facilities++;
+      if(facility.city)existing.cities.add(facility.city);
+      organizations.set(key,existing);
+    }
+  }
+  return [...organizations.values()].sort((a,b)=>b.facilities-a.facilities)
+    .slice(0,30).map((item,index)=>({
+      title:item.name,
+      url:COLORADO_CHILDCARE_DATASET,
+      snippet:"Official Colorado CDEC listing identifies this institutional " + item.category +
+        " affiliated with " + item.facilities + " observed licensed nonresidential facility listings"+
+        (item.cities.size?" in "+[...item.cities].slice(0,3).join(", "):"")+
+        ". Geographic coverage and affiliation require verification. This is not evidence of ABA demand or an active clinical referral relationship.",
+      query:"CDEC institutional "+item.category+" "+location+"; organization "+item.name,
+      sourceId:"co-cdec-referral-network",
+      rank:index+1,
+    }));
 }
 export function coloradoChildCareToSearchHits(providers: readonly ColoradoChildCareFacility[], location: string): PublicSearchHit[] {
   return providers.map((entry, index) => ({
