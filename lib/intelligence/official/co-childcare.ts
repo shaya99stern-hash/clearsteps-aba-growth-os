@@ -21,7 +21,7 @@ function safeLocation(value: string) {
 export function coloradoWhere(location: string) {
   const clean = safeLocation(location);
   const postcode = clean.match(/\b\d{5}\b/)?.[0];
-  if (postcode) return "zip = " + Number(postcode);
+  if (postcode) return "zip = '" + postcode + "'";
   const county = /\bcounty\b/i.test(clean) ? clean.replace(/\bcounty\b/gi, "").trim() : null;
   if (!clean || /^statewide$/i.test(clean)) return "state = 'CO'";
   const target = (county ?? clean).replace(/[^A-Za-z0-9 -]/g, "").toUpperCase().replace(/'/g, "''");
