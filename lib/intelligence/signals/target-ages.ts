@@ -18,7 +18,7 @@ export function assessPublicAgeFit(input: string): PublicAgeFit {
       return contained.some(([min, max]) => min === SERVICE_AGE_MIN && max === SERVICE_AGE_MAX)
         ? "explicit_target" : "target_subset";
     }
-    if (numeric.every(([,max]) => max < SERVICE_AGE_MIN || numeric.every(([min]) => min > SERVICE_AGE_MAX))) return "outside";
+    if (numeric.every(([min,max]) => max < SERVICE_AGE_MIN || min > SERVICE_AGE_MAX)) return "outside";
     return "mixed_ages";
   }
   if (UNDERAGE.test(text) || ADULT.test(text)) return SCHOOL_CUES.test(text) ? "mixed_ages" : "outside";
