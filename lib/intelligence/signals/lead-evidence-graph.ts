@@ -83,6 +83,8 @@ export function buildLeadEvidenceGraph(lead: Pick<ResolvedLead, "kind" | "eviden
       const text = [entry.title, entry.snippet].join(" ").slice(0, 2000);
       for (const [claim, pattern] of POSITIVE) {
         if (!pattern.test(text)) continue;
+        if (claim === "service_available" &&
+          /\b(not accepting new|no longer accepting|intake closed|wait ?list closed)\b/i.test(text)) continue;
         const votes = claimSources.get(claim) ?? new Set();
         votes.add(domain);
         claimSources.set(claim, votes);
