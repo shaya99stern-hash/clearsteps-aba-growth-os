@@ -501,9 +501,12 @@ export function matchedPublicSourceChannels(urls:readonly string[]) {
     let hostname:string;
     try {hostname=new URL(value).hostname.replace(/^www\./,"").toLowerCase();}
     catch {continue;}
-    for(const channel of PUBLIC_SOURCE_CHANNELS) {
-      if(hostname===channel.host || hostname.endsWith("."+channel.host))matched.add(channel.host);
-    }
+    // A subdomain belongs to its most specific registered channel only.
+    // Do not count cdec.colorado.gov and colorado.gov as two independent sources.
+    const matches=PUBLIC_SOURCE_CHANNELS.filter((channel) =>
+      hostname===channel.host || hostname.endsWith("."+channel.host)
+    ).sort((a,b)=>b.host.length-a.host.length);
+    if(matches[0])matched.add(matches[0].host);
   }
   return [...matched].sort();
 }
