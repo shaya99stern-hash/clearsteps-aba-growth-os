@@ -320,6 +320,8 @@ async function verifyPublicFamilyEntry(baseUrl:string) {
       await page.getByRole("heading",{name:"Find the next step toward ABA support."}).waitFor();
       assert.equal(await page.locator("form, input, textarea, select").count(),0,
         "Family-facing entry must not collect identifiable patient or medical details in unprotected app forms");
+      assert.equal(await page.locator('a[href="/"]').count(),0,
+        "Public families page must never invite families into the internal agency workspace");
       assert.equal(await page.getByText("No family contact, diagnoses or medical histories are collected on this page.").count(),1);
       assert.equal(await page.getByRole("heading",{name:"What to expect"}).count(),1);
       assert.equal(await page.getByRole("heading",{name:"Adolescents"}).count(),1);
