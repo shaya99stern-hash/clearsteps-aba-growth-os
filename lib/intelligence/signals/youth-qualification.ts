@@ -130,6 +130,26 @@ export function qualifyYouthLead(
   };
 }
 
+/** Only explicit public program age ranges can corroborate a narrower child cohort.
+ * A preschool or high school keyword by itself is not proof of admission ages. */
+export function publicTextCoversYouthAgeBand(text:string, requested:YouthAgeBand):boolean {
+  const band=AGE_BANDS[requested];
+  return ranges(text).some((range)=>range.min<=band.min && range.max>=band.max);
+}
+
+/** Each age lane maps to a specific public-institution research question. */
+export function ageBandSearchQueries(band:YouthAgeBand,location:string) {
+  const place=location.slice(0,90);
+  const exact=band==="2-5"?"ages 2-5 preschool early intervention":
+    band==="6-11"?"ages 6-11 elementary school":
+    band==="12-18"?"ages 12-18 teen school-age":"ages 2-18 children school-age";
+  return [
+    `ABA developmental services ${exact} ${place}`,
+    `pediatric therapy referral center ${exact} ${place}`,
+    `special education service capacity waitlist ${exact} ${place}`,
+  ];
+}
+
 export function youthLeadPriority(fit:YouthLeadQualification):number {
   const role=fit.organizationRole==="potential_referral"?15:
     fit.organizationRole==="school_program"?10:
