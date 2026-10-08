@@ -3,6 +3,7 @@ import { evidencePosture, latestTerritoryRuns, type ScoutRun } from "../lib/inte
 import { buildOperatorQueue, operatorSummary } from "../lib/intelligence/operator-insights";
 import type { SavedCrmLead } from "../lib/crm/local-store";
 import type { SavedTask } from "../lib/tasks/local-store";
+import { prepareCrmLeadSave } from "../lib/crm/promotion";
 
 const now = Date.parse("2026-10-08T10:00:00.000Z");
 const base: ScoutRun = {
@@ -34,4 +35,9 @@ assert(queue.some((item) => item.kind === "territory"));
 assert(!buildOperatorQueue([], [], [], now).length);
 assert.equal(operatorSummary([old, base, ks], [lead], [task], now).savedTerritories, 2);
 assert(!buildOperatorQueue([], [lead], [{ ...task, entityId: "ref-1" }], now).some((item) => item.kind === "crm"));
-console.log("Command center research/queue tests passed.");
+const previouslyQualified = { ...lead, stage: "Qualified", savedAt: "2026-09-01T00:00:00.000Z" } as SavedCrmLead;
+const resaved = prepareCrmLeadSave(lead, previouslyQualified, "2026-10-08T00:00:00.000Z");
+assert.equal(resaved.stage, "Qualified", "Re-discovery must not reset CRM stage");
+assert.equal(resaved.savedAt, previouslyQualified.savedAt, "Re-discovery must preserve original save date");
+assert.equal(resaved.updatedAt, "2026-10-08T00:00:00.000Z");
+console.log("Command center and CRM re-discovery regression tests passed.");
