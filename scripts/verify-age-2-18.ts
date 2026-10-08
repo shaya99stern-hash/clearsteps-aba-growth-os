@@ -1,0 +1,74 @@
+import assert from "node:assert/strict";
+import { PUBLIC_SOURCE_CHANNELS, choosePublicSourceChannels } from "../lib/intelligence/signals/source-channel-catalog";
+import { PUBLIC_SIGNAL_RULES, CROSS_SOURCE_CHECKS } from "../lib/intelligence/signals/extended-catalog";
+import { AGES_2_TO_18_PILLARS, AGES_2_TO_18_RULES, AGES_2_TO_18_CHECKS } from "../lib/intelligence/signals/age-2-18-catalog";
+import { INDICATOR_CATALOG, INDICATOR_PILLARS } from "../lib/intelligence/phase3/indicator-catalog";
+import { assessPublicAgeFit, isAgeAlignedPublicProgram, safeMeasuredPopulation3To17 } from "../lib/intelligence/signals/target-ages";
+import { scanPublicSignals } from "../lib/intelligence/signals/public-signal-scan";
+import type { PublicSearchHit } from "../lib/intelligence/source-types";
+
+assert(PUBLIC_SOURCE_CHANNELS.length >= 228, "Must triple the original 76 candidate public publisher channels");
+assert.equal(new Set(PUBLIC_SOURCE_CHANNELS.map((item) => item.host)).size,PUBLIC_SOURCE_CHANNELS.length,
+  "Publisher hostnames must remain uniquely addressable");
+assert.equal(AGES_2_TO_18_PILLARS.length,12);
+assert.equal(AGES_2_TO_18_RULES.length,120);
+assert.equal(PUBLIC_SIGNAL_RULES.length+AGES_2_TO_18_RULES.length,180);
+assert.equal(CROSS_SOURCE_CHECKS.length+AGES_2_TO_18_CHECKS.length,60);
+assert.equal(new Set([...CROSS_SOURCE_CHECKS,...AGES_2_TO_18_CHECKS].map((c)=>c.id)).size,60);
+assert.equal(INDICATOR_PILLARS.length,30);
+assert.equal(INDICATOR_CATALOG.length,300);
+assert.equal(new Set(INDICATOR_CATALOG.map((c)=>c.id)).size,300);
+
+const getHits=(text:string,domain:string):PublicSearchHit=>({
+  title:text,url:"https://"+domain+"/school-program",snippet:"Denver CO school age " + text,query:"ABA Denver Colorado",
+  sourceId:"bing-rss",rank:1,
+});
+assert.equal(assessPublicAgeFit("program ages 2-18"),"explicit_target");
+assert.equal(assessPublicAgeFit("program ages 13-18"),"target_subset");
+assert.equal(assessPublicAgeFit("program ages 0-21"),"mixed_ages");
+assert.equal(assessPublicAgeFit("preschool program"),"target_subset");
+assert.equal(assessPublicAgeFit("ages 19-25 only"),"outside");
+assert.equal(assessPublicAgeFit("children ages 0-2 only"),"outside");
+assert(!isAgeAlignedPublicProgram("autism awareness road sign outside a particular home"));
+const age3to17=safeMeasuredPopulation3To17({age3to5:1500,age6to11:3500,age12to17:2500});
+assert.equal(age3to17.ages3to17,7500);
+assert.equal(age3to17.exactAge2to18,null,"Cannot invent age 2 and 18 from grouped ACS tables");
+
+const complete=scanPublicSignals([
+  getHits("ABA waitlist for preschool ages 2-5", "district.edu"),
+  getHits("ABA waitlist in elementary school program", "localpaper.com"),
+],"2026-10-08","Denver, CO","2-18");
+assert.equal(complete.ageRange?.join("-"),"2-18");
+assert(complete.observations.some((x)=>x.indicatorId==="service-capacity.01"),
+  "Two independent age-aligned publishers can corroborate an institutional service clue");
+
+const excluded=scanPublicSignals([
+  getHits("ABA waitlist for children ages 0-1", "district.edu"),
+  getHits("ABA waitlist for adults ages 19-25", "localpaper.com"),
+],"2026-10-08","Denver, CO","2-18");
+assert.equal(excluded.observations.length,0,"Off-age evidence never increases client market score");
+
+const mixed=scanPublicSignals([
+  getHits("ABA waitlist ages 0-21", "district.edu"),
+  getHits("ABA waitlist ages 0-21", "localpaper.com"),
+],"2026-10-08","Denver, CO","2-18");
+assert.equal(mixed.observations.length,0,"Public programs spanning out-of-scope ages require clarification");
+
+const repeated=scanPublicSignals([
+  getHits("ABA waitlist elementary school Denver", "first.org"),
+  getHits("ABA waitlist elementary school Denver", "second.org"),
+],"2026-10-08","Denver, CO","2-18");
+assert.equal(repeated.observations.length,0,"Exact syndicated narrative may not self-corroborate");
+
+const uncorroborated=scanPublicSignals([
+  getHits("Teen autism community program expansion", "localpaper.com"),
+],"2026-10-08","Denver, CO","2-18");
+assert.equal(uncorroborated.observations.length,0,"One public source is research only");
+assert.equal(uncorroborated.crossChecks.length,60);
+
+for(const state of ["MO","KS","CO"] as const) {
+  const client=choosePublicSourceChannels(state,"client","school-age resource",8);
+  assert(client.some((c)=>c.scope===state),"Must look at local official and community publishers");
+  assert(client.every((c)=>["federal","national",state].includes(c.scope)),"No unrelated state sources");
+}
+console.log("2–18 institutional intelligence: 274 candidate channels, 300 indicator definitions, 180 text rules, 60 checks, age/syndication/privacy safeguards.");
