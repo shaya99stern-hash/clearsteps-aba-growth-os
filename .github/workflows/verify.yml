@@ -66,6 +66,9 @@ jobs:
       - name: Verify evidence graph and no-key source mesh
         run: npm run verify:evidence-mesh
 
+      - name: Verify age 2–18 tripled source mesh
+        run: npm run verify:age-2-18
+
       - name: Smoke real keyless upstream data feeds (non-gating)
         continue-on-error: true
         run: npm run smoke:live-acquisition
