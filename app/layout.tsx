@@ -11,7 +11,7 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 
 export const metadata: Metadata = {
   title: { default: "Clear Steps", template: "%s · Clear Steps" },
-  description: "Missouri and Kansas ABA client, RBT, and BCBA intelligence with evidence-first CRM workflows.",
+  description: "Missouri, Kansas and Colorado client-acquisition research, RBT staffing and public market intelligence.",
   applicationName: "ABA Engine",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
