@@ -17,7 +17,8 @@
     "verify:evidence-mesh": "tsx scripts/verify-evidence-mesh.ts",
     "smoke:live-acquisition": "tsx scripts/smoke-live-acquisition.ts",
     "verify:age-2-18": "tsx scripts/verify-age-2-18.ts",
-    "verify:provider-reputation": "tsx scripts/verify-provider-reputation.ts"
+    "verify:provider-reputation": "tsx scripts/verify-provider-reputation.ts",
+    "verify:evidence-precision": "tsx scripts/verify-evidence-precision.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",
