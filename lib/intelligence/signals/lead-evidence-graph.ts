@@ -65,7 +65,7 @@ function category(item: SearchEvidence, domain: string) {
 }
 
 /** Evidence is scoped to one organization or a territorial community signal, never a family. */
-export function buildLeadEvidenceGraph(lead: Pick<ResolvedLead, "kind" | "evidence" | "emails" | "phones">): LeadEvidenceGraph {
+export function buildLeadEvidenceGraph(lead: Pick<ResolvedLead, "kind" | "evidence" | "emails" | "phones" | "domain">): LeadEvidenceGraph {
   const publishers = new Map<string, {items: SearchEvidence[]; type: ReturnType<typeof category>}>();
   for (const item of lead.evidence) {
     const domain = host(item.url);
@@ -116,7 +116,7 @@ export function buildLeadEvidenceGraph(lead: Pick<ResolvedLead, "kind" | "eviden
   const dates = lead.evidence.map((item) => item.capturedAt).filter((x) => Number.isFinite(Date.parse(x))).sort();
   return {
     publishers: numberOfPublishers,
-    firstPartySources: institutionalSources,
+    firstPartySources: lead.domain ? [...publishers.keys()].filter((publisher) => publisher === publicationGroup(lead.domain!)).length : 0,
     governmentSources,
     institutionalSources,
     communitySources,
