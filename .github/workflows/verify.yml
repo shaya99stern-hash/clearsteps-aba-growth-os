@@ -63,6 +63,9 @@ jobs:
       - name: Verify Colorado and cross-source public indicators
         run: npm run verify:colorado-signals
 
+      - name: Verify evidence graph and no-key source mesh
+        run: npm run verify:evidence-mesh
+
       - name: Verify Missouri/Kansas state sources
         run: npx tsx scripts/verify-state-sources.ts
 
