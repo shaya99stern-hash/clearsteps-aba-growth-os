@@ -1,3 +1,4 @@
+import { EXPANDED_PUBLIC_SOURCE_CHANNELS } from "./expanded-source-channels";
 import type { LeadEngine } from "../phase3/indicator-catalog";
 export interface PublicSourceChannel {
   host: string;
@@ -6,7 +7,7 @@ export interface PublicSourceChannel {
   method: "site-search";
 }
 /** Sites are discoverable candidates, not claims of an active integration or confirmed hits. */
-export const PUBLIC_SOURCE_CHANNELS: readonly PublicSourceChannel[] = [
+const ORIGINAL_PUBLIC_SOURCE_CHANNELS: readonly PublicSourceChannel[] = [
   {
     "host": "census.gov",
     "scope": "federal",
@@ -465,24 +466,31 @@ export const PUBLIC_SOURCE_CHANNELS: readonly PublicSourceChannel[] = [
   }
 ];
 
+/** Candidate publisher hostnames, NOT 274 live adapters or 274 proven independent sources. */
+export const PUBLIC_SOURCE_CHANNELS: readonly PublicSourceChannel[] = [
+  ...ORIGINAL_PUBLIC_SOURCE_CHANNELS,
+  ...EXPANDED_PUBLIC_SOURCE_CHANNELS,
+];
+
 function relevant(item: PublicSourceChannel, engine: LeadEngine) {
-  if (engine === "client") return item.kind !== "workforce" && item.kind !== "contracts";
-  return ["workforce", "license", "education", "rules", "press", "research", "legislation"].includes(item.kind);
+  if (engine === "client") return !["workforce", "contracts", "context"].includes(item.kind);
+  return ["workforce", "license", "education", "rules", "press", "research", "legislation", "organization"].includes(item.kind);
 }
 /** Deterministic rotation allows later runs to investigate different registered public sources. */
 export function choosePublicSourceChannels(
-  state: "MO" | "KS" | "CO", engine: LeadEngine, location: string, max = 5,
+  state: "MO" | "KS" | "CO", engine: LeadEngine, location: string, max = 8, rotation = 0,
 ): PublicSourceChannel[] {
   const local = PUBLIC_SOURCE_CHANNELS.filter((item)=>item.scope===state && relevant(item,engine));
   const federal = PUBLIC_SOURCE_CHANNELS.filter((item)=>item.scope==="federal" && relevant(item,engine));
   const national = PUBLIC_SOURCE_CHANNELS.filter((item)=>item.scope==="national" && relevant(item,engine));
-  const seed=[...location.toLowerCase()].reduce((value,char)=>((value*31)+char.charCodeAt(0))>>>0,17);
+  const seed = ([...location.toLowerCase()].reduce((value,char)=>((value*31)+char.charCodeAt(0))>>>0,17) +
+    Math.max(0, Math.floor(rotation)) * 101;
   const rotated=(entries: PublicSourceChannel[],number:number,offset:number)=>
     entries.length ? Array.from({length:Math.min(number,entries.length)},(_,i)=>entries[(seed+offset+i)%entries.length]) : [];
   return [...new Map([
-    ...rotated(local,Math.ceil(max/2),0),
-    ...rotated(federal,1,1),
-    ...rotated(national,Math.floor(max/2),3),
+    ...rotated(local,Math.ceil(max * 0.5),0),
+    ...rotated(federal,Math.max(1,Math.floor(max * 0.25)),7),
+    ...rotated(national,Math.max(1,Math.floor(max * 0.25)),19),
   ].map((item)=>[item.host,item] as const)).values()].slice(0,max);
 }
 export function queryForPublicSource(channel:PublicSourceChannel,location:string,engine:LeadEngine) {
@@ -490,9 +498,10 @@ export function queryForPublicSource(channel:PublicSourceChannel,location:string
     channel.kind==="workforce"?(engine==="bcba"?"BCBA behavior analyst hiring":"RBT behavior technician hiring"):
     channel.kind==="education"?"early intervention child find":
     channel.kind==="payer"?"ABA Medicaid provider network":
-    channel.kind==="community"?"ABA therapy services resources":
+    channel.kind==="community"?"public regional youth service availability programs":
     channel.kind==="license"?"behavior analyst licensing professional":
-    "child developmental services referral";
+    channel.kind==="demographic"?"children ages 2 to 18 population county":
+    "pediatric developmental services ages 2-18 referral organizations";
   return "site:"+channel.host+" "+term+" "+location;
 }
 export function matchedPublicSourceChannels(urls:readonly string[]) {
