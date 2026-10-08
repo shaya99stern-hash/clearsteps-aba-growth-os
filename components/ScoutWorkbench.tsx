@@ -67,6 +67,9 @@ type SearchResponse = {
       age12to17: number;
       under18Share: number;
       under18FiveYearGrowth: number | null;
+      age3to17: number;
+      ages2to18: null;
+      ageCohortNote: string;
     };
   } | null;
   indicatorSummary?: {
@@ -327,9 +330,10 @@ export function ScoutWorkbench({
 
               {response.demographics && (
                 <div className="demographicStrip" aria-label={`${response.demographics.geographyName} demographic context`}>
-                  <div className="demographicCard"><span>Under 18</span><b>{formatCount(response.demographics.metrics.under18)}</b></div>
-                  <div className="demographicCard"><span>Age 0–5</span><b>{formatCount(response.demographics.metrics.age0to2 + response.demographics.metrics.age3to5)}</b></div>
-                  <div className="demographicCard"><span>5-year child trend</span><b>{formatGrowth(response.demographics.metrics.under18FiveYearGrowth)}</b></div>
+                  <div className="demographicCard"><span>Ages 3–5</span><b>{formatCount(response.demographics.metrics.age3to5)}</b></div>
+                  <div className="demographicCard"><span>Ages 6–11</span><b>{formatCount(response.demographics.metrics.age6to11)}</b></div>
+                  <div className="demographicCard"><span>Ages 12–17</span><b>{formatCount(response.demographics.metrics.age12to17)}</b></div>
+                  <p className="demographicNote" role="note">{response.demographics.metrics.ageCohortNote ?? "Population age 2 and age 18 not available from this grouped source. No exact 2–18 total inferred."}</p>
                 </div>
               )}
 
@@ -372,7 +376,7 @@ export function ScoutWorkbench({
                   </div>
                 ))}
                 <details className="ruleDisclosure">
-                  <summary>All 20 relationship checks</summary>
+                  <summary>All 60 relationship checks</summary>
                   <div className="ruleList">
                     {response.publicSignals.crossChecks.map((check) => (
                       <div className="ruleRow" key={check.id}>
