@@ -2,6 +2,7 @@
 
 import type { ResolvedLead } from "@/lib/intelligence/source-types";
 import { reconcileTimestampedRecords } from "@/lib/sync/reconcile";
+import { prepareCrmLeadSave } from "@/lib/crm/promotion";
 
 export type PipelineStage =
   | "Discovered"
@@ -81,16 +82,11 @@ export function saveCrmLead(lead: ResolvedLead): SavedCrmLead {
   if (!canSaveToCrm(lead)) {
     throw new Error("Area-level signals are intelligence only and cannot be saved as outreach contacts.");
   }
-  const pipeline = lead.kind === "candidate" ? "talent" : "referral";
   const now = new Date().toISOString();
-  const saved: SavedCrmLead = {
-    ...lead,
-    savedAt: now,
-    updatedAt: now,
-    pipeline,
-    stage: "Discovered",
-  };
   const current = loadCrmLeads();
+  const existing = current.find((item) => item.id === lead.id);
+  const saved = prepareCrmLeadSave(lead, existing, now);
+  if (saved === existing) return saved;
   const next = [saved, ...current.filter((item) => item.id !== saved.id)];
   writeCrmLeads(next);
   void persistCrmLead(saved);
