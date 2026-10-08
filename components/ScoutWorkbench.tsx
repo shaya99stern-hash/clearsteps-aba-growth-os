@@ -96,6 +96,20 @@ type SearchResponse = {
     reasoning: string[];
   };
   errors?: string[];
+  providerReputation?: Record<string,{
+    organizationId:string;
+    organizationName:string;
+    distinctPublishers:number;
+    verifiedReviewCount:0;
+    finding:"unverified";
+    guidance:string;
+    reviews:Array<{
+      url:string;
+      publisher:string;
+      access:"link_only"|"third_party_context";
+      verification:"not_verified";
+    }>;
+  }>;
   publicSignals?: {
     inspected: number;
     supportedChecks: number;
@@ -455,7 +469,7 @@ export function ScoutWorkbench({
         </section>
       )}
 
-      {selected && <LeadDossier lead={selected} onClose={() => setSelected(null)} onSave={() => saveLead(selected)} saved={savedIds.has(selected.id)} />}
+      {selected && <LeadDossier lead={selected} reputation={response?.providerReputation?.[selected.id]} onClose={() => setSelected(null)} onSave={() => saveLead(selected)} saved={savedIds.has(selected.id)} />}
     </div>
   );
 }
@@ -469,7 +483,7 @@ function SourceRow({ source }: { source: SourceState }) {
   );
 }
 
-function LeadDossier({ lead, onClose, onSave, saved }: { lead: ResolvedLead; onClose: () => void; onSave: () => void; saved: boolean }) {
+function LeadDossier({ lead, reputation, onClose, onSave, saved }: { lead: ResolvedLead; reputation?: NonNullable<SearchResponse["providerReputation"]>[string]; onClose: () => void; onSave: () => void; saved: boolean }) {
   const evidenceGraph = buildLeadEvidenceGraph(lead);
   return (
     <div className="sheetBackdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
@@ -525,6 +539,27 @@ function LeadDossier({ lead, onClose, onSave, saved }: { lead: ResolvedLead; onC
             </div>
           )}
         </section>
+
+        {reputation && (
+          <section className="dossierSection" aria-label="Public competitor reputation sources">
+            <h3>Public reputation / competitor reviews</h3>
+            <p>{reputation.reviews.length
+              ? reputation.reviews.length + " review or public press links found across " + reputation.distinctPublishers + " source type(s). None has been treated as independently verified."
+              : "No review-source links verified for this organization. An empty result is not a positive or negative rating."}</p>
+            <div className="stackList">
+              {reputation.reviews.map((review) => (
+                <a className="stackRow evidenceRow" href={review.url} target="_blank" rel="noopener noreferrer" key={review.url}>
+                  <div>
+                    <b>{review.publisher} · Open original source</b>
+                    <span>{review.access === "link_only" ? "Direct verification only; reviews not scraped" : "Public media context; not independently verified"}</span>
+                  </div>
+                  <ExternalLink size={16} aria-hidden="true" />
+                </a>
+              ))}
+            </div>
+            <p>Reviewers' identities, children, medical details and individual experiences are never added to CRM leads. Cross-check service claims with separate public sources.</p>
+          </section>
+        )}
 
         <section className="dossierSection">
           <div className="sectionTitleRow">
