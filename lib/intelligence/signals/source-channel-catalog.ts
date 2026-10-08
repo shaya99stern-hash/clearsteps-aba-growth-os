@@ -483,7 +483,7 @@ export function choosePublicSourceChannels(
   const local = PUBLIC_SOURCE_CHANNELS.filter((item)=>item.scope===state && relevant(item,engine));
   const federal = PUBLIC_SOURCE_CHANNELS.filter((item)=>item.scope==="federal" && relevant(item,engine));
   const national = PUBLIC_SOURCE_CHANNELS.filter((item)=>item.scope==="national" && relevant(item,engine));
-  const seed = ([...location.toLowerCase()].reduce((value,char)=>((value*31)+char.charCodeAt(0))>>>0,17) +
+  const seed = [...location.toLowerCase()].reduce((value,char)=>((value*31)+char.charCodeAt(0))>>>0,17) +
     Math.max(0, Math.floor(rotation)) * 101;
   const rotated=(entries: PublicSourceChannel[],number:number,offset:number)=>
     entries.length ? Array.from({length:Math.min(number,entries.length)},(_,i)=>entries[(seed+offset+i)%entries.length]) : [];
