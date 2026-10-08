@@ -68,7 +68,7 @@ type SearchResponse = {
       under18Share: number;
       under18FiveYearGrowth: number | null;
       age3to17: number;
-      ages2to18: null;
+      ages2to18: number | null;
       ageCohortNote: string;
     };
   } | null;
@@ -330,6 +330,9 @@ export function ScoutWorkbench({
 
               {response.demographics && (
                 <div className="demographicStrip" aria-label={`${response.demographics.geographyName} demographic context`}>
+                  {response.demographics.metrics.ages2to18 != null && (
+                    <div className="demographicCard"><span>Exact ages 2–18</span><b>{formatCount(response.demographics.metrics.ages2to18)}</b></div>
+                  )}
                   <div className="demographicCard"><span>Ages 3–5</span><b>{formatCount(response.demographics.metrics.age3to5)}</b></div>
                   <div className="demographicCard"><span>Ages 6–11</span><b>{formatCount(response.demographics.metrics.age6to11)}</b></div>
                   <div className="demographicCard"><span>Ages 12–17</span><b>{formatCount(response.demographics.metrics.age12to17)}</b></div>
