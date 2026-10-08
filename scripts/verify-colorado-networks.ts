@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { parseColoradoChildCare, coloradoPublicReferralNetworkHits, coloradoWhere } from "../lib/intelligence/official/co-childcare";
+import { parseColoradoChildCare, coloradoPublicReferralNetworkHits } from "../lib/intelligence/official/co-childcare";
 import { buildStateSourceContribution } from "../lib/intelligence/official/state-source-contribution";
 import { resolveSearchHits } from "../lib/intelligence/entity-resolution";
 
