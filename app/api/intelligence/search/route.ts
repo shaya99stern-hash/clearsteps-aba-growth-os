@@ -355,15 +355,15 @@ function observationsFromResolvedLeads(leads: ResolvedLead[], engine: LeadEngine
   const hiringSignals = leads.filter((lead) => lead.kind === "talent_signal" || lead.signals.includes("hiring"));
   const observations: IndicatorObservation[] = [];
 
-  if (engine === "client") {
+  if (engine === "client" && leads.length > 0) {
     observations.push({ indicatorId: "relationship-quality.01", value: ratioScore(contactable, Math.max(1, leads.length)), confidence: 70, sourceIds, capturedAt });
     observations.push({ indicatorId: "relationship-quality.10", value: scaledCount(leads.reduce((sum, lead) => sum + lead.evidence.length, 0), 30), confidence: 68, sourceIds, capturedAt });
   }
-  if (engine === "rbt") {
+  if (engine === "rbt" && hiringSignals.length > 0) {
     observations.push({ indicatorId: "rbt-workforce.01", value: scaledCount(hiringSignals.length, 12), confidence: 62, sourceIds, capturedAt });
     observations.push({ indicatorId: "rbt-workforce.08", value: scaledCount(new Set(hiringSignals.map((lead) => lead.domain || lead.name)).size, 8), confidence: 60, sourceIds, capturedAt });
   }
-  if (engine === "bcba") {
+  if (engine === "bcba" && hiringSignals.length > 0) {
     observations.push({ indicatorId: "bcba-workforce.01", value: scaledCount(hiringSignals.length, 10), confidence: 62, sourceIds, capturedAt });
     observations.push({ indicatorId: "bcba-workforce.10", value: scaledCount(new Set(hiringSignals.map((lead) => lead.domain || lead.name)).size, 8), confidence: 60, sourceIds, capturedAt });
   }
@@ -372,15 +372,24 @@ function observationsFromResolvedLeads(leads: ResolvedLead[], engine: LeadEngine
 
 function evidenceQualityObservations(leads: ResolvedLead[], sourceStatus: SourceState[]): IndicatorObservation[] {
   const evidence = leads.flatMap((lead) => lead.evidence);
-  const sourceIds = Array.from(new Set(evidence.map((item) => item.sourceId)));
-  const workingSources = sourceStatus.filter((source) => source.status === "complete").length;
-  const confidence = leads.length ? Math.round(leads.reduce((sum, lead) => sum + lead.confidence, 0) / leads.length) : 0;
+  if (evidence.length === 0) return []; // No actual evidence is unknown, not an observed zero.
+  const publishers = Array.from(new Set(
+    evidence.map((item) => safeDomain(item.url)).filter((domain): domain is string => Boolean(domain)),
+  ));
+  if (publishers.length === 0) return [];
+  const sourceIds = publishers;
+  const collectionSources = sourceStatus.filter((source) =>
+    source.status === "complete" &&
+    !["Public source channel coverage", "Public multi-source signal correlations"].includes(source.source),
+  ).length;
+  const confidence = Math.round(leads.reduce((sum, lead) => sum + lead.confidence, 0) / leads.length);
   const capturedAt = new Date().toISOString();
   return [
-    { indicatorId: "evidence-quality.01", value: scaledCount(sourceIds.length, 8), confidence: 90, sourceIds, capturedAt },
-    { indicatorId: "evidence-quality.02", value: scaledCount(workingSources, 5), confidence: 90, sourceIds, capturedAt },
-    { indicatorId: "evidence-quality.05", value: evidence.length ? 92 : 0, confidence: 90, sourceIds, capturedAt },
-    { indicatorId: "evidence-quality.06", value: confidence, confidence: 80, sourceIds, capturedAt },
+    { indicatorId: "evidence-quality.01", value: scaledCount(publishers.length, 8), confidence: 80, sourceIds, capturedAt },
+    { indicatorId: "evidence-quality.02", value: scaledCount(collectionSources, 5), confidence: 80, sourceIds, capturedAt },
+    // One website, even with 100 identical pages, provides no independent corroboration.
+    { indicatorId: "evidence-quality.05", value: publishers.length >= 2 ? scaledCount(publishers.length - 1, 6) : 0, confidence: 82, sourceIds, capturedAt },
+    { indicatorId: "evidence-quality.06", value: confidence, confidence: 70, sourceIds, capturedAt },
   ];
 }
 
