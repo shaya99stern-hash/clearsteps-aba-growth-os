@@ -19,10 +19,10 @@ const TALENT_STAGES: TalentStage[] = ["Discovered", "Verified", "Contacted", "Re
 const dateFormatter = new Intl.DateTimeFormat("en", { month: "short", day: "numeric" });
 const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export function CrmPipeline({ mode }: { mode: "referral" | "talent" }) {
+export function CrmPipeline({ mode, initialQuery = "" }: { mode: "referral" | "talent"; initialQuery?: string }) {
   const leads = useSyncExternalStore(subscribeCrmLeads, loadCrmLeads, getServerCrmLeads);
-  const [view, setView] = useState<"board" | "list">("board");
-  const [query, setQuery] = useState("");
+  const [view, setView] = useState<"board" | "list">(initialQuery ? "list" : "board");
+  const [query, setQuery] = useState(initialQuery);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const drawerRef = useRef<HTMLElement | null>(null);
   const openerRef = useRef<HTMLButtonElement | null>(null);

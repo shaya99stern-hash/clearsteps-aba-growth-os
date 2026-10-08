@@ -1,33 +1,21 @@
+import Link from "next/link";
 import { InfoCard, PageShell } from "@/components/PageShell";
-
-const serviceStates = ["NJ", "MO"];
-const insurance = ["Cigna", "Optum", "MHS", "Aetna", "Anthem"];
-const compliance = [
-  "Physical mailing address required before any bulk outreach workflow",
-  "Unsubscribe footer required",
-  "Daily send limit required",
-  "Manual review required before outreach",
-  "Organization-level referral intelligence only",
-];
 
 export default function SettingsPage() {
   return (
-    <PageShell title="Settings" description="Operational settings placeholders for Clear Steps ABA territory, insurance, and outreach compliance controls.">
-      <div className="grid gap-4 lg:grid-cols-3">
-        <InfoCard title="Service states">
-          <div className="flex flex-wrap gap-2 text-sm">
-            {serviceStates.map((state) => <span key={state} className="rounded-full bg-cyan-50 px-3 py-1 font-bold text-cyan-800">{state}</span>)}
-          </div>
+    <PageShell title="Settings" description="What this workspace actually does, and what requires verification before an operational decision.">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <InfoCard title="New research: Missouri + Kansas" description="Scout acquires public, organization-level evidence for Clients, RBTs, and BCBAs. Historical records from other states remain in the CRM; they do not change the new-research scope.">
+          <Link href="/" className="underline underline-offset-4">Open Scout →</Link>
         </InfoCard>
-        <InfoCard title="Accepted insurance placeholders">
-          <div className="flex flex-wrap gap-2 text-sm">
-            {insurance.map((name) => <span key={name} className="rounded-full bg-slate-50 px-3 py-1 font-bold text-slate-700">{name}</span>)}
-          </div>
+        <InfoCard title="Storage and synchronization" description="The most recent 30 summarized Scout research results are kept on this device for immediate comparison. CRM, tasks and full server research records use PostgreSQL when DATABASE_URL is configured; device storage remains available as a fallback.">
+          <Link href="/connectors" className="underline underline-offset-4">Inspect source availability →</Link>
         </InfoCard>
-        <InfoCard title="Compliance requirements">
-          <ul className="space-y-2 text-sm text-slate-600">
-            {compliance.map((item) => <li key={item}>• {item}</li>)}
-          </ul>
+        <InfoCard title="Coverage and credentials" description="A high research score is not proof of payer acceptance, state licensure or recruiting eligibility. Check current official rules and direct primary-source evidence before acting.">
+          <Link href="/intelligence" className="underline underline-offset-4">Review intelligence →</Link>
+        </InfoCard>
+        <InfoCard title="Outreach protections" description="Manual review is mandatory. No patient/household targeting, private-group scraping, PHI-based mass marketing or scraping registries solely for recruiting. Sending is intentionally disabled until an authorized compliance-reviewed delivery workflow exists.">
+          <Link href="/outreach" className="underline underline-offset-4">Reviewed outreach drafts →</Link>
         </InfoCard>
       </div>
     </PageShell>
