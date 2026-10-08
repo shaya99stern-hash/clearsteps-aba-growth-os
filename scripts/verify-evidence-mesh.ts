@@ -1,4 +1,9 @@
 import assert from "node:assert/strict";
+import { assessOpportunityReliability } from "../lib/intelligence/score-reliability";
+import { parseNppesResponse } from "../lib/intelligence/official/nppes-live";
+import { KANSAS_PUBLISHED_PROGRAMS } from "../lib/intelligence/official/ks-roster-snapshot";
+import { buildKansasEarlyInterventionObservations } from "../lib/intelligence/official/ks-early-intervention";
+import { buildStateSourceContribution } from "../lib/intelligence/official/state-source-contribution";
 import { PUBLIC_SOURCE_CHANNELS, choosePublicSourceChannels, matchedPublicSourceChannels } from "../lib/intelligence/signals/source-channel-catalog";
 import { buildSearchPlan } from "../lib/intelligence/query-planner";
 import { scanPublicSignals, matchesPublicTerritory } from "../lib/intelligence/signals/public-signal-scan";
@@ -72,4 +77,43 @@ const conflicts=buildLeadEvidenceGraph({kind:"organization",domain:"example.org"
 ]});
 assert.equal(conflicts.contradictions.length,1,"Contradictory intake reports must be visible");
 assert.equal(conflicts.posture,"conflicting");
+// Screenshot regression: an observed-only 80/100 score with 3% coverage is not an opportunity claim.
+const noEvidence = assessOpportunityReliability({
+  score:80, coverage:3, observedIndicators:3, pillarBreakdown:[
+    {pillarId:"aba-supply",title:"Supply",score:80,observed:1,applicable:10,weight:8},
+  ],
+},1);
+assert.equal(noEvidence.grade,"insufficient");
+assert.equal(noEvidence.displayScore,null);
+assert.equal(assessOpportunityReliability({
+  score:49, coverage:5, observedIndicators:8, pillarBreakdown:[
+    {pillarId:"referral-ecosystem",title:"Referrals",score:49,observed:8,applicable:10,weight:15},
+  ],
+},2).displayScore,null);
+assert.equal(assessOpportunityReliability({
+  score:71, coverage:15, observedIndicators:17, pillarBreakdown:[
+    {pillarId:"referral-ecosystem",title:"Referrals",score:80,observed:8,applicable:10,weight:15},
+    {pillarId:"developmental-demand",title:"Demand",score:60,observed:5,applicable:10,weight:14},
+    {pillarId:"market-motion",title:"Competition",score:65,observed:4,applicable:10,weight:7},
+  ],
+},3).grade,"preliminary");
+
+// NPPES 200-error response must never masquerade as a legitimate empty result.
+assert.match(parseNppesResponse({Errors:[{description:"No taxonomy codes found with entered description"}]}).errors[0],/taxonomy/i);
+assert.match(parseNppesResponse({}).errors[0],/result_count/);
+assert.equal(parseNppesResponse({result_count:0,results:[]}).errors.length,0);
+
+// Government-published dated roster is only a lead-reference fallback, never live provider supply.
+assert.equal(KANSAS_PUBLISHED_PROGRAMS.length,29);
+assert(KANSAS_PUBLISHED_PROGRAMS.every((p)=>p.archivedSnapshot));
+assert.equal(buildKansasEarlyInterventionObservations(KANSAS_PUBLISHED_PROGRAMS,100000).length,0);
+const archival=buildStateSourceContribution({
+  state:"KS",engine:"client",location:"Kansas",under18Population:100000,
+  kansasEarlyIntervention:KANSAS_PUBLISHED_PROGRAMS,
+});
+assert.equal(archival.snapshotOnly,true);
+assert.equal(archival.observations.length,0);
+assert.equal(archival.referralHits.length,29);
+assert(archival.referralHits.every((hit)=>hit.snippet.includes("Historical official")));
+
 console.log("Evidence mesh verification passed: registered publishers, live source planning, geography, Census decoding, RSS and claim corroboration.");
