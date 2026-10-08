@@ -59,6 +59,7 @@ type SearchResponse = {
   leads?: ResolvedLead[];
   ageBand?: YouthAgeBand | null;
   clientGrowth?: ClientGrowthPlan | null;
+  communityNetworks?: Array<{title:string;url:string;snippet:string;sourceId:string}>;
   youthQualifications?: Record<string, YouthLeadQualification>;
   demographics?: {
     geographyName: string;
@@ -411,6 +412,26 @@ export function ScoutWorkbench({
               {response?.browser && <SourceRow source={response.browser} />}
             </div>
           </details>
+
+          {engine === "client" && Boolean(response?.communityNetworks?.length) && (
+            <details className="sourceDisclosure">
+              <summary>
+                <span>Local family-resource ecosystem</span>
+                <span>{response?.communityNetworks?.length ?? 0} public organizations · research only</span>
+              </summary>
+              <div className="sourceRail">
+                <p>These organizations appear in Colorado&apos;s official child-care listings. They are NOT client leads, confirmed ABA referral relationships, or partner opportunities. No family or personal health information was collected.</p>
+                {response?.communityNetworks?.slice(0,12).map((resource,index)=>(
+                  <div className="sourceItem" key={resource.sourceId+resource.title+index}>
+                    <i className="sourceDot complete" />
+                    <div><b>{resource.title}</b><span>{resource.snippet}</span>
+                      <a className="underline underline-offset-2" href={resource.url} target="_blank" rel="noopener noreferrer">Verify official listing ↗</a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
 
           {response?.publicSignals && (
             <details className="sourceDisclosure">

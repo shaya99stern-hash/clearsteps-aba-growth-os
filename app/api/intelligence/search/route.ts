@@ -421,6 +421,9 @@ export async function POST(request: Request) {
       },
       screened,
       leads: resolved,
+      // These are named public resource organizations for territory context ONLY.
+      // They are NOT family inquiries, partners or CRM-ready client contacts.
+      communityNetworks: engine === "client" ? stateContribution.communityNetworks ?? [] : [],
       youthQualifications,
       ageBand: engine === "client" ? ageBand : null,
       clientGrowth,

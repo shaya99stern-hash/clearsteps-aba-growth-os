@@ -14,7 +14,7 @@ import {
   type MissouriChildCareProvider,
 } from "./mo-child-care-gis";
 import { stateSourceSelection } from "./state-source-selection";
-import { searchColoradoChildCare, coloradoChildCareToSearchHits, coloradoChildCareObservations, type ColoradoChildCareFacility } from "./co-childcare";
+import { searchColoradoChildCare, coloradoChildCareToSearchHits, coloradoPublicReferralNetworkHits, coloradoChildCareObservations, type ColoradoChildCareFacility } from "./co-childcare";
 
 export interface StateSourceContributionInput {
   state: "MO" | "KS" | "CO";
@@ -30,6 +30,8 @@ export interface StateSourceContribution {
   referralHits: PublicSearchHit[];
   observations: IndicatorObservation[];
   sourceDetail: string | null;
+  /** Named public early-childhood organizations are market context, NOT client/family leads. */
+  communityNetworks?: PublicSearchHit[];
   /** Evidence uses a dated static publication rather than a successful live request. */
   snapshotOnly?: boolean;
 }
@@ -72,10 +74,14 @@ export function buildStateSourceContribution(input: StateSourceContributionInput
     if (input.coloradoChildCare === undefined) return { referralHits: [], observations: [], sourceDetail: null };
     const facilities = input.coloradoChildCare;
     const bounded = !/^(colorado|co|statewide)$/i.test(input.location.trim());
+    const communityNetworks=coloradoPublicReferralNetworkHits(facilities,input.location);
     return {
+      communityNetworks,
       referralHits: coloradoChildCareToSearchHits(facilities, input.location),
       observations: coloradoChildCareObservations(facilities, input.under18Population, bounded),
-      sourceDetail: facilities.length + " Colorado CDEC institutional facilities" + (bounded ? "" : " (statewide sample only; no density scored)"),
+      sourceDetail: facilities.length + " Colorado CDEC institutional facilities; "+
+        communityNetworks.length+" distinct resource/referral councils as market context (NOT clients/partnerships)"+
+        (bounded ? "" : " (statewide sample only; no density scored)"),
     };
   }
   return { referralHits: [], observations: [], sourceDetail: null };
