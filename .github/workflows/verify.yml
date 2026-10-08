@@ -75,6 +75,9 @@ jobs:
       - name: Verify task rules
         run: npx tsx scripts/verify-tasks.ts
 
+      - name: Verify Scout command center decisions
+        run: npm run verify:command-center
+
       - name: Verify outreach rules
         run: npx tsx scripts/verify-outreach.ts
 
