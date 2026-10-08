@@ -130,7 +130,7 @@ export async function POST(request: Request) {
         state,
         engine,
         location: targetLocation,
-        under18Population: census?.metrics.under18 ?? 0,
+        under18Population: 0, // Exact ages 2–18 denominator unavailable: no misleading density score.
       });
       if (stateSource) {
         stateContribution = stateSource.contribution;
@@ -218,8 +218,10 @@ export async function POST(request: Request) {
   }
 
   const enrichmentByDomain = new Map(uniqueForEnrichment.map((row) => [safeDomain(row.hit.url), row.enrichment]));
+  // Public discussion is aggregate context; a forum poster must never become a family-level CRM lead.
+  const researchOnlyCommunity = (url: string) => /(^|\.)(reddit\.com|facebook\.com|nextdoor\.com|threads\.net|instagram\.com|tiktok\.com|x\.com)$/i.test(safeDomain(url) ?? "");
   const resolvedPublic = resolveSearchHits(
-    rows.map((row) => ({
+    rows.filter((row) => !researchOnlyCommunity(row.hit.url)).map((row) => ({
       ...row,
       enrichment: row.enrichment ?? enrichmentByDomain.get(safeDomain(row.hit.url)) ?? null,
     })),
@@ -227,13 +229,13 @@ export async function POST(request: Request) {
   ).slice(0, maxResults);
   const resolved = mergeStateSourceLeads(resolvedPublic, stateContribution, targetLocation, maxResults);
 
-  const publicSignals = scanPublicSignals(rows.map((item) => item.hit), new Date().toISOString(), targetLocation);
+  const publicSignals = scanPublicSignals(rows.map((item) => item.hit), new Date().toISOString(), targetLocation, engine === "client" ? "2-18" : "all");
   observations.push(...publicSignals.observations);
   sourceStatus.push({
     source: "Public multi-source signal correlations",
     status: publicSignals.observations.length ? "complete" : "unavailable",
     detail: publicSignals.clues.length + " observed clues, " + publicSignals.observations.length +
-      " independently supported indicators, " + publicSignals.supportedChecks + "/20 cross-checks",
+      " age-aligned independently supported indicators, " + publicSignals.supportedChecks + "/60 cross-checks",
   });
   observations.push(...observationsFromResolvedLeads(resolved, engine));
   observations.push(...evidenceQualityObservations(resolved, sourceStatus));
