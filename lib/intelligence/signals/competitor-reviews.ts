@@ -112,7 +112,7 @@ export function reviewDiscoveryQueries(name:string,location:string):string[] {
   ];
 }
 export function summarizeCompanyReviewEvidence(
-  lead: Pick<ResolvedLead,"id"|"name">,
+  lead: Pick<ResolvedLead,"id"|"name"> & {domain?:string},
   searchHits:readonly PublicSearchHit[],
   location:string,
 ):CompetitorReviewInsight {
@@ -121,6 +121,7 @@ export function summarizeCompanyReviewEvidence(
     searchLink("Yelp",lead.name,location),
   ];
   const evidence=new Map<ReviewTheme,Map<string,ReviewSentiment>>();
+  const distinctNarratives=new Map<ReviewTheme,Set<string>>();
   let publishedMatches=0;
   for(const hit of searchHits.slice(0,80)) {
     if(!matchesBusiness(hit,lead.name))continue;
@@ -142,10 +143,16 @@ export function summarizeCompanyReviewEvidence(
     const snippet=(hit.title+" "+hit.snippet).slice(0,1400);
     if(/\b(my child|my son|my daughter|our child|diagnos(?:ed|is)|medical record|home address|lives at)\b/i.test(snippet))continue;
     if(!/\b(aba|behavioral? therapy|autism services|pediatric therapy|clinic)\b/i.test(snippet))continue;
+    if (lead.domain && (host===lead.domain || host.endsWith("."+lead.domain))) continue;
     const publisher=rootPublisher(host);
     let matched=false;
     for(const [theme,sentiment,re] of THEMES) {
       if(!re.test(snippet))continue;
+      const fingerprint=normalize(snippet);
+      const seen=distinctNarratives.get(theme)??new Set<string>();
+      if(seen.has(fingerprint))continue; // Syndicated copy is not independent corroboration.
+      seen.add(fingerprint);
+      distinctNarratives.set(theme,seen);
       const domains=evidence.get(theme)??new Map<string,ReviewSentiment>();
       domains.set(publisher,sentiment);
       evidence.set(theme,domains);
