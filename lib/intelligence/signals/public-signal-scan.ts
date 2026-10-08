@@ -163,7 +163,7 @@ export function scanPublicSignals(hits: readonly PublicSearchHit[], capturedAt =
 
   return {
     inspected: candidates.length,
-    clues: clues.sort((a, b) => Number(b.corroborated) - Number(a.corroborated) || b.sourceCount - a.sourceCount).slice(0, 60),
+    clues: clues.sort((a, b) => Number(b.corroborated) - Number(a.corroborated) || b.sourceCount - a.sourceCount).slice(0, 180),
     observations,
     crossChecks,
     supportedChecks: crossChecks.filter((item) => item.status === "supported").length,

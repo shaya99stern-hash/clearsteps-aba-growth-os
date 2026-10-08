@@ -69,6 +69,9 @@ jobs:
       - name: Verify publisher, geography and source narrative precision
         run: npm run verify:evidence-precision
 
+      - name: Verify adaptive cross-reference of weak institutional signals
+        run: npm run verify:adaptive-followup
+
       - name: Verify public organization contact follow-up
         run: npm run verify:institutional-followup
 
