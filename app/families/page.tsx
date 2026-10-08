@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, CalendarCheck2, HeartHandshake, MapPinCheckInside, Phone, ShieldCheck } from "lucide-react";
+import { ArrowRight, CalendarCheck2, HeartHandshake, MapPin, Phone, ShieldCheck } from "lucide-react";
 import { familyContactSettings } from "@/lib/intelligence/family-contact";
 import styles from "./families.module.css";
 
