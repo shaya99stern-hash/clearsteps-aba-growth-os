@@ -94,7 +94,7 @@ type SearchResponse = {
     clues: Array<{
       indicatorId: string; name: string; group: string;
       sourceCount: number; corroborated: boolean;
-      sourceDomains: string[];
+      sourceDomains: string[]; geographySupported: boolean;
     }>;
     crossChecks: Array<{
       id: string; title: string; status: "supported" | "partial" | "unobserved"; sourceCount: number;
