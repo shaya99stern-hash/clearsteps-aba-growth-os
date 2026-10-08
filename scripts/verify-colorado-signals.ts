@@ -53,4 +53,4 @@ const privateClue=scanPublicSignals([
  hit("forum.org","My autistic son lives at our house on 123 Main Street; ABA waitlist"),
 ]);
 assert.equal(privateClue.clues.length,0,"Household-level signals must not be included");
-console.log("Colorado institutional collector, 60 signals, 20 cross-checks and privacy checks passed.");
+console.log("Colorado institutional collector, 180 public hypotheses, 60 cross-checks and privacy checks passed.");
