@@ -54,6 +54,17 @@ export function reviewBelongsToOrganization(hit:PublicSearchHit,organizationName
   const title=normalize(hit.title);
   return title.includes(name) || (distinctive.length>=2 && distinctive.every((word)=>title.split(" ").includes(word)));
 }
+export function providerReviewQueries(lead: Pick<ResolvedLead,"name" | "kind">,location:string) {
+  const broad=providerReviewQuery(lead,location);
+  if(!broad) return [];
+  const escapedName='"'+lead.name.slice(0,100).replace(/["\\]/g,"")+'"';
+  return [
+    broad,
+    "site:google.com/maps " + escapedName + " reviews " + location.slice(0,80),
+    "site:yelp.com/biz " + escapedName + " reviews " + location.slice(0,80),
+  ];
+}
+
 export function providerReviewQuery(lead: Pick<ResolvedLead,"name" | "kind">,location:string) {
   if (!["organization","referral"].includes(lead.kind) || !/\b(aba|behavior|autism|therapy|therapies)\b/i.test(lead.name)) return null;
   if (lead.name.length<8 || !/[A-Za-z]/.test(lead.name)) return null;
