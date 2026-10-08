@@ -64,6 +64,8 @@ export function youthOrganizationRole(lead:Pick<ResolvedLead,"name"|"kind"|"evid
   const text=(lead.name+" "+lead.evidence
     .filter((item)=>!isRestrictedPersonalReview(item.url))
     .slice(0,6).map((item)=>item.title).join(" ")).toLowerCase();
+  if(lead.evidence.some((item)=>item.sourceId==="co-cdec-referral-network"))
+    return "potential_referral"; // Official general child-care referral/council network, not confirmed ABA referral.
   if(lead.kind==="competitor_signal"||/\b(aba clinic|aba therapy|applied behavior analysis provider|behavior analysis center)\b/i.test(text))
     return "aba_competitor";
   if(/\b(school district|elementary school|middle school|high school|preschool|child find|head start)\b/i.test(text))
