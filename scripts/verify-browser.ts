@@ -126,6 +126,28 @@ async function verifyDesktopCrm(baseUrl: string) {
 
 async function verifyMobilePwa(baseUrl: string) {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await context.addInitScript(() => {
+    window.localStorage.setItem("clearsteps.scout.history.v1", JSON.stringify([{
+      id: "browser-territory-1",
+      capturedAt: new Date().toISOString(),
+      state: "MO",
+      engine: "client",
+      location: "Kansas City, Missouri",
+      query: "Find public pediatric referral organizations",
+      score: 78,
+      label: "High",
+      confidence: 82,
+      coverage: 45,
+      reasoning: ["Public referral evidence from multiple sources"],
+      screened: 28,
+      qualified: 5,
+      observedIndicators: 24,
+      applicableIndicators: 60,
+      completedSources: 3,
+      sourceCount: 4,
+      warnings: 0,
+    }]));
+  });
   const page = await context.newPage();
   try {
     await page.goto(`${baseUrl}/outreach`, { waitUntil: "domcontentloaded" });
@@ -180,6 +202,25 @@ async function verifyMobilePwa(baseUrl: string) {
     assert.equal(await locationInput.inputValue(), "Kansas", "switching state should move a state-only target to Kansas");
     await page.getByRole("button", { name: "RBTs", exact: true }).click();
     assert.equal(await page.getByRole("button", { name: "RBTs", exact: true }).getAttribute("aria-pressed"), "true");
+
+    await page.goto(baseUrl + "/territories", { waitUntil: "domcontentloaded" });
+    await assertNoBodyOverflow(page, "Territories");
+    await assertNativeMobileChrome(page, "Territories");
+    await page.getByRole("heading", { name: "Kansas City, Missouri" }).waitFor({ state: "visible", timeout: 10_000 });
+    assert.equal(await page.getByText("78", { exact: true }).count() > 0, true, "Territories should show the saved real-score snapshot");
+
+    await page.goto(baseUrl + "/intelligence", { waitUntil: "domcontentloaded" });
+    await assertNoBodyOverflow(page, "Intelligence");
+    await assertNativeMobileChrome(page, "More");
+    await page.getByRole("heading", { name: "Decision queue" }).waitFor({ state: "visible" });
+    await page.getByText("Kansas City, Missouri · CLIENT", { exact: true }).waitFor({ state: "visible" });
+
+    await page.goto(baseUrl + "/?state=KS&engine=rbt&location=Wichita&query=Find%20RBT%20hiring", { waitUntil: "domcontentloaded" });
+    await assertNoBodyOverflow(page, "Prefilled Scout");
+    assert.equal(await page.getByRole("button", { name: "Kansas", exact: true }).getAttribute("aria-pressed"), "true");
+    assert.equal(await page.getByRole("button", { name: "RBTs", exact: true }).getAttribute("aria-pressed"), "true");
+    assert.equal(await page.getByLabel("Target city, ZIP, county or state").inputValue(), "Wichita");
+    assert.equal(await page.locator('textarea[aria-label="Research request"]').inputValue(), "Find RBT hiring");
   } finally {
     await context.close();
   }
