@@ -11,7 +11,8 @@
     "verify:aba-engine": "tsx scripts/verify-aba-engine.ts",
     "postinstall": "prisma generate",
     "browser:install": "playwright install --with-deps --only-shell chromium",
-    "verify:browser": "tsx scripts/verify-browser.ts"
+    "verify:browser": "tsx scripts/verify-browser.ts",
+    "verify:command-center": "tsx scripts/verify-command-center.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",
