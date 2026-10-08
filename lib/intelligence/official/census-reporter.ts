@@ -1,3 +1,4 @@
+import { safeMeasuredPopulation3To17 } from "../signals/target-ages";
 import type { CensusDemographicsResult } from "./census-demographics";
 import type { IndicatorObservation } from "../phase3/indicator-catalog";
 
@@ -78,10 +79,12 @@ export function parseCensusReporterData(raw: unknown, geoid: string) {
   const age6to11=count(b09001,"B09001006")+count(b09001,"B09001007");
   const age12to17=count(b09001,"B09001008")+count(b09001,"B09001009");
   if (under18 > totalPopulation) throw new Error("Impossible ACS age totals; rejecting source record");
+  const ageScope=safeMeasuredPopulation3To17({age3to5,age6to11,age12to17});
   return {
     name:payload?.geography?.[geoid]?.name ?? geoid,
     metrics: {totalPopulation,under18,age0to2,age3to5,age6to11,age12to17,
-      under18Share:totalPopulation>0?under18/totalPopulation*100:0,under18FiveYearGrowth:null},
+      under18Share:totalPopulation>0?under18/totalPopulation*100:0,under18FiveYearGrowth:null,
+      age3to17:ageScope.ages3to17,ages2to18:null,ageCohortNote:ageScope.note},
   };
 }
 
@@ -103,11 +106,9 @@ export async function fetchCensusReporterDemographics(
     year:YEAR,
     metrics:m,
     observations:[
-      observation("demographic-demand.01",score(m.age0to2,7500)),
       observation("demographic-demand.02",score(m.age3to5,7500)),
       observation("demographic-demand.03",score(m.age6to11,15000)),
       observation("demographic-demand.04",score(m.age12to17,15000)),
-      observation("demographic-demand.05",Math.max(0,Math.min(100,Math.round((m.under18Share-12)/18*100)))),
     ],
     sourceUrl:"https://censusreporter.org/",
   };
