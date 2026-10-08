@@ -11,7 +11,7 @@ export interface ScoutResearchSourceState {
 export interface ScoutResearchPersistenceInput {
   query: string;
   location: string;
-  state: "MO" | "KS";
+  state: "MO" | "KS" | "CO";
   engine: LeadEngine;
   plan: unknown;
   sourceStatus: readonly ScoutResearchSourceState[];
@@ -220,7 +220,7 @@ function dedupeEvidence(leads: readonly ResolvedLead[]): EvidenceRecordWrite[] {
   return [...records.values()];
 }
 
-function territoryEntityId(state: "MO" | "KS", location: string, engine: LeadEngine) {
+function territoryEntityId(state: "MO" | "KS" | "CO", location: string, engine: LeadEngine) {
   return `${state}:${slug(location || state)}:${engine}`;
 }
 
