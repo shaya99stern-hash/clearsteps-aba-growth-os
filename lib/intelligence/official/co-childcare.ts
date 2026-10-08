@@ -19,8 +19,8 @@ function norm(value: unknown) { return String(value ?? "").trim(); }
 /** Ignore missing/placeholder entries and any person-like or residential field. */
 function safePublicOrganization(value: unknown):string|undefined {
   const text=norm(value).slice(0,130);
-  if(!text || /^(none|n\/a|not applicable|unknown|no ccrr|no ecc|not assigned|unavailable)$/i.test(text))return undefined;
-  if(/(?:@|https?:|\d{3}[- .]\d{3}[- .]\d{4}|\b\d+\s+(?:st|ave|road|drive|street)\b)/i.test(text))return undefined;
+  if(!text || /^(none|na|n\/a|not applicable|unknown|no ccrr|no ecc|not assigned|unavailable)$/i.test(text))return undefined;
+  if(/(?:@|https?:|\d{3}[- .]\d{3}[- .]\d{4}|^\s*\d+\s+[a-z]|\b\d+\s+(?:st|ave|road|drive|street)\b)/i.test(text))return undefined;
   return text;
 }
 function safeLocation(value: string) {
