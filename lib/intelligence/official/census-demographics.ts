@@ -37,7 +37,7 @@ export interface CensusDemographicsResult {
   sourceUrl: string;
 }
 
-export async function fetchCensusDemographics(input: { state: "MO" | "KS" | "CO" | "CO" | "CO" | "CO"; location: string }): Promise<CensusDemographicsResult> {
+export async function fetchCensusDemographics(input: { state: "MO" | "KS" | "CO"; location: string }): Promise<CensusDemographicsResult> {
   const geography = await resolveGeography(input.state, input.location, CURRENT_YEAR);
   const current = await fetchRow(CURRENT_YEAR, geography);
   const prior = await fetchPriorUnder18(geography).catch(() => null);
