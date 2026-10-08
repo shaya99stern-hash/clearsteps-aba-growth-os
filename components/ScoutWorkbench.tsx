@@ -109,6 +109,12 @@ type SearchResponse = {
       access:"link_only"|"third_party_context";
       verification:"not_verified";
     }>;
+    independentThemes?: {
+      status:"corroborated"|"unconfirmed"|"no_public_evidence";
+      reviewLinks:Array<{platform:string;url:string;linkOnly:true;source:"indexed_business_page"|"external_search"}>;
+      publicThemes:Array<{theme:string;sentiment:"positive"|"concern"|"mixed";publishers:number;sources:string[];independentlyCorroborated:boolean}>;
+      note:string;
+    };
   }>;
   publicSignals?: {
     inspected: number;
@@ -557,6 +563,34 @@ function LeadDossier({ lead, reputation, onClose, onSave, saved }: { lead: Resol
                 </a>
               ))}
             </div>
+            {reputation.independentThemes && (
+              <>
+                <h3>Cross-publisher reputation themes</h3>
+                <p>{reputation.independentThemes.status === "corroborated"
+                  ? "Some organization-level themes appear in multiple independent public reports. These are research findings, not clinical service-quality determinations."
+                  : "No independently verified reputation pattern established. Single-source mentions are research leads, not market conclusions."}</p>
+                <div className="stackList">
+                  {reputation.independentThemes.publicThemes.map((theme) => (
+                    <div className="stackRow" key={theme.theme}>
+                      <div>
+                        <b>{theme.theme.replaceAll("_"," ")} · {theme.independentlyCorroborated ? "Cross-referenced" : "Unconfirmed"}</b>
+                        <span>{theme.publishers} independent public publisher{theme.publishers===1?"":"s"} · {theme.sentiment} report · {theme.sources.join(", ")}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <h3>Open Google / Yelp review search</h3>
+                <p>External search links only. Platform ratings and individual review text are not scraped or stored.</p>
+                <div className="stackList">
+                  {reputation.independentThemes.reviewLinks.map((item) => (
+                    <a className="stackRow evidenceRow" href={item.url} key={item.platform} target="_blank" rel="noopener noreferrer">
+                      <div><b>{item.platform}</b><span>{item.source==="indexed_business_page"?"Indexed organization page · verify directly":"Search by organization and locality · verify the business match"}</span></div>
+                      <ExternalLink size={16} aria-hidden="true" />
+                    </a>
+                  ))}
+                </div>
+              </>
+            )}
             <p>Reviewers' identities, children, medical details and individual experiences are never added to CRM leads. Cross-check service claims with separate public sources.</p>
           </section>
         )}
