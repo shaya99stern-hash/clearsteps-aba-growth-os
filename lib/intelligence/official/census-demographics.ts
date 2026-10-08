@@ -1,3 +1,4 @@
+import { fetchCensusReporterDemographics } from "./census-reporter";
 import type { IndicatorObservation } from "../phase3/indicator-catalog";
 
 const CURRENT_YEAR = 2024;
@@ -38,9 +39,7 @@ export interface CensusDemographicsResult {
 }
 
 export async function fetchCensusDemographics(input: { state: "MO" | "KS" | "CO"; location: string }): Promise<CensusDemographicsResult> {
-  if (!process.env.CENSUS_API_KEY?.trim()) {
-    throw new Error("Census API key required since May 2026. Configure CENSUS_API_KEY for accurate official demographics; no fabricated population figures will be supplied.");
-  }
+  if (!process.env.CENSUS_API_KEY?.trim()) return fetchCensusReporterDemographics(input);
   const geography = await resolveGeography(input.state, input.location, CURRENT_YEAR);
   const current = await fetchRow(CURRENT_YEAR, geography);
   const prior = await fetchPriorUnder18(geography).catch(() => null);
