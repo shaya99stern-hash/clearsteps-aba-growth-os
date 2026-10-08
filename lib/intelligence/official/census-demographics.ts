@@ -38,6 +38,9 @@ export interface CensusDemographicsResult {
 }
 
 export async function fetchCensusDemographics(input: { state: "MO" | "KS" | "CO"; location: string }): Promise<CensusDemographicsResult> {
+  if (!process.env.CENSUS_API_KEY?.trim()) {
+    throw new Error("Census API key required since May 2026. Configure CENSUS_API_KEY for accurate official demographics; no fabricated population figures will be supplied.");
+  }
   const geography = await resolveGeography(input.state, input.location, CURRENT_YEAR);
   const current = await fetchRow(CURRENT_YEAR, geography);
   const prior = await fetchPriorUnder18(geography).catch(() => null);
@@ -111,6 +114,7 @@ async function fetchPriorUnder18(geography: Awaited<ReturnType<typeof resolveGeo
 async function fetchRows(year: number, forClause: string, inClause?: string): Promise<CensusRow[]> {
   const params = new URLSearchParams({ get: VARIABLES.join(","), for: forClause });
   if (inClause) params.set("in", inClause);
+  params.set("key", process.env.CENSUS_API_KEY?.trim() ?? "");
   const url = `https://api.census.gov/data/${year}/acs/acs5?${params.toString()}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 9_000);
@@ -121,7 +125,11 @@ async function fetchRows(year: number, forClause: string, inClause?: string): Pr
       cache: "no-store",
     });
     if (!response.ok) throw new Error(`Census ACS returned ${response.status}`);
-    const payload = await response.json() as string[][];
+    const raw = await response.text();
+    if (/^\s*</.test(raw) || !raw.trim().startsWith("[")) {
+      throw new Error("Census data endpoint returned HTML or invalid JSON; check Census API credentials and service status.");
+    }
+    const payload = JSON.parse(raw) as string[][];
     if (!Array.isArray(payload) || payload.length < 2) throw new Error("Census ACS returned no matching rows");
     const headers = payload[0];
     return payload.slice(1).map((values) => Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""])));
