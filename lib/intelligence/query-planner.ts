@@ -34,7 +34,7 @@ export function buildSearchPlan(input: string, location: string, engine?: LeadEn
   for (const lane of selected) queries.push(...laneQueries(lane, input, place, engine));
 
   const targeted = state && engine
-    ? choosePublicSourceChannels(state, engine, place + " " + input, 10, Math.floor(Date.now() / 86_400_000)).map((channel) => ({
+    ? choosePublicSourceChannels(state, engine, place + " " + input, 6, Math.floor(Date.now() / 86_400_000)).map((channel) => ({
         lane: (channel.kind === "workforce" ? "talent" : channel.kind === "press" || channel.kind === "community" ? "community" : "referral") as SearchLane,
         query: queryForPublicSource(channel, place, engine),
       }))
@@ -44,7 +44,16 @@ export function buildSearchPlan(input: string, location: string, engine?: LeadEn
     location: place,
     engine,
     lanes: selected,
-    queries: Array.from(new Map([...targeted, ...queries].map((row) => [`${row.lane}:${row.query}`, row])).values()).slice(0, 20),
+    // The limited live search budget must find actual local institutions first.
+    // Do not spend 10 of 15 real searches on rotating catalog domains.
+    queries: Array.from(new Map([
+      ...queries.filter((row)=>row.lane==="referral").slice(0,4),
+      ...queries.filter((row)=>row.lane==="talent").slice(0,4),
+      ...queries.filter((row)=>row.lane==="market").slice(0,4),
+      ...queries.filter((row)=>row.lane==="community").slice(0,2),
+      ...targeted,
+      ...queries,
+    ].map((row)=>[`${row.lane}:${row.query}`, row])).values()).slice(0, 20),
     safeguards: [
       "Public organization/professional information only.",
       "Community discussions are aggregated as territory demand signals; no parent/child profiles.",

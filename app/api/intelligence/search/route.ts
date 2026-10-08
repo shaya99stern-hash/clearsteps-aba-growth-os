@@ -4,6 +4,7 @@ import { evaluateResearchRequest } from "@/lib/intelligence/request-policy";
 import { buildSearchPlan, type SearchLane } from "@/lib/intelligence/query-planner";
 import { enrichPublicWebsite, searchPublicWeb } from "@/lib/intelligence/free-search";
 import { resolveSearchHits } from "@/lib/intelligence/entity-resolution";
+import { isPublicInstitutionalLead, publicInstitutionLookupQuery, selectOrganizationWebsiteHit, enrichInstitutionalLead } from "@/lib/intelligence/institutional-enrichment";
 import { collectPublicPageWithPlaywright, playwrightAvailable } from "@/lib/intelligence/browser-collector";
 import { withScoutResearchPersistence } from "@/lib/intelligence/research-persistence";
 import { fetchCensusDemographics } from "@/lib/intelligence/official/census-demographics";
@@ -183,7 +184,8 @@ export async function POST(request: Request) {
       if (result.error) errors.push(`${result.planQuery.lane}: ${result.error}`);
       rows.push(...result.hits.map((hit) => ({ lane: result.planQuery.lane, hit })));
     }
-    if (rows.length >= maxResults * 3) break;
+    // Always execute the bounded public search plan. NPPES hits are registry rows,
+    // not searched publisher corroboration; they must never terminate discovery.
   }
   const webHits = rows.filter((row) => row.hit.sourceId === "duckduckgo-html" || row.hit.sourceId === "bing-rss").length;
   if (webHits === 0) {
@@ -239,7 +241,37 @@ export async function POST(request: Request) {
     targetLocation,
   ).slice(0, maxResults);
   const unqualified = mergeStateSourceLeads(resolvedPublic, stateContribution, targetLocation, maxResults);
-  const classified = engine === "client" ? unqualified.map((lead) => {
+  // The state registry gives a *name*, not a verified contact. Resolve the top
+  // institutional facilities against an independently located organization site.
+  // This is a bounded public lookup, never a family, home or personal-review crawl.
+  const institutionalCandidates = engine === "client"
+    ? unqualified.filter(isPublicInstitutionalLead).slice(0,5) : [];
+  const verifiedInstitutions = await Promise.all(institutionalCandidates.map(async (lead)=>{
+    try {
+      const hits=await searchPublicWeb(publicInstitutionLookupQuery(lead.name,targetLocation),5);
+      const matched=selectOrganizationWebsiteHit(lead,hits);
+      if (!matched) return lead;
+      const site=await enrichPublicWebsite(matched.url);
+      return enrichInstitutionalLead(lead,matched,site);
+    } catch {
+      return lead;
+    }
+  }));
+  const institutionalById=new Map(verifiedInstitutions.map((lead)=>[lead.id,lead]));
+  const organizationQualified=unqualified.map((lead)=>institutionalById.get(lead.id)??lead);
+  const verifiedInstitutionalWebsites=verifiedInstitutions.filter((lead)=>{
+    const original=institutionalCandidates.find((candidate)=>candidate.id===lead.id);
+    return Boolean(original&&original.website!==lead.website);
+  }).length;
+  if(engine==="client")sourceStatus.push({
+    source:"Official organization website resolution",
+    status:verifiedInstitutionalWebsites?"complete":"unavailable",
+    detail:institutionalCandidates.length+" official institutional facilities checked; "+
+      verifiedInstitutionalWebsites+" independently matched live organization websites; "+
+      verifiedInstitutions.filter((lead)=>lead.phones.length||lead.emails.length).length+
+      " with published contacts (not necessarily referral decision-makers)",
+  });
+  const classified = engine === "client" ? organizationQualified.map((lead) => {
     const fit = qualifyYouthLead(lead,ageBand as YouthAgeBand);
     const documented = fit.ageStatus === "documented";
     const competitor = fit.organizationRole === "aba_competitor";
@@ -254,7 +286,7 @@ export async function POST(request: Request) {
     };
   }).filter((item) => item.fit.ageStatus !== "outside")
     .sort((a,b) => youthLeadPriority(b.fit) - youthLeadPriority(a.fit) || b.lead.score - a.lead.score) : [];
-  const resolved = engine === "client" ? classified.map((item) => item.lead) : unqualified;
+  const resolved = engine === "client" ? classified.map((item) => item.lead) : organizationQualified;
   const youthQualifications = Object.fromEntries(classified.map((item) => [item.lead.id,item.fit]));
   if (engine === "client") sourceStatus.push({
     source:"Child age and organization qualification",
