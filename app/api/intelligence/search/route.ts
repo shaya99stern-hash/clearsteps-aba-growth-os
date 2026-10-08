@@ -135,11 +135,19 @@ export async function POST(request: Request) {
       if (stateSource) {
         stateContribution = stateSource.contribution;
         observations.push(...stateContribution.observations);
-        completeSource(
-          sourceStatus,
-          stateSource.descriptor.source,
-          stateContribution.sourceDetail ?? stateSource.descriptor.emptyDetail,
-        );
+        if (stateContribution.snapshotOnly) {
+          unavailableSource(
+            sourceStatus,
+            stateSource.descriptor.source,
+            stateContribution.sourceDetail ?? "Only historical organizational listings available",
+          );
+        } else {
+          completeSource(
+            sourceStatus,
+            stateSource.descriptor.source,
+            stateContribution.sourceDetail ?? stateSource.descriptor.emptyDetail,
+          );
+        }
       }
     } catch (error) {
       const detail = errorMessage(error, stateSourceDescriptor.errorFallback);
@@ -403,10 +411,6 @@ function normalizedTargetLocation(location: string, state: "MO" | "KS" | "CO") {
   if (!trimmed) return state === "MO" ? "Missouri" : state === "KS" ? "Kansas" : "Colorado";
   if (/\b(MO|Missouri|KS|Kansas|CO|Colorado)\b/i.test(trimmed)) return trimmed;
   return `${trimmed}, ${state}`;
-}
-
-function scoreLabel(score: number) {
-  return score >= 80 ? "Very High" : score >= 65 ? "High" : score >= 45 ? "Moderate" : score > 0 ? "Early Signal" : "Insufficient Evidence";
 }
 
 function scaledCount(value: number, strongAt: number) {
