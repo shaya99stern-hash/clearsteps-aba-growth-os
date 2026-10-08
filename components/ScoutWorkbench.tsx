@@ -591,7 +591,7 @@ function LeadDossier({ lead, reputation, onClose, onSave, saved }: { lead: Resol
                 </div>
               </>
             )}
-            <p>Reviewers' identities, children, medical details and individual experiences are never added to CRM leads. Cross-check service claims with separate public sources.</p>
+            <p>Reviewer identities, children, medical details and individual experiences are never added to CRM leads. Cross-check service claims with separate public sources.</p>
           </section>
         )}
 
