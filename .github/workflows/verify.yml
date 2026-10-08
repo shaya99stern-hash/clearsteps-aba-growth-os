@@ -149,7 +149,7 @@ jobs:
       - name: Enforce lint gate
         if: steps.lint.outcome == 'failure'
         run: |
-          node -e 'const r=require("./lint-results.json"); for (const f of r.filter(x=>x.errorCount||x.warningCount)) console.error(f.filePath, "errors="+f.errorCount, "warnings="+f.warningCount); process.exit(1)'
+          node -e 'const r=require("./lint-results.json"); const bad=r.filter(x=>x.errorCount||x.warningCount); for(const f of bad){console.error(f.filePath,"errors="+f.errorCount,"warnings="+f.warningCount);for(const m of f.messages||[]) console.error("  line "+m.line+":"+m.column, m.ruleId+":",m.message)} if(bad.length)process.exit(1)'
 
       - name: Enforce build gate
         if: steps.lint.outcome == 'success' && steps.build.outcome == 'failure'
