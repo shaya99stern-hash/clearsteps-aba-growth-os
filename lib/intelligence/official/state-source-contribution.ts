@@ -14,14 +14,16 @@ import {
   type MissouriChildCareProvider,
 } from "./mo-child-care-gis";
 import { stateSourceSelection } from "./state-source-selection";
+import { searchColoradoChildCare, coloradoChildCareToSearchHits, coloradoChildCareObservations, type ColoradoChildCareFacility } from "./co-childcare";
 
 export interface StateSourceContributionInput {
-  state: "MO" | "KS";
+  state: "MO" | "KS" | "CO";
   engine: LeadEngine;
   location: string;
   under18Population: number;
   missouriChildCare?: readonly MissouriChildCareProvider[];
   kansasEarlyIntervention?: readonly KansasEarlyInterventionProgram[];
+  coloradoChildCare?: readonly ColoradoChildCareFacility[];
 }
 
 export interface StateSourceContribution {
@@ -33,6 +35,7 @@ export interface StateSourceContribution {
 export interface StateSourceRuntimeDependencies {
   searchMissouriChildCare: (location: string) => Promise<MissouriChildCareProvider[]>;
   searchKansasEarlyIntervention: (location: string) => Promise<KansasEarlyInterventionProgram[]>;
+  searchColoradoChildCare: (location: string) => Promise<ColoradoChildCareFacility[]>;
 }
 
 export function buildStateSourceContribution(input: StateSourceContributionInput): StateSourceContribution {
@@ -59,11 +62,21 @@ export function buildStateSourceContribution(input: StateSourceContributionInput
     };
   }
 
+  if (selection.coloradoChildCare) {
+    if (input.coloradoChildCare === undefined) return { referralHits: [], observations: [], sourceDetail: null };
+    const facilities = input.coloradoChildCare;
+    const bounded = !/^(colorado|co|statewide)$/i.test(input.location.trim());
+    return {
+      referralHits: coloradoChildCareToSearchHits(facilities, input.location),
+      observations: coloradoChildCareObservations(facilities, input.under18Population, bounded),
+      sourceDetail: facilities.length + " Colorado CDEC institutional facilities" + (bounded ? "" : " (statewide sample only; no density scored)"),
+    };
+  }
   return { referralHits: [], observations: [], sourceDetail: null };
 }
 
 export async function collectStateSourceContribution(
-  input: Omit<StateSourceContributionInput, "missouriChildCare" | "kansasEarlyIntervention">,
+  input: Omit<StateSourceContributionInput, "missouriChildCare" | "kansasEarlyIntervention" | "coloradoChildCare">,
   dependencies: Partial<StateSourceRuntimeDependencies> = {},
 ): Promise<StateSourceContribution> {
   const selection = stateSourceSelection(input.state, input.engine);
@@ -78,6 +91,10 @@ export async function collectStateSourceContribution(
     return buildStateSourceContribution({ ...input, kansasEarlyIntervention: programs });
   }
 
+  if (selection.coloradoChildCare) {
+    const facilities = await (dependencies.searchColoradoChildCare ?? searchColoradoChildCare)(input.location);
+    return buildStateSourceContribution({ ...input, coloradoChildCare: facilities });
+  }
   return { referralHits: [], observations: [], sourceDetail: null };
 }
 
