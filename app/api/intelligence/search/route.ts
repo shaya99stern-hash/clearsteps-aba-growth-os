@@ -143,8 +143,8 @@ export async function POST(request: Request) {
   }
 
   const searchQueries = plan.queries.slice(0, 15);
-  for (let index = 0; index < searchQueries.length; index += 3) {
-    const batch = searchQueries.slice(index, index + 3);
+  for (let index = 0; index < searchQueries.length; index += 5) {
+    const batch = searchQueries.slice(index, index + 5);
     const results = await Promise.all(batch.map(async (planQuery) => {
       try {
         return { planQuery, hits: await searchPublicWeb(planQuery.query, 5), error: null as string | null };
