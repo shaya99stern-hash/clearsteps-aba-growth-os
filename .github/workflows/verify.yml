@@ -72,6 +72,9 @@ jobs:
       - name: Verify independent provider review discovery
         run: npm run verify:provider-reputation
 
+      - name: Verify youth age groups and organizational referral qualification
+        run: npm run verify:youth-qualification
+
       - name: Smoke real keyless upstream data feeds (non-gating)
         continue-on-error: true
         run: npm run smoke:live-acquisition
