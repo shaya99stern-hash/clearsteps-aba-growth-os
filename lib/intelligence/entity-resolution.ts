@@ -100,6 +100,7 @@ function toLead(
 }
 
 function entityKey(hit: PublicSearchHit, lane: SearchLane) {
+  if (hit.sourceId === "co-cdec-licensed-childcare") return "co-facility-" + slug(hit.query);
   if (lane === "community") return `community-${slug(hit.url)}`;
   const domain = getDomain(hit.url);
   if (domain && !isAggregatorDomain(domain)) return `domain-${slug(domain)}`;
