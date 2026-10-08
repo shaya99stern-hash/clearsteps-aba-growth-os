@@ -24,6 +24,7 @@ console.log("Clear Steps Playwright Chromium + Phase 4 UI acceptance passed.");
 async function verifyClearStepsUi(baseUrl: string) {
   await verifyDesktopCrm(baseUrl);
   await verifyMobilePwa(baseUrl);
+  await verifyClientGrowthOnIphone(baseUrl);
 }
 
 async function verifyDesktopCrm(baseUrl: string) {
@@ -233,6 +234,78 @@ async function verifyMobilePwa(baseUrl: string) {
     assert.equal(await page.getByRole("button", { name: "RBTs", exact: true }).getAttribute("aria-pressed"), "true");
     assert.equal(await page.getByLabel("Target city, ZIP, county or state").inputValue(), "Wichita");
     assert.equal(await page.locator('textarea[aria-label="Research request"]').inputValue(), "Find RBT hiring");
+  } finally {
+    await context.close();
+  }
+}
+
+/** Test real mobile controls without launching a marketing campaign or collecting private health data. */
+async function verifyClientGrowthOnIphone(baseUrl:string) {
+  const context=await browser.newContext({viewport:{width:390,height:844}});
+  const page=await context.newPage();
+  const plan={
+    mode:"family_acquisition",location:"Denver County, CO",state:"CO",ageBand:"2-18",
+    verifiedTargetPopulation:124416,
+    populationBasis:"2025 U.S. Census exact county ages 2–18; not ABA demand",
+    demandStatus:"unverified",independentCapacityPublishers:0,directFamilyInquiries:0,
+    staffReady:"unverified",secureIntakeReady:false,ageQualifiedFamiliesFound:0,
+    actions:[
+      {id:"activate_intake",title:"Make it possible for a family to reach your agency",status:"prepare",purpose:"Conversion",
+        description:"Verify secure intake before advertising",metric:"Consented family inquiries",url:null,dependency:"Real agency contact"},
+      {id:"local_service_page",title:"Create Denver page",status:"research",purpose:"High-intent search",
+        description:"Research local ABA searches",metric:"Inbound inquiries",url:"https://www.google.com/search?q=ABA+Denver",dependency:"Verify actual service coverage"},
+      {id:"google_business",title:"Verify business profile",status:"prepare",purpose:"Local discovery",
+        description:"Review profile",metric:"Real calls",url:"https://business.google.com/",dependency:"Authorized agency ownership"},
+      {id:"staff_capacity",title:"Recruit RBT coverage",status:"prepare",purpose:"Staffing readiness",
+        description:"Verify RBT supervision and schedule",metric:"Confirmed openings",url:"/talent",dependency:"BCBA supervision"},
+      {id:"public_program_research",title:"Research public service gaps",status:"research",purpose:"Community discovery",
+        description:"Only institutional sources",metric:"Confirmed public facts",url:"https://www.google.com/search?q=Denver+resources",dependency:"No household profiling"},
+    ],
+    ethicalBoundary:"Public directories are market sources, not family leads.",
+  };
+  await page.route("**/api/intelligence/search", async (route)=>{
+    if(route.request().method()!=="POST"){await route.continue();return;}
+    await route.fulfill({
+      contentType:"application/json",
+      status:200,
+      body:JSON.stringify({
+        ok:true,state:"CO",engine:"client",clientGrowth:plan,screened:1,
+        sourceStatus:[{source:"CMS NPPES",status:"complete",detail:"Sample public record"}],
+        leads:[{
+          id:"co-provider-sample",name:"Official Preschool Directory",kind:"referral",score:33,confidence:30,
+          domain:"data.colorado.gov",website:"https://data.colorado.gov/dataset",location:"Denver County, CO",
+          reasons:["Registry listing only"],unknowns:["Actual program ages not confirmed"],
+          phones:[],emails:[],signals:[],evidence:[{
+            id:"ref-1",sourceId:"co-cdec-licensed-childcare",title:"Official Preschool Directory",
+            url:"https://data.colorado.gov/dataset",snippet:"Public nonresidential facility",
+            query:"Public licensed facilities",capturedAt:"2026-10-08T00:00:00Z",purpose:"discover",
+          }],
+        }],
+      }),
+    });
+  });
+  try {
+    await page.goto(baseUrl+"/?state=CO&engine=client&location=Denver%20County%2C%20CO",{
+      waitUntil:"domcontentloaded",
+    });
+    await page.getByRole("button",{name:"Run research"}).click();
+    await page.getByRole("heading",{name:"Where new families can find your agency"}).waitFor();
+    assert.equal(await page.getByText("124,416",{exact:true}).count(),1);
+    assert.equal(await page.getByText("public market sources (not family leads)").count(),1);
+    await assertNoBodyOverflow(page,"Client family-growth actions on iPhone");
+    assert.equal(await page.getByRole("button",{name:"CRM",exact:true}).count(),0,
+      "An official preschool is not a direct opt-in family client record");
+    await page.getByRole("button",{name:"Create 5 tasks"}).click();
+    await page.getByText("Five tasks added").waitFor();
+    const tasks=await page.evaluate(()=>{
+      const value=window.localStorage.getItem("clearsteps.tasks.v1")??"[]";
+      return JSON.parse(value) as Array<{title:string;entityType:string}>;
+    });
+    assert.equal(tasks.length,5,"Five real local operator tasks generated from source plan");
+    assert(tasks.every((item)=>item.entityType==="territory"));
+    await page.getByRole("button",{name:"Official Preschool Directory"}).click();
+    await page.getByText("Market research, not a client inquiry").waitFor();
+    assert.equal(await page.getByRole("button",{name:"Save to CRM"}).count(),0);
   } finally {
     await context.close();
   }

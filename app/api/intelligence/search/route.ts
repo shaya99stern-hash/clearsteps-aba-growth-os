@@ -30,6 +30,7 @@ import { qualifyYouthLead, youthLeadPriority, ageBandSearchQueries, type YouthAg
 import { buildProviderReviewDossier, providerReviewQuery, providerReviewQueries, isRestrictedReviewSite } from "@/lib/intelligence/signals/provider-reputation";
 import { summarizeCompanyReviewEvidence } from "@/lib/intelligence/signals/competitor-reviews";
 import { assessOpportunityReliability } from "@/lib/intelligence/score-reliability";
+import { buildClientGrowthPlan } from "@/lib/intelligence/client-growth";
 import { PUBLIC_SOURCE_CHANNELS, matchedPublicSourceChannels } from "@/lib/intelligence/signals/source-channel-catalog";
 
 export const runtime = "nodejs";
@@ -330,6 +331,11 @@ export async function POST(request: Request) {
 
   const publicSignals = scanPublicSignals(rows.map((item) => item.hit), new Date().toISOString(), targetLocation, engine === "client" ? ageBand : "all");
   observations.push(...publicSignals.observations);
+  const clientGrowth = engine === "client" ? buildClientGrowthPlan({
+    state,location:targetLocation,ageBand,
+    demographics:census ? {geographyName:census.geographyName,geographyKind:census.geographyKind,year:census.year,metrics:census.metrics} : null,
+    publicClues:publicSignals.clues,
+  }) : null;
   sourceStatus.push({
     source: "Public multi-source signal correlations",
     status: publicSignals.observations.length ? "complete" : "unavailable",
@@ -387,6 +393,7 @@ export async function POST(request: Request) {
       leads: resolved,
       youthQualifications,
       ageBand: engine === "client" ? ageBand : null,
+      clientGrowth,
       providerReputation,
       demographics: census ? { geographyName: census.geographyName, geographyKind: census.geographyKind, year: census.year, metrics: census.metrics } : null,
       indicatorSummary: {

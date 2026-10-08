@@ -16,6 +16,8 @@ import {
   X,
 } from "lucide-react";
 import type { ResolvedLead } from "@/lib/intelligence/source-types";
+import type { ClientGrowthPlan } from "@/lib/intelligence/client-growth";
+import { ClientGrowthPanel } from "./ClientGrowthPanel";
 import { canSaveToCrm, saveCrmLead } from "@/lib/crm/local-store";
 import { recordScoutRun } from "@/lib/intelligence/scout-history";
 import { buildLeadEvidenceGraph } from "@/lib/intelligence/signals/lead-evidence-graph";
@@ -56,6 +58,7 @@ type SearchResponse = {
   screened?: number;
   leads?: ResolvedLead[];
   ageBand?: YouthAgeBand | null;
+  clientGrowth?: ClientGrowthPlan | null;
   youthQualifications?: Record<string, YouthLeadQualification>;
   demographics?: {
     geographyName: string;
@@ -135,7 +138,7 @@ type SearchResponse = {
 };
 
 const ENGINE_PROMPTS: Record<Engine, string> = {
-  client: "Find public organizational referral opportunities and programs serving ages 2–18, with evidence from independent sources.",
+  client: "Find areas where families can access your ABA services, validate public demand and staffing, and create actions that attract consenting family inquiries for ages 2–18.",
   rbt: "Find RBT hiring pressure, talent supply, employers, training signals and recruiting opportunities, with Missouri/Kansas/Colorado compliance context.",
   bcba: "Find BCBA/LBA hiring pressure, licensed analyst supply, employers and recruiting opportunities, with state licensure context.",
 };
@@ -250,7 +253,7 @@ export function ScoutWorkbench({
         <span className="eyebrow">ABA Engine · Missouri + Kansas + Colorado</span>
         <div className="scoutHeadlineRow">
           <h1>Scout</h1>
-          <p>Cross-reference public demand, providers, referral networks, workforce signals and current state/payer rules.</p>
+          <p>Find where families may need your ABA services, improve local visibility and plan RBT coverage. Public research never identifies individual children.</p>
         </div>
 
         <div className="scoutControlDeck" aria-label="Scout research mode">
@@ -345,6 +348,8 @@ export function ScoutWorkbench({
           {response?.errors && response.errors.length > 0 && (
             <div className="warningCard">{response.errors.slice(0, 4).map((error) => <p key={error}>{error}</p>)}</div>
           )}
+
+          {response?.clientGrowth && <ClientGrowthPanel key={response.clientGrowth.location+response.clientGrowth.ageBand} plan={response.clientGrowth} />}
 
           {response?.territory && score && response.indicatorSummary && (
             <>
@@ -464,7 +469,7 @@ export function ScoutWorkbench({
             </p>
           )}
           <div className="resultSummary">
-            <div><strong>{leads.length}</strong> leads/signals <span>·</span> {response?.screened ?? 0} records screened</div>
+            <div><strong>{leads.length}</strong> {engine === "client" ? "public market sources (not family leads)" : "professional leads / signals"} <span>·</span> {response?.screened ?? 0} records screened</div>
             {response?.territory && <div className="territoryPill"><span>{response.territory.location}</span><b>{reliability?.displayScore == null ? "Insufficient evidence" : (reliability.displayScore + "/100 · " + response.territory.label)}</b></div>}
           </div>
 
@@ -489,11 +494,11 @@ export function ScoutWorkbench({
                   </div>
                   <ChevronRight size={18} className="chevron" aria-hidden="true" />
                 </button>
-                {canSaveToCrm(lead) ? (
+                {engine !== "client" && canSaveToCrm(lead) ? (
                   <button type="button" className="saveLeadButton" onClick={() => saveLead(lead)}>
                     {savedIds.has(lead.id) ? <><Check size={14} /> Saved</> : <><Save size={14} /> CRM</>}
                   </button>
-                ) : <span className="saveLeadButton">Signal</span>}
+                ) : <span className="saveLeadButton">{engine === "client" ? "Market research" : "Signal"}</span>}
               </article>
             ))}
           </div>
@@ -504,7 +509,7 @@ export function ScoutWorkbench({
         </section>
       )}
 
-      {selected && <LeadDossier lead={selected} youthFit={response?.youthQualifications?.[selected.id]} reputation={response?.providerReputation?.[selected.id]} onClose={() => setSelected(null)} onSave={() => saveLead(selected)} saved={savedIds.has(selected.id)} />}
+      {selected && <LeadDossier marketOnly={engine === "client"} lead={selected} youthFit={response?.youthQualifications?.[selected.id]} reputation={response?.providerReputation?.[selected.id]} onClose={() => setSelected(null)} onSave={() => saveLead(selected)} saved={savedIds.has(selected.id)} />}
     </div>
   );
 }
@@ -518,7 +523,7 @@ function SourceRow({ source }: { source: SourceState }) {
   );
 }
 
-function LeadDossier({ lead, reputation, youthFit, onClose, onSave, saved }: { lead: ResolvedLead; reputation?: NonNullable<SearchResponse["providerReputation"]>[string]; youthFit?: YouthLeadQualification; onClose: () => void; onSave: () => void; saved: boolean }) {
+function LeadDossier({ lead, reputation, youthFit, onClose, onSave, saved, marketOnly }: { lead: ResolvedLead; marketOnly: boolean; reputation?: NonNullable<SearchResponse["providerReputation"]>[string]; youthFit?: YouthLeadQualification; onClose: () => void; onSave: () => void; saved: boolean }) {
   const evidenceGraph = buildLeadEvidenceGraph(lead);
   return (
     <div className="sheetBackdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
@@ -534,7 +539,7 @@ function LeadDossier({ lead, reputation, youthFit, onClose, onSave, saved }: { l
 
         <div className="scoreHero">
           <div className="bigScore">{lead.score}</div>
-          <div><b>Why this reached the lead feed</b><p>{lead.reasons.join(" · ")}</p></div>
+          <div><b>{marketOnly ? "Why this public market source was found" : "Why this reached the lead feed"}</b><p>{lead.reasons.join(" · ")}</p></div>
         </div>
 
         <div className="statusStrip">
@@ -642,10 +647,10 @@ function LeadDossier({ lead, reputation, youthFit, onClose, onSave, saved }: { l
 
         <section className="dossierSection">
           <div className="sectionTitleRow">
-            <h3>Public contact & qualification</h3>
-            {canSaveToCrm(lead) ? (
+            <h3>{marketOnly ? "Public organization information" : "Public contact & qualification"}</h3>
+            {!marketOnly && canSaveToCrm(lead) ? (
               <button type="button" className="miniPrimary" onClick={onSave}>{saved ? <><Check size={14}/> Saved</> : <><Save size={14}/> Save to CRM</>}</button>
-            ) : <span className="statusChip">Territory signal only</span>}
+            ) : <span className="statusChip">{marketOnly ? "Market research, not a client inquiry" : "Territory signal only"}</span>}
           </div>
           <div className="factCard">
             <div><span>Lead type</span><b>{lead.kind.replace("_", " ")}</b></div>
