@@ -509,7 +509,7 @@ export function ScoutWorkbench({
         </section>
       )}
 
-      {selected && <LeadDossier lead={selected} youthFit={response?.youthQualifications?.[selected.id]} reputation={response?.providerReputation?.[selected.id]} onClose={() => setSelected(null)} onSave={() => saveLead(selected)} saved={savedIds.has(selected.id)} />}
+      {selected && <LeadDossier marketOnly={engine === "client"} lead={selected} youthFit={response?.youthQualifications?.[selected.id]} reputation={response?.providerReputation?.[selected.id]} onClose={() => setSelected(null)} onSave={() => saveLead(selected)} saved={savedIds.has(selected.id)} />}
     </div>
   );
 }
@@ -523,7 +523,7 @@ function SourceRow({ source }: { source: SourceState }) {
   );
 }
 
-function LeadDossier({ lead, reputation, youthFit, onClose, onSave, saved }: { lead: ResolvedLead; reputation?: NonNullable<SearchResponse["providerReputation"]>[string]; youthFit?: YouthLeadQualification; onClose: () => void; onSave: () => void; saved: boolean }) {
+function LeadDossier({ lead, reputation, youthFit, onClose, onSave, saved, marketOnly }: { lead: ResolvedLead; marketOnly: boolean; reputation?: NonNullable<SearchResponse["providerReputation"]>[string]; youthFit?: YouthLeadQualification; onClose: () => void; onSave: () => void; saved: boolean }) {
   const evidenceGraph = buildLeadEvidenceGraph(lead);
   return (
     <div className="sheetBackdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
@@ -539,7 +539,7 @@ function LeadDossier({ lead, reputation, youthFit, onClose, onSave, saved }: { l
 
         <div className="scoreHero">
           <div className="bigScore">{lead.score}</div>
-          <div><b>Why this reached the lead feed</b><p>{lead.reasons.join(" · ")}</p></div>
+          <div><b>{marketOnly ? "Why this public market source was found" : "Why this reached the lead feed"}</b><p>{lead.reasons.join(" · ")}</p></div>
         </div>
 
         <div className="statusStrip">
@@ -647,10 +647,10 @@ function LeadDossier({ lead, reputation, youthFit, onClose, onSave, saved }: { l
 
         <section className="dossierSection">
           <div className="sectionTitleRow">
-            <h3>Public contact & qualification</h3>
-            {canSaveToCrm(lead) ? (
+            <h3>{marketOnly ? "Public organization information" : "Public contact & qualification"}</h3>
+            {!marketOnly && canSaveToCrm(lead) ? (
               <button type="button" className="miniPrimary" onClick={onSave}>{saved ? <><Check size={14}/> Saved</> : <><Save size={14}/> Save to CRM</>}</button>
-            ) : <span className="statusChip">Territory signal only</span>}
+            ) : <span className="statusChip">{marketOnly ? "Market research, not a client inquiry" : "Territory signal only"}</span>}
           </div>
           <div className="factCard">
             <div><span>Lead type</span><b>{lead.kind.replace("_", " ")}</b></div>
