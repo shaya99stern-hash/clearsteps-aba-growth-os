@@ -1,3 +1,5 @@
+import { EXTRA_SIGNAL_PILLARS } from "../signals/extended-catalog";
+
 export type LeadEngine = "client" | "rbt" | "bcba";
 export type IndicatorDirection = "higher_opportunity" | "lower_opportunity" | "context" | "gate" | "confidence";
 export type SourceClass = "federal" | "state" | "payer" | "organization" | "labor" | "web" | "derived";
@@ -291,6 +293,7 @@ export const INDICATOR_PILLARS: readonly IndicatorPillar[] = [
       "Evidence persistence across repeated snapshots",
     ],
   },
+  ...EXTRA_SIGNAL_PILLARS,
 ] as const;
 
 export const INDICATOR_CATALOG: readonly IndicatorDefinition[] = INDICATOR_PILLARS.flatMap((pillar) =>
