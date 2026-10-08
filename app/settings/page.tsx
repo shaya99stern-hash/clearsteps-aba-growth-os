@@ -15,7 +15,7 @@ export default function SettingsPage() {
           : "Preview only. Family inquiries cannot be accepted from this page until an authorized agency contact destination is activated."}>
           <div className="space-y-3 text-sm">
             <p>To activate: configure <code>NEXT_PUBLIC_AGENCY_PHONE</code> and/or a reviewed HTTPS <code>NEXT_PUBLIC_SECURE_INTAKE_URL</code>, then set <code>NEXT_PUBLIC_INTAKE_PUBLISHED=true</code> and redeploy.</p>
-            <p>Use an appropriate privacy-reviewed intake provider for patient information. This app does not collect children's medical details and cannot validate whether an outside form meets your requirements.</p>
+            <p>Use an appropriate privacy-reviewed intake provider for patient information. This app does not collect children&apos;s medical details and cannot validate whether an outside form meets your requirements.</p>
             <Link href="/families" className="underline underline-offset-4">Preview family entry page →</Link>
           </div>
         </InfoCard>
