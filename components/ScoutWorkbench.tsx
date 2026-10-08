@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import type { ResolvedLead } from "@/lib/intelligence/source-types";
 import { canSaveToCrm, saveCrmLead } from "@/lib/crm/local-store";
+import { recordScoutRun } from "@/lib/intelligence/scout-history";
 
 type Engine = "client" | "rbt" | "bcba";
 type TargetState = "MO" | "KS";
@@ -102,20 +103,34 @@ const DEFAULT_SOURCE_STATES: SourceState[] = [
   { source: "Public Website Enrichment", status: "working", detail: "Contact/service verification" },
 ];
 
-export function ScoutWorkbench() {
-  const [engine, setEngine] = useState<Engine>("client");
-  const [targetState, setTargetState] = useState<TargetState>("MO");
-  const [query, setQuery] = useState(ENGINE_PROMPTS.client);
-  const [location, setLocation] = useState(STATE_NAMES.MO);
+export function ScoutWorkbench({
+  initialEngine = "client",
+  initialState = "MO",
+  initialQuery = "",
+  initialLocation = "",
+}: {
+  initialEngine?: Engine;
+  initialState?: TargetState;
+  initialQuery?: string;
+  initialLocation?: string;
+}) {
+  const [engine, setEngine] = useState<Engine>(initialEngine);
+  const [targetState, setTargetState] = useState<TargetState>(initialState);
+  const [query, setQuery] = useState(initialQuery || ENGINE_PROMPTS[initialEngine]);
+  const [location, setLocation] = useState(initialLocation || STATE_NAMES[initialState]);
   const [running, setRunning] = useState(false);
   const [response, setResponse] = useState<SearchResponse | null>(null);
   const [selected, setSelected] = useState<ResolvedLead | null>(null);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [historyResult, setHistoryResult] = useState<"saved" | "unavailable" | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
   const leads = useMemo(() => response?.leads ?? [], [response]);
   const score = response?.engineScores?.[response.engine ?? engine] ?? null;
 
   function selectEngine(next: Engine) {
+    controllerRef.current?.abort();
+    setRunning(false);
+    setHistoryResult(null);
     const queryIsPreset = Object.values(ENGINE_PROMPTS).includes(query);
     setEngine(next);
     if (queryIsPreset) setQuery(ENGINE_PROMPTS[next]);
@@ -124,6 +139,9 @@ export function ScoutWorkbench() {
   }
 
   function selectState(next: TargetState) {
+    controllerRef.current?.abort();
+    setRunning(false);
+    setHistoryResult(null);
     const oldStateOnly = !location.trim() || location.trim() === STATE_NAMES[targetState] || location.trim() === targetState;
     setTargetState(next);
     if (oldStateOnly) setLocation(STATE_NAMES[next]);
@@ -134,6 +152,7 @@ export function ScoutWorkbench() {
   function resetScout() {
     controllerRef.current?.abort();
     setRunning(false);
+    setHistoryResult(null);
     setQuery(ENGINE_PROMPTS[engine]);
     setLocation(STATE_NAMES[targetState]);
     setResponse(null);
@@ -145,6 +164,7 @@ export function ScoutWorkbench() {
     const controller = new AbortController();
     controllerRef.current = controller;
     setRunning(true);
+    setHistoryResult(null);
     setResponse(null);
     setSelected(null);
     try {
@@ -155,6 +175,11 @@ export function ScoutWorkbench() {
         signal: controller.signal,
       });
       const json = await result.json() as SearchResponse;
+      if (controller.signal.aborted) return;
+      const stored = json.ok && json.territory
+        ? recordScoutRun(json, { query, location, state: targetState, engine })
+        : null;
+      setHistoryResult(stored === null ? null : stored ? "saved" : "unavailable");
       setResponse(json);
     } catch (error) {
       if (!controller.signal.aborted) {
@@ -315,6 +340,13 @@ export function ScoutWorkbench() {
             </details>
           )}
 
+          {historyResult && (
+            <p className={historyResult === "saved" ? "statusStrip" : "warningCard"} role="status">
+              {historyResult === "saved"
+                ? "Research summary saved on this device. Compare it in Territories or review next steps in Intelligence."
+                : "Research completed, but device history could not be saved. Check available storage; server persistence may still be available."}
+            </p>
+          )}
           <div className="resultSummary">
             <div><strong>{leads.length}</strong> leads/signals <span>·</span> {response?.screened ?? 0} records screened</div>
             {response?.territory && <div className="territoryPill"><span>{response.territory.location}</span><b>{response.territory.total}/100 · {response.territory.label}</b></div>}
