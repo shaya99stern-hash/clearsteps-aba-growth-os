@@ -23,7 +23,8 @@
     "verify:institutional-followup": "tsx scripts/verify-institutional-followup.ts",
     "verify:client-growth": "tsx scripts/verify-client-growth.ts",
     "verify:family-contact": "tsx scripts/verify-family-contact.ts",
-    "verify:adaptive-followup": "tsx scripts/verify-adaptive-followup.ts"
+    "verify:adaptive-followup": "tsx scripts/verify-adaptive-followup.ts",
+    "verify:colorado-networks": "tsx scripts/verify-colorado-networks.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",
