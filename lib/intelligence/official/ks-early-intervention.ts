@@ -1,4 +1,5 @@
 import type { IndicatorObservation } from "../phase3/indicator-catalog";
+import { KANSAS_PUBLISHED_PROGRAMS } from "./ks-roster-snapshot";
 import type { PublicSearchHit } from "../source-types";
 
 export const KANSAS_EARLY_INTERVENTION_SOURCE_ID = "ks-kdhe-tiny-k-reports";
@@ -10,6 +11,8 @@ export interface KansasEarlyInterventionProgram {
   name: string;
   sourceId: typeof KANSAS_EARLY_INTERVENTION_SOURCE_ID;
   sourceUrl: string;
+  /** Dated official publication fallback, not a live 2026 verification. */
+  archivedSnapshot?: boolean;
 }
 
 export async function searchKansasEarlyIntervention(
@@ -24,9 +27,14 @@ export async function searchKansasEarlyIntervention(
       headers: { "user-agent": "ClearStepsResearch/1.0 (+public Kansas KDHE roster)" },
       cache: "no-store",
     });
-    if (!response.ok) throw new Error(`Kansas KDHE early-intervention roster returned ${response.status}`);
+    if (!response.ok) return filterKansasEarlyInterventionPrograms(KANSAS_PUBLISHED_PROGRAMS, location);
     const html = await response.text();
-    return filterKansasEarlyInterventionPrograms(parseKansasEarlyInterventionPrograms(html), location);
+    const actual = parseKansasEarlyInterventionPrograms(html);
+    return filterKansasEarlyInterventionPrograms(actual.length ? actual : KANSAS_PUBLISHED_PROGRAMS, location);
+  } catch {
+    // A live government website can block server-side fetches with HTTP 403.
+    // Keep publicly published organization references discoverable, clearly dated.
+    return filterKansasEarlyInterventionPrograms(KANSAS_PUBLISHED_PROGRAMS, location);
   } finally {
     clearTimeout(timer);
   }
@@ -87,7 +95,9 @@ export function kansasEarlyInterventionToSearchHits(
   return programs.map((program, index) => ({
     title: program.name,
     url: program.sourceUrl,
-    snippet: `Official Kansas KDHE early-intervention program listed in the current Semi-Annual Report Data Sheets for ${location || "Kansas"}.`,
+    snippet: program.archivedSnapshot
+      ? `Historical official Kansas early-intervention program listing; published reference snapshot dated 2026-10-08. Current activity and referral contact must be independently verified.`
+      : `Kansas KDHE early-intervention program found in the official live Semi-Annual Report Data Sheets for ${location || "Kansas"}.`,
     query: `KDHE tiny-k early intervention ${location || "Kansas"}`,
     sourceId: KANSAS_EARLY_INTERVENTION_SOURCE_ID,
     rank: index + 1,
@@ -98,7 +108,7 @@ export function buildKansasEarlyInterventionObservations(
   programs: readonly KansasEarlyInterventionProgram[],
   under18Population: number,
 ): IndicatorObservation[] {
-  if (programs.length === 0 || under18Population <= 0) return [];
+  if (programs.length === 0 || under18Population <= 0 || programs.some((p) => p.archivedSnapshot)) return [];
   const programsPer100kChildren = (programs.length / under18Population) * 100_000;
   const value = Math.max(0, Math.min(100, Math.round((programsPer100kChildren / 4) * 100)));
   return [{

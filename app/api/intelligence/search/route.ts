@@ -25,6 +25,7 @@ import {
 import { REGULATORY_RULES, type AbaRole } from "@/lib/intelligence/phase3/regulatory-rules";
 import type { ResolvedLead } from "@/lib/intelligence/source-types";
 import { scanPublicSignals } from "@/lib/intelligence/signals/public-signal-scan";
+import { assessOpportunityReliability } from "@/lib/intelligence/score-reliability";
 import { PUBLIC_SOURCE_CHANNELS, matchedPublicSourceChannels } from "@/lib/intelligence/signals/source-channel-catalog";
 
 export const runtime = "nodejs";
@@ -102,7 +103,12 @@ export async function POST(request: Request) {
   const nppes = nppesSettled.status === "fulfilled" ? nppesSettled.value : null;
   if (nppes) {
     observations.push(...observationsFromNppes(nppes));
-    completeSource(sourceStatus, "CMS NPPES", `${nppes.hits.length} bounded provider records across ${nppes.attempted.length} taxonomy searches`);
+    if (nppes.successful.length > 0) {
+      completeSource(sourceStatus, "CMS NPPES", nppes.successful.length + "/" + nppes.attempted.length +
+        " valid taxonomy responses; " + nppes.hits.length + " provider records; NPI does not verify licensure");
+    } else {
+      unavailableSource(sourceStatus, "CMS NPPES", "All taxonomy requests failed; no provider-density observations counted");
+    }
     errors.push(...nppes.errors.map((error) => `nppes: ${error}`));
     if (engine === "client") {
       rows.push(...nppes.hits
@@ -129,11 +135,19 @@ export async function POST(request: Request) {
       if (stateSource) {
         stateContribution = stateSource.contribution;
         observations.push(...stateContribution.observations);
-        completeSource(
-          sourceStatus,
-          stateSource.descriptor.source,
-          stateContribution.sourceDetail ?? stateSource.descriptor.emptyDetail,
-        );
+        if (stateContribution.snapshotOnly) {
+          unavailableSource(
+            sourceStatus,
+            stateSource.descriptor.source,
+            stateContribution.sourceDetail ?? "Only historical organizational listings available",
+          );
+        } else {
+          completeSource(
+            sourceStatus,
+            stateSource.descriptor.source,
+            stateContribution.sourceDetail ?? stateSource.descriptor.emptyDetail,
+          );
+        }
       }
     } catch (error) {
       const detail = errorMessage(error, stateSourceDescriptor.errorFallback);
@@ -143,8 +157,10 @@ export async function POST(request: Request) {
   }
 
   const searchQueries = plan.queries.slice(0, 15);
+  let queriesAttempted = 0;
   for (let index = 0; index < searchQueries.length; index += 5) {
     const batch = searchQueries.slice(index, index + 5);
+    queriesAttempted += batch.length;
     const results = await Promise.all(batch.map(async (planQuery) => {
       try {
         return { planQuery, hits: await searchPublicWeb(planQuery.query, 5), error: null as string | null };
@@ -170,7 +186,7 @@ export async function POST(request: Request) {
     source: "Public source channel coverage",
     status: matchedDomains.length > 0 ? "complete" : "unavailable",
     detail: PUBLIC_SOURCE_CHANNELS.length + " registered public-source channels; " +
-      plan.queries.filter((item) => item.query.startsWith("site:")).length +
+      searchQueries.slice(0, queriesAttempted).filter((item) => item.query.startsWith("site:")).length +
       " site searches scheduled; " + matchedDomains.length +
       " channel domains actually returned results" +
       (matchedDomains.length ? ": " + matchedDomains.slice(0, 7).join(", ") : ""),
@@ -215,7 +231,7 @@ export async function POST(request: Request) {
   observations.push(...publicSignals.observations);
   sourceStatus.push({
     source: "Public multi-source signal correlations",
-    status: "complete",
+    status: publicSignals.observations.length ? "complete" : "unavailable",
     detail: publicSignals.clues.length + " observed clues, " + publicSignals.observations.length +
       " independently supported indicators, " + publicSignals.supportedChecks + "/20 cross-checks",
   });
@@ -227,13 +243,22 @@ export async function POST(request: Request) {
     rbt: scoreEngineFromObservations("rbt", dedupedObservations),
     bcba: scoreEngineFromObservations("bcba", dedupedObservations),
   };
+  const independentPublishers = new Set([
+    ...rows.map((row) => safeDomain(row.hit.url)).filter((item): item is string => Boolean(item)),
+    ...stateContribution.referralHits.map((hit) => safeDomain(hit.url)).filter((item): item is string => Boolean(item)),
+  ]).size;
+  const scoreReliability = Object.fromEntries(
+    (["client", "rbt", "bcba"] as const).map((name) =>
+      [name, assessOpportunityReliability(engineScores[name], independentPublishers)]
+    )
+  ) as Record<LeadEngine, ReturnType<typeof assessOpportunityReliability>>;
   const selectedScore = engineScores[engine];
   const rules = REGULATORY_RULES.filter((rule) => rule.state === state && rule.roles.includes(roleForEngine(engine)));
   const screened = rows.length + stateContribution.referralHits.length;
   const territory = {
     location: census?.geographyName ?? targetLocation,
-    total: selectedScore.score,
-    label: scoreLabel(selectedScore.score),
+    total: scoreReliability[engine].displayScore ?? 0,
+    label: scoreReliability[engine].label,
     confidence: selectedScore.confidence,
     coverage: selectedScore.coverage,
     reasoning: selectedScore.pillarBreakdown
@@ -268,6 +293,7 @@ export async function POST(request: Request) {
         coverage: selectedScore.coverage,
       },
       engineScores,
+      scoreReliability,
       publicSignals,
       regulatoryRules: rules.map((rule) => ({
         id: rule.id,
@@ -310,13 +336,15 @@ function observationsFromNppes(nppes: NppesSearchResult): IndicatorObservation[]
     sourceIds,
     capturedAt,
   });
+  const finished = new Set(nppes.successful);
   return [
-    make("referral-ecosystem.01", nppes.counts.pediatrics, 18),
-    make("referral-ecosystem.02", nppes.counts.developmental_pediatrics, 6),
-    make("referral-ecosystem.03", nppes.counts.child_psychology, 10),
-    make("referral-ecosystem.05", nppes.counts.speech, 20),
-    make("referral-ecosystem.06", nppes.counts.occupational, 20),
-    make("aba-supply.01", nppes.counts.behavior_analyst, 25, 72),
+    ...(finished.has("pediatrics") ? [make("referral-ecosystem.01", nppes.counts.pediatrics, 18)] : []),
+    ...(finished.has("developmental_pediatrics") ? [make("referral-ecosystem.02", nppes.counts.developmental_pediatrics, 6)] : []),
+    ...(finished.has("child_psychology") ? [make("referral-ecosystem.03", nppes.counts.child_psychology, 10)] : []),
+    ...(finished.has("speech") ? [make("referral-ecosystem.05", nppes.counts.speech, 20)] : []),
+    ...(finished.has("occupational") ? [make("referral-ecosystem.06", nppes.counts.occupational, 20)] : []),
+    // A maximum-12-record NPPES sample cannot establish total ABA supply or scarcity.
+    // Retain the raw records as context only; never reverse them into a high-need claim.
   ];
 }
 
@@ -327,15 +355,15 @@ function observationsFromResolvedLeads(leads: ResolvedLead[], engine: LeadEngine
   const hiringSignals = leads.filter((lead) => lead.kind === "talent_signal" || lead.signals.includes("hiring"));
   const observations: IndicatorObservation[] = [];
 
-  if (engine === "client") {
+  if (engine === "client" && leads.length > 0) {
     observations.push({ indicatorId: "relationship-quality.01", value: ratioScore(contactable, Math.max(1, leads.length)), confidence: 70, sourceIds, capturedAt });
     observations.push({ indicatorId: "relationship-quality.10", value: scaledCount(leads.reduce((sum, lead) => sum + lead.evidence.length, 0), 30), confidence: 68, sourceIds, capturedAt });
   }
-  if (engine === "rbt") {
+  if (engine === "rbt" && hiringSignals.length > 0) {
     observations.push({ indicatorId: "rbt-workforce.01", value: scaledCount(hiringSignals.length, 12), confidence: 62, sourceIds, capturedAt });
     observations.push({ indicatorId: "rbt-workforce.08", value: scaledCount(new Set(hiringSignals.map((lead) => lead.domain || lead.name)).size, 8), confidence: 60, sourceIds, capturedAt });
   }
-  if (engine === "bcba") {
+  if (engine === "bcba" && hiringSignals.length > 0) {
     observations.push({ indicatorId: "bcba-workforce.01", value: scaledCount(hiringSignals.length, 10), confidence: 62, sourceIds, capturedAt });
     observations.push({ indicatorId: "bcba-workforce.10", value: scaledCount(new Set(hiringSignals.map((lead) => lead.domain || lead.name)).size, 8), confidence: 60, sourceIds, capturedAt });
   }
@@ -344,15 +372,24 @@ function observationsFromResolvedLeads(leads: ResolvedLead[], engine: LeadEngine
 
 function evidenceQualityObservations(leads: ResolvedLead[], sourceStatus: SourceState[]): IndicatorObservation[] {
   const evidence = leads.flatMap((lead) => lead.evidence);
-  const sourceIds = Array.from(new Set(evidence.map((item) => item.sourceId)));
-  const workingSources = sourceStatus.filter((source) => source.status === "complete").length;
-  const confidence = leads.length ? Math.round(leads.reduce((sum, lead) => sum + lead.confidence, 0) / leads.length) : 0;
+  if (evidence.length === 0) return []; // No actual evidence is unknown, not an observed zero.
+  const publishers = Array.from(new Set(
+    evidence.map((item) => safeDomain(item.url)).filter((domain): domain is string => Boolean(domain)),
+  ));
+  if (publishers.length === 0) return [];
+  const sourceIds = publishers;
+  const collectionSources = sourceStatus.filter((source) =>
+    source.status === "complete" &&
+    !["Public source channel coverage", "Public multi-source signal correlations"].includes(source.source),
+  ).length;
+  const confidence = Math.round(leads.reduce((sum, lead) => sum + lead.confidence, 0) / leads.length);
   const capturedAt = new Date().toISOString();
   return [
-    { indicatorId: "evidence-quality.01", value: scaledCount(sourceIds.length, 8), confidence: 90, sourceIds, capturedAt },
-    { indicatorId: "evidence-quality.02", value: scaledCount(workingSources, 5), confidence: 90, sourceIds, capturedAt },
-    { indicatorId: "evidence-quality.05", value: evidence.length ? 92 : 0, confidence: 90, sourceIds, capturedAt },
-    { indicatorId: "evidence-quality.06", value: confidence, confidence: 80, sourceIds, capturedAt },
+    { indicatorId: "evidence-quality.01", value: scaledCount(publishers.length, 8), confidence: 80, sourceIds, capturedAt },
+    { indicatorId: "evidence-quality.02", value: scaledCount(collectionSources, 5), confidence: 80, sourceIds, capturedAt },
+    // One website, even with 100 identical pages, provides no independent corroboration.
+    { indicatorId: "evidence-quality.05", value: publishers.length >= 2 ? scaledCount(publishers.length - 1, 6) : 0, confidence: 82, sourceIds, capturedAt },
+    { indicatorId: "evidence-quality.06", value: confidence, confidence: 70, sourceIds, capturedAt },
   ];
 }
 
@@ -383,10 +420,6 @@ function normalizedTargetLocation(location: string, state: "MO" | "KS" | "CO") {
   if (!trimmed) return state === "MO" ? "Missouri" : state === "KS" ? "Kansas" : "Colorado";
   if (/\b(MO|Missouri|KS|Kansas|CO|Colorado)\b/i.test(trimmed)) return trimmed;
   return `${trimmed}, ${state}`;
-}
-
-function scoreLabel(score: number) {
-  return score >= 80 ? "Very High" : score >= 65 ? "High" : score >= 45 ? "Moderate" : score > 0 ? "Early Signal" : "Insufficient Evidence";
 }
 
 function scaledCount(value: number, strongAt: number) {

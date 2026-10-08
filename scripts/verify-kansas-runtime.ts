@@ -36,14 +36,13 @@ const statewide = await searchKansasEarlyIntervention(
 );
 assert.equal(statewide.length, 2, "statewide runtime should retain the current active program roster");
 
-await assert.rejects(
-  () => searchKansasEarlyIntervention(
-    "Kansas",
-    async () => new Response("service unavailable", { status: 503, headers: { "content-type": "text/html" } }),
-  ),
-  /503/,
-  "non-success KDHE responses should fail explicitly so Scout can mark the source unavailable",
+const datedFallback = await searchKansasEarlyIntervention(
+  "Kansas",
+  async () => new Response("service unavailable", { status: 503, headers: { "content-type": "text/html" } }),
 );
+assert.equal(datedFallback.length, 29, "When KDHE blocks fetch, retain the dated official organization snapshot");
+assert(datedFallback.every((program) => program.archivedSnapshot), "Fallback must never pretend to be live");
+
 
 let kansasCollectorCalls = 0;
 let missouriCollectorCalls = 0;

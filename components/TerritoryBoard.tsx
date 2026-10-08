@@ -62,7 +62,7 @@ export function TerritoryBoard() {
               <article className={styles.territoryCard} key={run.id}>
                 <div className={styles.cardTop}>
                   <div><span className={styles.kicker}>{run.state} · {run.engine === "client" ? "Clients" : run.engine.toUpperCase()}</span><h3>{run.location}</h3></div>
-                  <div className={styles.score}><strong>{run.score}</strong><small>/100</small></div>
+                  <div className={styles.score}><strong>{run.label === "Insufficient Evidence" ? "—" : run.score}</strong><small>{run.label === "Insufficient Evidence" ? "unscored" : "/100"}</small></div>
                 </div>
                 <div className={styles.progressRow}>
                   <div><span>Confidence</span><b>{run.confidence}%</b><i><em style={{ width: run.confidence + "%" }} /></i></div>

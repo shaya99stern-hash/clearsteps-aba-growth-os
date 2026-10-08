@@ -64,7 +64,16 @@ export function loadScoutRuns(): ScoutRun[] {
   if (raw === cachedRaw) return cachedRuns;
   try {
     const parsed: unknown = JSON.parse(raw);
-    cachedRuns = Array.isArray(parsed) ? parsed.filter(isScoutRun).slice(0, 30) : EMPTY;
+    cachedRuns = Array.isArray(parsed)
+      ? parsed.filter(isScoutRun).slice(0, 30).map((run) => {
+          // Prior releases persisted unjustified 80/100 ratings at 3% model coverage.
+          // Do not rewrite user history; just stop displaying those old scores as rankings.
+          if (run.coverage < 12 || run.observedIndicators < 12) {
+            return { ...run, score: 0, label: "Insufficient Evidence" };
+          }
+          return run;
+        })
+      : EMPTY;
   } catch {
     cachedRuns = EMPTY;
   }

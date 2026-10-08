@@ -77,6 +77,12 @@ type SearchResponse = {
     coverage: number;
   };
   engineScores?: Record<Engine, EngineScore>;
+  scoreReliability?: Record<Engine, {
+    grade: "insufficient" | "preliminary" | "supported";
+    displayScore: number | null;
+    label: string;
+    reasons: string[];
+  }>;
   regulatoryRules?: RegulatoryRule[];
   territory?: {
     location: string;
@@ -140,6 +146,7 @@ export function ScoutWorkbench({
   const controllerRef = useRef<AbortController | null>(null);
   const leads = useMemo(() => response?.leads ?? [], [response]);
   const score = response?.engineScores?.[response.engine ?? engine] ?? null;
+  const reliability = response?.scoreReliability?.[response.engine ?? engine];
 
   function selectEngine(next: Engine) {
     controllerRef.current?.abort();
@@ -293,7 +300,7 @@ export function ScoutWorkbench({
           {response?.territory && score && response.indicatorSummary && (
             <>
               <div className="engineScoreStrip" aria-label={`${ENGINE_LABELS[response.engine ?? engine]} intelligence summary`}>
-                <div className="engineMetric"><span>Opportunity</span><strong>{score.score}</strong><small>{response.territory.label}</small></div>
+                <div className="engineMetric"><span>Opportunity</span><strong>{reliability?.displayScore ?? "—"}</strong><small>{reliability?.label ?? "Evidence review"}</small></div>
                 <div className="engineMetric"><span>Confidence</span><strong>{score.confidence}%</strong><small>evidence quality</small></div>
                 <div className="engineMetric"><span>Coverage</span><strong>{score.coverage}%</strong><small>applicable model</small></div>
                 <div className="engineMetric"><span>Indicators</span><strong>{response.indicatorSummary.selectedObserved}</strong><small>of {response.indicatorSummary.selectedApplicable} applicable · {response.indicatorSummary.modelTotal} total</small></div>
@@ -304,9 +311,17 @@ export function ScoutWorkbench({
                   {(["client", "rbt", "bcba"] as const).map((item) => (
                     <div key={item} className={(response.engine ?? engine) === item ? "crossEngineCard active" : "crossEngineCard"}>
                       <span>{ENGINE_LABELS[item]}</span>
-                      <b>{response.engineScores?.[item].score ?? 0}/100</b>
+                      <b>{response.scoreReliability?.[item]?.displayScore == null ? "Needs evidence" : (response.scoreReliability?.[item]?.displayScore + "/100")}</b>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {reliability?.grade === "insufficient" && (
+                <div className="warningCard" role="status">
+                  <b>Research incomplete — no reliable territory opportunity rating yet.</b>
+                  {reliability.reasons.map((reason) => <p key={reason}>{reason}</p>)}
+                  <p>A high average across just a few indicators is not proof of strong market demand. Keep researching other independent sources.</p>
                 </div>
               )}
 
@@ -319,7 +334,7 @@ export function ScoutWorkbench({
               )}
 
               <article className="territoryInsight">
-                <div className="scoreOrb territoryScore"><strong>{response.territory.total}</strong><span>{response.engine ?? engine}</span></div>
+                <div className="scoreOrb territoryScore"><strong>{reliability?.displayScore ?? "—"}</strong><span>{response.engine ?? engine}</span></div>
                 <div>
                   <span className="eyebrow">{response.territory.location} · {response.territory.confidence}% confidence</span>
                   <h2>{response.territory.label} {ENGINE_LABELS[response.engine ?? engine].toLowerCase()} opportunity</h2>
@@ -397,7 +412,7 @@ export function ScoutWorkbench({
           )}
           <div className="resultSummary">
             <div><strong>{leads.length}</strong> leads/signals <span>·</span> {response?.screened ?? 0} records screened</div>
-            {response?.territory && <div className="territoryPill"><span>{response.territory.location}</span><b>{response.territory.total}/100 · {response.territory.label}</b></div>}
+            {response?.territory && <div className="territoryPill"><span>{response.territory.location}</span><b>{reliability?.displayScore == null ? "Insufficient evidence" : (reliability.displayScore + "/100 · " + response.territory.label)}</b></div>}
           </div>
 
           <div className="leadList">

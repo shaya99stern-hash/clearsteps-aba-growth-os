@@ -30,6 +30,8 @@ export interface StateSourceContribution {
   referralHits: PublicSearchHit[];
   observations: IndicatorObservation[];
   sourceDetail: string | null;
+  /** Evidence uses a dated static publication rather than a successful live request. */
+  snapshotOnly?: boolean;
 }
 
 export interface StateSourceRuntimeDependencies {
@@ -55,10 +57,14 @@ export function buildStateSourceContribution(input: StateSourceContributionInput
       return { referralHits: [], observations: [], sourceDetail: null };
     }
     const programs = input.kansasEarlyIntervention;
+    const snapshotOnly = programs.some((program) => program.archivedSnapshot);
     return {
       referralHits: kansasEarlyInterventionToSearchHits(programs, input.location),
       observations: buildKansasEarlyInterventionObservations(programs, input.under18Population),
-      sourceDetail: `${programs.length} current Kansas KDHE early-intervention ${programs.length === 1 ? "program" : "programs"}`,
+      ...(snapshotOnly ? { snapshotOnly: true } : {}),
+      sourceDetail: snapshotOnly
+        ? programs.length + " published Kansas institutional listings (historical reference, not live verified; no density scored)"
+        : `${programs.length} current Kansas KDHE early-intervention ${programs.length === 1 ? "program" : "programs"}`,
     };
   }
 
