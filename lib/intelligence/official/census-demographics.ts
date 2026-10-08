@@ -188,11 +188,6 @@ function absoluteDemandScore(value: number, strongAt: number) {
   return clamp(Math.round((Math.log1p(value) / Math.log1p(strongAt)) * 100));
 }
 
-function scaleRange(value: number, low: number, high: number) {
-  if (high <= low) return 0;
-  return clamp(Math.round(((value - low) / (high - low)) * 100));
-}
-
 function first(rows: CensusRow[]) {
   const row = rows[0];
   if (!row) throw new Error("Census ACS returned no matching row");
