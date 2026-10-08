@@ -102,7 +102,12 @@ export async function POST(request: Request) {
   const nppes = nppesSettled.status === "fulfilled" ? nppesSettled.value : null;
   if (nppes) {
     observations.push(...observationsFromNppes(nppes));
-    completeSource(sourceStatus, "CMS NPPES", `${nppes.hits.length} bounded provider records across ${nppes.attempted.length} taxonomy searches`);
+    if (nppes.successful.length > 0) {
+      completeSource(sourceStatus, "CMS NPPES", nppes.successful.length + "/" + nppes.attempted.length +
+        " valid taxonomy responses; " + nppes.hits.length + " provider records; NPI does not verify licensure");
+    } else {
+      unavailableSource(sourceStatus, "CMS NPPES", "All taxonomy requests failed; no provider-density observations counted");
+    }
     errors.push(...nppes.errors.map((error) => `nppes: ${error}`));
     if (engine === "client") {
       rows.push(...nppes.hits
@@ -143,8 +148,10 @@ export async function POST(request: Request) {
   }
 
   const searchQueries = plan.queries.slice(0, 15);
+  let queriesAttempted = 0;
   for (let index = 0; index < searchQueries.length; index += 5) {
     const batch = searchQueries.slice(index, index + 5);
+    queriesAttempted += batch.length;
     const results = await Promise.all(batch.map(async (planQuery) => {
       try {
         return { planQuery, hits: await searchPublicWeb(planQuery.query, 5), error: null as string | null };
@@ -170,7 +177,7 @@ export async function POST(request: Request) {
     source: "Public source channel coverage",
     status: matchedDomains.length > 0 ? "complete" : "unavailable",
     detail: PUBLIC_SOURCE_CHANNELS.length + " registered public-source channels; " +
-      plan.queries.filter((item) => item.query.startsWith("site:")).length +
+      searchQueries.slice(0, queriesAttempted).filter((item) => item.query.startsWith("site:")).length +
       " site searches scheduled; " + matchedDomains.length +
       " channel domains actually returned results" +
       (matchedDomains.length ? ": " + matchedDomains.slice(0, 7).join(", ") : ""),
@@ -215,7 +222,7 @@ export async function POST(request: Request) {
   observations.push(...publicSignals.observations);
   sourceStatus.push({
     source: "Public multi-source signal correlations",
-    status: "complete",
+    status: publicSignals.observations.length ? "complete" : "unavailable",
     detail: publicSignals.clues.length + " observed clues, " + publicSignals.observations.length +
       " independently supported indicators, " + publicSignals.supportedChecks + "/20 cross-checks",
   });
@@ -310,13 +317,14 @@ function observationsFromNppes(nppes: NppesSearchResult): IndicatorObservation[]
     sourceIds,
     capturedAt,
   });
+  const finished = new Set(nppes.successful);
   return [
-    make("referral-ecosystem.01", nppes.counts.pediatrics, 18),
-    make("referral-ecosystem.02", nppes.counts.developmental_pediatrics, 6),
-    make("referral-ecosystem.03", nppes.counts.child_psychology, 10),
-    make("referral-ecosystem.05", nppes.counts.speech, 20),
-    make("referral-ecosystem.06", nppes.counts.occupational, 20),
-    make("aba-supply.01", nppes.counts.behavior_analyst, 25, 72),
+    ...(finished.has("pediatrics") ? [make("referral-ecosystem.01", nppes.counts.pediatrics, 18)] : []),
+    ...(finished.has("developmental_pediatrics") ? [make("referral-ecosystem.02", nppes.counts.developmental_pediatrics, 6)] : []),
+    ...(finished.has("child_psychology") ? [make("referral-ecosystem.03", nppes.counts.child_psychology, 10)] : []),
+    ...(finished.has("speech") ? [make("referral-ecosystem.05", nppes.counts.speech, 20)] : []),
+    ...(finished.has("occupational") ? [make("referral-ecosystem.06", nppes.counts.occupational, 20)] : []),
+    ...(finished.has("behavior_analyst") ? [make("aba-supply.01", nppes.counts.behavior_analyst, 25, 72)] : []),
   ];
 }
 
