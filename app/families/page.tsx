@@ -47,7 +47,7 @@ export default function FamiliesPage() {
             <p className={styles.cardLabel}>A clearer beginning</p>
             <h2>What to expect</h2>
             <div className={styles.feature}><Phone size={20} aria-hidden="true"/><div><strong>Speak with an intake coordinator</strong><p>Ask about service locations and whether the agency is accepting inquiries.</p></div></div>
-            <div className={styles.feature}><MapPinCheckInside size={20} aria-hidden="true"/><div><strong>Confirm the practical details</strong><p>Review the service area, payers and assessment process with the team.</p></div></div>
+            <div className={styles.feature}><MapPin size={20} aria-hidden="true"/><div><strong>Confirm the practical details</strong><p>Review the service area, payers and assessment process with the team.</p></div></div>
             <div className={styles.feature}><CalendarCheck2 size={20} aria-hidden="true"/><div><strong>Discuss scheduling and staffing</strong><p>Any services require an appropriate care plan and qualified clinical supervision.</p></div></div>
           </div>
         </section>
