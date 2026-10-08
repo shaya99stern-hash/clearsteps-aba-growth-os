@@ -1,4 +1,5 @@
 import type { PublicSearchHit, ResolvedLead } from "../source-types";
+import { publicPublisherId, samePublicNarrative } from "./publisher-evidence";
 
 /**
  * Reputation research for ORGANIZATIONS only. No reviewer/user records or review text are retained.
@@ -68,12 +69,6 @@ function matchesBusiness(hit: PublicSearchHit, businessName: string) {
   const name=normalize(businessName),title=normalize(hit.title),snippet=normalize(hit.snippet);
   return title.includes(name) || snippet.includes(name);
 }
-function rootPublisher(host: string) {
-  const parts=host.split(".");
-  if(parts.length<=2 || host.endsWith(".gov"))return host;
-  if(host.endsWith(".co.uk"))return parts.slice(-3).join(".");
-  return parts.slice(-2).join(".");
-}
 function isOrganizationCompetitor(lead: ResolvedLead) {
   if (lead.kind === "competitor_signal") return true;
   if (!["organization","referral"].includes(lead.kind)) return false;
@@ -121,7 +116,7 @@ export function summarizeCompanyReviewEvidence(
     searchLink("Yelp",lead.name,location),
   ];
   const evidence=new Map<ReviewTheme,Map<string,ReviewSentiment>>();
-  const distinctNarratives=new Map<ReviewTheme,Set<string>>();
+  const distinctNarratives=new Map<ReviewTheme,string[]>();
   let publishedMatches=0;
   for(const hit of searchHits.slice(0,80)) {
     if(!matchesBusiness(hit,lead.name))continue;
@@ -144,14 +139,14 @@ export function summarizeCompanyReviewEvidence(
     if(/\b(my child|my son|my daughter|our child|diagnos(?:ed|is)|medical record|home address|lives at)\b/i.test(snippet))continue;
     if(!/\b(aba|behavioral? therapy|autism services|pediatric therapy|clinic)\b/i.test(snippet))continue;
     if (lead.domain && (host===lead.domain || host.endsWith("."+lead.domain))) continue;
-    const publisher=rootPublisher(host);
+    const publisher=publicPublisherId(host);
     let matched=false;
     for(const [theme,sentiment,re] of THEMES) {
       if(!re.test(snippet))continue;
       const fingerprint=normalize(snippet);
-      const seen=distinctNarratives.get(theme)??new Set<string>();
-      if(seen.has(fingerprint))continue; // Syndicated copy is not independent corroboration.
-      seen.add(fingerprint);
+      const seen=distinctNarratives.get(theme)??[];
+      if(seen.some((item)=>samePublicNarrative(item,fingerprint)))continue;
+      seen.push(fingerprint);
       distinctNarratives.set(theme,seen);
       const domains=evidence.get(theme)??new Map<string,ReviewSentiment>();
       domains.set(publisher,sentiment);
