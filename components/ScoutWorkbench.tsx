@@ -86,6 +86,19 @@ type SearchResponse = {
     reasoning: string[];
   };
   errors?: string[];
+  publicSignals?: {
+    inspected: number;
+    supportedChecks: number;
+    observations: Array<{ indicatorId: string }>;
+    clues: Array<{
+      indicatorId: string; name: string; group: string;
+      sourceCount: number; corroborated: boolean;
+      sourceDomains: string[];
+    }>;
+    crossChecks: Array<{
+      id: string; title: string; status: "supported" | "partial" | "unobserved"; sourceCount: number;
+    }>;
+  };
 };
 
 const ENGINE_PROMPTS: Record<Engine, string> = {
@@ -324,6 +337,40 @@ export function ScoutWorkbench({
               {response?.browser && <SourceRow source={response.browser} />}
             </div>
           </details>
+
+          {response?.publicSignals && (
+            <details className="sourceDisclosure">
+              <summary>
+                <span>60 public market indicators + 20 cross-checks</span>
+                <span>{response.publicSignals.observations.length} supported · {response.publicSignals.supportedChecks}/20 linked</span>
+              </summary>
+              <div className="sourceRail">
+                <p>Every clue is screened against distinct public sources. Unconfirmed reports remain leads for additional research and do not add points to the market score. Personal residential details are excluded.</p>
+                {response.publicSignals.clues.slice(0, 20).map((clue) => (
+                  <div className="sourceItem" key={clue.indicatorId}>
+                    <i className={`sourceDot ${clue.corroborated ? "complete" : "unavailable"}`} />
+                    <div>
+                      <b>{clue.name} · {clue.corroborated ? "Corroborated" : "Needs independent evidence"}</b>
+                      <span>{clue.sourceCount} distinct domains · {clue.sourceDomains.join(", ")}</span>
+                    </div>
+                  </div>
+                ))}
+                <details className="ruleDisclosure">
+                  <summary>All 20 relationship checks</summary>
+                  <div className="ruleList">
+                    {response.publicSignals.crossChecks.map((check) => (
+                      <div className="ruleRow" key={check.id}>
+                        <span className={`ruleBadge ${check.status === "supported" ? "PASS" : check.status === "partial" ? "REVIEW" : "INFO"}`}>
+                          {check.status}
+                        </span>
+                        <div className="ruleCopy"><b>{check.title}</b><p>{check.sourceCount} public source domains considered</p></div>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              </div>
+            </details>
+          )}
 
           {response?.regulatoryRules && response.regulatoryRules.length > 0 && (
             <details className="ruleDisclosure">
