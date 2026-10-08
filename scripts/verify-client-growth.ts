@@ -13,7 +13,7 @@ assert.equal(a.secureIntakeReady,false);
 assert.equal(a.directFamilyInquiries,0);
 assert.equal(a.ageQualifiedFamiliesFound,0);
 assert.equal(a.actions.length,5);
-assert(a.actions.some((x)=>x.id==="activate_intake" && x.url===null));
+assert(a.actions.some((x)=>x.id==="activate_intake" && x.url==="/families"));
 assert(a.actions.some((x)=>x.id==="staff_capacity" && x.url==="/talent"));
 assert(!a.actions.some((x)=>/ABA partnership|competitor as client|scrape/i.test(x.description)));
 assert(a.actions.filter((x)=>x.url?.startsWith("https://www.google.com/search")).length>=2);
