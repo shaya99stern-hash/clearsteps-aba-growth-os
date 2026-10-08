@@ -324,11 +324,13 @@ async function verifyPublicFamilyEntry(baseUrl:string) {
       assert.equal(await page.getByRole("heading",{name:"What to expect"}).count(),1);
       assert.equal(await page.getByRole("heading",{name:"Adolescents"}).count(),1);
       await assertNoBodyOverflow(page,"Family entry at width "+width);
-      const ctas=await page.locator('a[href^="tel:"],a[href*="/secure"]').count();
-      if(ctas===0){
-        await page.getByText("Intake contact is not yet activated.").waitFor();
+      const inactive=await page.getByText("Intake contact is not yet activated.").count();
+      if(inactive>0){
         const robots=await page.locator('meta[name="robots"]').getAttribute("content");
-        assert(robots?.includes("noindex"),"Unconfigured intake page must not be indexed as accepting enquiries");
+        assert(robots?.includes("noindex"),"Unconfigured intake page must not be indexed as accepting inquiries");
+      } else {
+        const callOrIntake=await page.locator('a[href^="tel:"],a[target="_blank"]').count();
+        assert(callOrIntake>0,"A published service page must expose a verified agency contact destination");
       }
     } finally {await page.close();}
   }
