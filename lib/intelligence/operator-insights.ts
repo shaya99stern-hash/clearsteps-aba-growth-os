@@ -67,7 +67,7 @@ export function buildOperatorQueue(
       detail: lead.pipeline === "talent"
         ? "Recruiting signal · " + lead.score + "/100 score · " + lead.confidence + "% confidence. Verify source and credentials before outreach."
         : "Referral opportunity · " + lead.score + "/100 score · " + lead.confidence + "% confidence. Review fit and evidence before outreach.",
-      href: lead.pipeline === "talent" ? "/talent" : "/pipeline",
+      href: (lead.pipeline === "talent" ? "/talent" : "/pipeline") + "?search=" + encodeURIComponent(lead.name),
       priority: 60 + Math.round(lead.score / 10),
       leadId: lead.id,
       leadKind: lead.kind,
