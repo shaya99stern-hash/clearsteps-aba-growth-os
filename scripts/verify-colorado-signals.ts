@@ -48,7 +48,7 @@ const corroborated=scanPublicSignals([
 assert(corroborated.observations.some(x=>x.indicatorId==="service-capacity.01"));
 assert(corroborated.observations.some(x=>x.indicatorId==="institutional-demand.10"));
 assert.equal(corroborated.crossChecks.find(x=>x.id==="X01")?.status,"supported");
-assert.equal(corroborated.crossChecks.length,20);
+assert.equal(corroborated.crossChecks.length,60);
 const privateClue=scanPublicSignals([
  hit("forum.org","My autistic son lives at our house on 123 Main Street; ABA waitlist"),
 ]);
