@@ -54,7 +54,10 @@ function toLead(
 
   const lanes = new Set(matches.map((row) => row.lane));
   const text = matches.map((row) => `${row.hit.title} ${row.hit.snippet} ${row.enrichment?.textSample ?? ""}`).join(" ").toLowerCase();
-  const kind = lanes.has("talent")
+  const authoritativeReferral = matches.every((row) =>
+    row.hit.sourceId === "co-cdec-licensed-childcare" ||
+    row.hit.sourceId === "mo-dhss-child-care-gis");
+  const kind = authoritativeReferral ? "referral" : lanes.has("talent")
     ? looksLikeIndividualCandidate(text) ? "candidate" : "talent_signal"
     : lanes.has("community") && lanes.size === 1
       ? "community_signal"
@@ -66,12 +69,19 @@ function toLead(
 
   const signals = signalTerms(text);
   const independentQueries = new Set(matches.map((row) => row.hit.query)).size;
+  const independentDomains = new Set(evidence.map((item) => getDomain(item.url)).filter(Boolean)).size;
+  const actualContact = emails.length > 0 || phones.length > 0;
   const contactability = Math.min(20, emails.length * 8 + phones.length * 7 + (domain ? 5 : 0));
-  const crossReference = Math.min(25, independentQueries * 6 + Math.max(0, evidence.length - matches.length) * 5);
+  const crossReference = Math.min(25, Math.max(0, independentDomains - 1) * 12 +
+    (enrichments.length && independentDomains > 1 ? 5 : 0));
   const relevance = Math.min(35, signals.length * 5 + (lanes.has("referral") ? 8 : 0) + (lanes.has("talent") ? 8 : 0));
   const geography = location ? 10 : 4;
-  const score = Math.min(100, contactability + crossReference + relevance + geography + 10);
-  const confidence = Math.min(100, 25 + independentQueries * 12 + enrichments.length * 18 + (domain ? 8 : 0));
+  const rawScore = Math.min(100, contactability + crossReference + relevance + geography);
+  // Single institutional registries are source candidates, not high-quality referral leads.
+  const score = independentDomains < 2 ? Math.min(rawScore, actualContact ? 55 : 44) :
+    actualContact ? rawScore : Math.min(rawScore, 64);
+  const confidence = Math.min(90, 24 + independentDomains * 13 + (actualContact ? 13 : 0) +
+    (enrichments.length > 0 ? 10 : 0) + Math.min(8, independentQueries * 2));
 
   return {
     id: key,
@@ -84,12 +94,15 @@ function toLead(
     confidence,
     reasons: [
       `${evidence.length} public evidence record${evidence.length === 1 ? "" : "s"}`,
-      `${independentQueries} independent search path${independentQueries === 1 ? "" : "s"}`,
+      `${independentDomains} independent website domain${independentDomains === 1 ? "" : "s"}`,
+      `${independentQueries} search path${independentQueries === 1 ? "" : "s"} (not independent sources)`,
       signals.length ? `Signals: ${signals.slice(0, 4).join(", ")}` : "General category/location relevance",
       emails.length || phones.length ? "Direct public contact data found on website" : "Contact enrichment still needed",
     ],
     unknowns: [
       ...(emails.length || phones.length ? [] : ["Decision-maker contact not verified"]),
+      ...(independentDomains >= 2 ? [] : ["Only one independent publisher; corroborate referral relevance"]),
+      ...(!actualContact ? ["Public contact and organization suitability not verified"] : []),
       ...(confidence >= 70 ? [] : ["Additional independent source recommended"]),
     ],
     emails,
@@ -100,6 +113,8 @@ function toLead(
 }
 
 function entityKey(hit: PublicSearchHit, lane: SearchLane) {
+  if (hit.sourceId === "mo-dhss-child-care-gis") return "mo-facility-" + slug(hit.query.split(" facility ").at(-1) || hit.title);
+  if (hit.sourceId === "co-cdec-licensed-childcare") return "co-facility-" + slug(hit.query);
   if (lane === "community") return `community-${slug(hit.url)}`;
   const domain = getDomain(hit.url);
   if (domain && !isAggregatorDomain(domain)) return `domain-${slug(domain)}`;

@@ -2,7 +2,7 @@
 
 /** Small, privacy-bounded research summaries. Never store patient or household dossiers. */
 export type ScoutEngine = "client" | "rbt" | "bcba";
-export type ScoutState = "MO" | "KS";
+export type ScoutState = "MO" | "KS" | "CO";
 export type EvidencePosture = "review" | "thin" | "stale";
 
 export interface ScoutRun {
@@ -159,7 +159,7 @@ function isScoutRun(value: unknown): value is ScoutRun {
   const run = value as Partial<ScoutRun>;
   return typeof run.id === "string"
     && typeof run.capturedAt === "string"
-    && ["MO", "KS"].includes(String(run.state))
+    && ["MO", "KS", "CO"].includes(String(run.state))
     && ["client", "rbt", "bcba"].includes(String(run.engine))
     && typeof run.location === "string"
     && typeof run.query === "string"

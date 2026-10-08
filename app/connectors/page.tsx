@@ -22,6 +22,28 @@ export default async function SourcesPage() {
           <SourceStat icon={<Globe2 size={17} />} value={snapshot.counts.apiKeyFree} label="no paid key" />
         </section>
 
+        <section className={styles.manifest} aria-label="Public source channel catalog">
+          <div className={styles.manifestIcon}><Globe2 size={19} /></div>
+          <div>
+            <span className="eyebrow">Public source discovery · No API keys</span>
+            <h2>{snapshot.channelCatalog.total} registered research channels</h2>
+            <p>These are candidate public websites the scraper can investigate through bounded site-specific searches, not 76 functioning direct integrations. Only sources that return actual results are counted as acquired evidence in Scout.</p>
+            {(["CO", "KS", "MO", "federal", "national"] as const).map((scope) => {
+              const channels = snapshot.channelCatalog.channels.filter((channel) => channel.scope === scope);
+              return (
+                <details key={scope}>
+                  <summary>{scope === "CO" ? "Colorado" : scope === "KS" ? "Kansas" : scope === "MO" ? "Missouri" : scope === "federal" ? "Federal" : "National / Community"} · {channels.length} channels</summary>
+                  <div className={styles.manifestMeta}>
+                    {channels.map((channel) => (
+                      <span key={channel.host}>{channel.host} · {channel.kind}</span>
+                    ))}
+                  </div>
+                </details>
+              );
+            })}
+          </div>
+        </section>
+
         <section className={styles.mesh}>
           {snapshot.sources.map((source) => (
             <article className={styles.card} key={source.id}>

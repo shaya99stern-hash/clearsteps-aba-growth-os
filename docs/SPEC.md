@@ -2,15 +2,15 @@
 
 Clear Steps is an evidence-first ABA lead-intelligence, recruiting, referral-growth, outreach, and CRM operating system.
 
-## Phase 3 product definition
+## Current product definition (2026-10)
 
 Clear Steps now operates as **three lead engines sharing one durable CRM core**:
 
-1. **Client Engine** — ranks Missouri and Kansas territories and public organization-level referral opportunities likely to produce qualified client demand.
+1. **Client Engine** — ranks Missouri, Kansas, and Colorado territories and public organization-level referral opportunities likely to produce qualified client demand.
 2. **RBT Engine** — ranks labor markets, employers, hiring signals, training pipelines, public candidate signals, payer readiness, and technician compliance constraints.
 3. **BCBA Engine** — ranks analyst labor markets, licensed-professional supply, open roles, supervision capacity, payer readiness, and state licensure constraints.
 
-The product is constrained to **Missouri and Kansas** for new Scout research. Existing historical CRM records from other states are preserved but are not used as new territory targets.
+The product is constrained to **Missouri, Kansas, and Colorado** for new Scout research. Existing historical CRM records from other states are preserved but are not used as new territory targets.
 
 ## Intelligence architecture
 
@@ -18,7 +18,7 @@ Scout is not a single web search. A research run must produce an evidence graph:
 
 `public sources -> normalized observations -> entity resolution -> regulatory/payer gates -> engine scores -> explainable lead dossier`
 
-The target model contains at least **120 independently addressable indicators** across twelve pillars:
+The target model contains **180 independently addressable indicators** across eighteen pillars:
 
 - child/demographic demand
 - developmental and public-program demand
@@ -83,3 +83,19 @@ The installed application is labeled **ABA Engine** while the in-product brand r
 - Public named professionals may be verified when already discovered through a legitimate recruiting or professional source.
 - Source provenance, freshness, confidence, conflicts, and unknowns stay visible in the UI.
 - The product may encode official legal/payer requirements, but uncertain applicability must be surfaced as `REVIEW`, not guessed.
+## Cross-source public intelligence expansion (October 2026)
+
+- 120 initial model indicators plus 60 additional public/institutional hypotheses across six added pillars.
+- 20 explicitly paired cross-source tests, status supported, partial, or unobserved based on actual evidence.
+- 76 registered public domain/channel candidates across Missouri, Kansas, Colorado, federal, and national sources. Registered does NOT mean queried, accessible, verified, or integrated.
+- Discovery without user API keys: bounded public HTML search, public RSS fallback, direct official agency datasets, NPPES, and keyless Census Reporter ACS.
+- City/county matching is required before public discussion can contribute to local market scoring.
+- Multiple search snippets from one publisher count as ONE source. Strong corroboration requires independent domains and relevant first-party or authoritative evidence.
+- Lead dossiers expose independent claim confirmations, conflicts over intake/hiring, source dates and missing evidence.
+- Enacted Colorado HB26-1425 has practitioner licensing starting July 1, 2028; clinic and payer rules have separate review obligations.
+- No residential sign-to-home disability inference or family profiles. Public discussion is aggregated only.
+
+## Shipping and verification
+
+Tests include verify:aba-engine, verify:colorado-signals, verify:evidence-mesh, state-source checks, production build, mobile Playwright and a non-gating real public-source smoke.
+Green code tests do not prove public hosts return live results, cross-device database persistence or active daily monitoring. Always report live source status independently.

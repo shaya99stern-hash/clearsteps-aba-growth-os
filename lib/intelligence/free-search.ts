@@ -5,26 +5,54 @@ import type { EnrichedWebsite, PublicSearchHit } from "./source-types";
 const SEARCH_ENDPOINT = "https://html.duckduckgo.com/html/";
 
 export async function searchPublicWeb(query: string, limit = 8): Promise<PublicSearchHit[]> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 12_000);
-  try {
+  const requested = Math.max(1, Math.min(limit, 20));
+  const errors: string[] = [];
+  {
     const body = new URLSearchParams({ q: query, kl: "us-en" });
-    const response = await fetch(SEARCH_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "content-type": "application/x-www-form-urlencoded",
-        "user-agent": "Mozilla/5.0 ClearStepsResearch/1.0",
-      },
-      body,
-      redirect: "follow",
-      cache: "no-store",
-      signal: controller.signal,
-    });
-    if (!response.ok) throw new Error(`Public search returned ${response.status}.`);
-    return parseDuckDuckGo(await response.text(), query).slice(0, Math.max(1, Math.min(limit, 20)));
-  } finally {
-    clearTimeout(timer);
+    try {
+      const response = await fetch(SEARCH_ENDPOINT, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded", "user-agent": "Mozilla/5.0 ClearStepsResearch/1.0" },
+        body, redirect: "follow", cache: "no-store", signal: AbortSignal.timeout(5000),
+      });
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      const results = parseDuckDuckGo(await response.text(), query);
+      if (results.length > 0) return results.slice(0, requested);
+      errors.push("DuckDuckGo had no parseable public results");
+    } catch (error) {
+      errors.push("DuckDuckGo: " + (error instanceof Error ? error.message : "unavailable"));
+    }
+    // Public RSS, not a paid search API. No tokens and no scraping login walls.
+    try {
+      const rssUrl = "https://www.bing.com/search?" + new URLSearchParams({format:"rss",q:query,count:String(requested)});
+      const response = await fetch(rssUrl, {
+        headers: { accept: "application/rss+xml, application/xml, text/xml" },
+        signal: AbortSignal.timeout(5000), cache: "no-store",
+      });
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      const results = parseBingRss(await response.text(),query);
+      if (results.length > 0) return results.slice(0,requested);
+      errors.push("Bing RSS had no parseable public results");
+    } catch (error) {
+      errors.push("Bing RSS: " + (error instanceof Error ? error.message : "unavailable"));
+    }
+    throw new Error(errors.join("; "));
   }
+}
+export function parseBingRss(xml: string, query: string): PublicSearchHit[] {
+  const result: PublicSearchHit[]=[];
+  const blocks=xml.match(/<item\b[^>]*>[\s\S]*?<\/item>/gi) ?? [];
+  for (const block of blocks.slice(0,25)) {
+    const rawLink=firstMatch(block,/<link>([\s\S]*?)<\/link>/i).trim();
+    const url=decodeHtml(rawLink.replace(/^<!\[CDATA\[|\]\]>$/g,""));
+    if (!isObviouslyPublicHttpUrl(url)) continue;
+    result.push({
+      title:htmlToText(firstMatch(block,/<title>([\s\S]*?)<\/title>/i)).slice(0,240),
+      url, snippet:htmlToText(firstMatch(block,/<description>([\s\S]*?)<\/description>/i)).slice(0,700),
+      query,sourceId:"bing-rss",rank:result.length+1,
+    });
+  }
+  return dedupeHits(result);
 }
 
 export async function enrichPublicWebsite(url: string): Promise<EnrichedWebsite | null> {

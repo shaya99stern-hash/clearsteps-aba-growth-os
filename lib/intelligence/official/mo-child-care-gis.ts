@@ -137,7 +137,7 @@ export function missouriChildCareToSearchHits(
 ): PublicSearchHit[] {
   return providers.map((provider, index) => ({
     title: provider.name,
-    url: provider.sourceUrl,
+    url: "https://healthapps.dhss.mo.gov/childcaresearch/SearchEngine.aspx",
     snippet: [
       "Official Missouri DHSS child-care facility",
       provider.siteType,
@@ -147,7 +147,7 @@ export function missouriChildCareToSearchHits(
       provider.minAge || provider.maxAge ? `ages ${provider.minAge || "?"}-${provider.maxAge || "?"}` : undefined,
       provider.phone ? `public phone ${provider.phone}` : undefined,
     ].filter(Boolean).join(" · "),
-    query: `Missouri DHSS child care ${location}`.trim(),
+    query: `Missouri DHSS child care ${location} facility ${provider.id}`.trim(),
     sourceId: MISSOURI_CHILD_CARE_SOURCE_ID,
     rank: index + 1,
   }));

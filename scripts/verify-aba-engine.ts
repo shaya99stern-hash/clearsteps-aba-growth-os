@@ -8,9 +8,9 @@ import {
 import { evaluateRegulatoryContext, REGULATORY_RULES } from "../lib/intelligence/phase3/regulatory-rules";
 import { parseNppesResponse } from "../lib/intelligence/official/nppes-live";
 
-assert.equal(INDICATOR_PILLARS.length, 12, "Phase 3 should have 12 MECE indicator pillars");
-assert.equal(INDICATOR_CATALOG.length, 120, "Phase 3 should expose exactly 120 initial indicators");
-assert.equal(new Set(INDICATOR_CATALOG.map((indicator) => indicator.id)).size, 120, "Indicator IDs must be unique");
+assert.equal(INDICATOR_PILLARS.length, 18, "Eighteen indicator pillars");
+assert.equal(INDICATOR_CATALOG.length, 180, "180 catalog indicators");
+assert.equal(new Set(INDICATOR_CATALOG.map((indicator) => indicator.id)).size, 180, "Indicator IDs must be unique");
 assert(indicatorsForEngine("client").length > indicatorsForEngine("rbt").length, "Client engine should use the broader territory/referral evidence set");
 assert(indicatorsForEngine("rbt").some((indicator) => indicator.pillarId === "rbt-workforce"));
 assert(indicatorsForEngine("bcba").some((indicator) => indicator.pillarId === "bcba-workforce"));

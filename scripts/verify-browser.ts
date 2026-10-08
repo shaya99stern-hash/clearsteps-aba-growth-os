@@ -184,8 +184,8 @@ async function verifyMobilePwa(baseUrl: string) {
     assert.equal(await page.getByRole("button", { name: "Clients", exact: true }).getAttribute("aria-pressed"), "true");
 
     const stateButtons = page.locator('[aria-label="Target state"] button');
-    assert.equal(await stateButtons.count(), 2, "Scout should expose exactly Missouri and Kansas state controls");
-    assert.deepEqual(await stateButtons.allInnerTexts(), ["Missouri", "Kansas"]);
+    assert.equal(await stateButtons.count(), 3, "Scout should expose Missouri, Kansas and Colorado state controls");
+    assert.deepEqual(await stateButtons.allInnerTexts(), ["Missouri", "Kansas", "Colorado"]);
     assert.equal(await page.getByRole("button", { name: "Missouri", exact: true }).getAttribute("aria-pressed"), "true");
 
     const locationInput = page.getByLabel("Target city, ZIP, county or state");
@@ -200,6 +200,9 @@ async function verifyMobilePwa(baseUrl: string) {
 
     await page.getByRole("button", { name: "Kansas", exact: true }).click();
     assert.equal(await locationInput.inputValue(), "Kansas", "switching state should move a state-only target to Kansas");
+    await page.getByRole("button", { name: "Colorado", exact: true }).click();
+    assert.equal(await locationInput.inputValue(), "Colorado", "switching to Colorado must update the target state");
+    await page.getByRole("button", { name: "Kansas", exact: true }).click();
     await page.getByRole("button", { name: "RBTs", exact: true }).click();
     assert.equal(await page.getByRole("button", { name: "RBTs", exact: true }).getAttribute("aria-pressed"), "true");
 

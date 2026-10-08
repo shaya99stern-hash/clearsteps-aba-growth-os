@@ -18,9 +18,10 @@ import {
 import type { ResolvedLead } from "@/lib/intelligence/source-types";
 import { canSaveToCrm, saveCrmLead } from "@/lib/crm/local-store";
 import { recordScoutRun } from "@/lib/intelligence/scout-history";
+import { buildLeadEvidenceGraph } from "@/lib/intelligence/signals/lead-evidence-graph";
 
 type Engine = "client" | "rbt" | "bcba";
-type TargetState = "MO" | "KS";
+type TargetState = "MO" | "KS" | "CO";
 type SourceState = { source: string; status: "working" | "complete" | "unavailable"; detail?: string };
 
 type EngineScore = {
@@ -86,16 +87,29 @@ type SearchResponse = {
     reasoning: string[];
   };
   errors?: string[];
+  publicSignals?: {
+    inspected: number;
+    supportedChecks: number;
+    observations: Array<{ indicatorId: string }>;
+    clues: Array<{
+      indicatorId: string; name: string; group: string;
+      sourceCount: number; corroborated: boolean;
+      sourceDomains: string[]; geographySupported: boolean;
+    }>;
+    crossChecks: Array<{
+      id: string; title: string; status: "supported" | "partial" | "unobserved"; sourceCount: number;
+    }>;
+  };
 };
 
 const ENGINE_PROMPTS: Record<Engine, string> = {
   client: "Find the strongest client-growth territories and public referral organizations, and explain the evidence behind each opportunity.",
-  rbt: "Find RBT hiring pressure, talent supply, employers, training signals and recruiting opportunities, with Missouri/Kansas compliance context.",
+  rbt: "Find RBT hiring pressure, talent supply, employers, training signals and recruiting opportunities, with Missouri/Kansas/Colorado compliance context.",
   bcba: "Find BCBA/LBA hiring pressure, licensed analyst supply, employers and recruiting opportunities, with state licensure context.",
 };
 
 const ENGINE_LABELS: Record<Engine, string> = { client: "Clients", rbt: "RBTs", bcba: "BCBAs" };
-const STATE_NAMES: Record<TargetState, string> = { MO: "Missouri", KS: "Kansas" };
+const STATE_NAMES: Record<TargetState, string> = { MO: "Missouri", KS: "Kansas", CO: "Colorado" };
 const DEFAULT_SOURCE_STATES: SourceState[] = [
   { source: "U.S. Census ACS", status: "working", detail: "Child-population context" },
   { source: "CMS NPPES", status: "working", detail: "Public provider cross-reference" },
@@ -199,7 +213,7 @@ export function ScoutWorkbench({
   return (
     <div className="scoutShellV3">
       <section className="scoutHeroV3">
-        <span className="eyebrow">ABA Engine · Missouri + Kansas</span>
+        <span className="eyebrow">ABA Engine · Missouri + Kansas + Colorado</span>
         <div className="scoutHeadlineRow">
           <h1>Scout</h1>
           <p>Cross-reference public demand, providers, referral networks, workforce signals and current state/payer rules.</p>
@@ -220,7 +234,7 @@ export function ScoutWorkbench({
             ))}
           </div>
           <div className="segmentedControl stateControl" aria-label="Target state">
-            {(["MO", "KS"] as const).map((item) => (
+            {(["MO", "KS", "CO"] as const).map((item) => (
               <button
                 key={item}
                 type="button"
@@ -325,6 +339,40 @@ export function ScoutWorkbench({
             </div>
           </details>
 
+          {response?.publicSignals && (
+            <details className="sourceDisclosure">
+              <summary>
+                <span>60 public market indicators + 20 cross-checks</span>
+                <span>{response.publicSignals.observations.length} supported · {response.publicSignals.supportedChecks}/20 linked</span>
+              </summary>
+              <div className="sourceRail">
+                <p>Every clue is screened against distinct public sources. Unconfirmed reports remain leads for additional research and do not add points to the market score. Personal residential details are excluded.</p>
+                {response.publicSignals.clues.slice(0, 20).map((clue) => (
+                  <div className="sourceItem" key={clue.indicatorId}>
+                    <i className={`sourceDot ${clue.corroborated ? "complete" : "unavailable"}`} />
+                    <div>
+                      <b>{clue.name} · {clue.corroborated ? "Corroborated" : "Needs independent evidence"}</b>
+                      <span>{clue.sourceCount} distinct domains · {clue.geographySupported ? "Area verified" : "Location not corroborated"} · {clue.sourceDomains.join(", ")}</span>
+                    </div>
+                  </div>
+                ))}
+                <details className="ruleDisclosure">
+                  <summary>All 20 relationship checks</summary>
+                  <div className="ruleList">
+                    {response.publicSignals.crossChecks.map((check) => (
+                      <div className="ruleRow" key={check.id}>
+                        <span className={`ruleBadge ${check.status === "supported" ? "PASS" : check.status === "partial" ? "REVIEW" : "INFO"}`}>
+                          {check.status}
+                        </span>
+                        <div className="ruleCopy"><b>{check.title}</b><p>{check.sourceCount} public source domains considered</p></div>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              </div>
+            </details>
+          )}
+
           {response?.regulatoryRules && response.regulatoryRules.length > 0 && (
             <details className="ruleDisclosure">
               <summary><span>Rules + payer gates</span><span>{response.regulatoryRules.length} current rules</span></summary>
@@ -400,6 +448,7 @@ function SourceRow({ source }: { source: SourceState }) {
 }
 
 function LeadDossier({ lead, onClose, onSave, saved }: { lead: ResolvedLead; onClose: () => void; onSave: () => void; saved: boolean }) {
+  const evidenceGraph = buildLeadEvidenceGraph(lead);
   return (
     <div className="sheetBackdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <article className="sheet" role="dialog" aria-modal="true" aria-label={`${lead.name} evidence dossier`}>
@@ -422,6 +471,38 @@ function LeadDossier({ lead, onClose, onSave, saved }: { lead: ResolvedLead; onC
           <span className="statusChip"><Users size={12} /> {lead.emails.length + lead.phones.length} contacts</span>
           <span className="statusChip"><Database size={12} /> {lead.domain || "domain unresolved"}</span>
         </div>
+
+        <section className="dossierSection" aria-label="Independent evidence corroboration">
+          <h3>Independent evidence review</h3>
+          <div className="factCard">
+            <div><span>Independent publishers</span><b>{evidenceGraph.publishers}</b></div>
+            <div><span>Official/government</span><b>{evidenceGraph.governmentSources}</b></div>
+            <div><span>Confirmed claims</span><b>{evidenceGraph.claims.filter((item) => item.supported).length}</b></div>
+            <div><span>Evidence status</span><b>{evidenceGraph.posture.replaceAll("_", " ")}</b></div>
+          </div>
+          <p>{evidenceGraph.explanation}</p>
+          {evidenceGraph.observedAt && (
+            <p>Last collected {evidenceGraph.observedAt.slice(0, 10)}. Collection date is not the source publication date.</p>
+          )}
+          {evidenceGraph.contradictions.length > 0 && (
+            <div className="unknownCard">
+              <b>Conflicts requiring manual verification</b>
+              {evidenceGraph.contradictions.map((conflict) => <p key={conflict}>{conflict}</p>)}
+            </div>
+          )}
+          {evidenceGraph.claims.length > 0 && (
+            <div className="stackList">
+              {evidenceGraph.claims.map((item) => (
+                <div className="stackRow" key={item.claim}>
+                  <div>
+                    <b>{item.claim.replaceAll("_", " ")} · {item.supported ? "Independent confirmation" : "Needs confirmation"}</b>
+                    <span>{item.sourceCount} publisher{item.sourceCount === 1 ? "" : "s"} · {item.sourceDomains.join(", ")}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
         <section className="dossierSection">
           <div className="sectionTitleRow">

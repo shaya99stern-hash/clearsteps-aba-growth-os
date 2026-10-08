@@ -1,3 +1,4 @@
+import { PUBLIC_SOURCE_CHANNELS } from "./signals/source-channel-catalog";
 import { playwrightAvailable } from "./browser-collector";
 import { getNppesDownloadManifest } from "./official/nppes-manifest";
 import { getSourceRegistry } from "./source-registry";
@@ -18,6 +19,11 @@ export interface OperationalSourcesSnapshot {
     apiKeyFree: number;
   };
   sources: OperationalSourceStatus[];
+  channelCatalog: {
+    total: number;
+    method: "bounded site-search";
+    channels: Array<{ host: string; scope: string; kind: string }>;
+  };
   cms: {
     fetchedAt?: string;
     monthly?: { label: string; url: string };
@@ -105,6 +111,11 @@ export async function getOperationalSourcesSnapshot(): Promise<OperationalSource
       apiKeyFree: sources.filter((source) => !source.apiKeyRequired).length,
     },
     sources,
+    channelCatalog: {
+      total: PUBLIC_SOURCE_CHANNELS.length,
+      method: "bounded site-search",
+      channels: PUBLIC_SOURCE_CHANNELS.map(({host,scope,kind}) => ({host,scope,kind})),
+    },
     cms: {
       fetchedAt: cmsManifest?.fetchedAt,
       monthly: cmsManifest?.monthly ? { label: cmsManifest.monthly.label, url: cmsManifest.monthly.url } : undefined,

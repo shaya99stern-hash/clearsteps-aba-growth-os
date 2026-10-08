@@ -1,3 +1,4 @@
+import { fetchCensusReporterDemographics } from "./census-reporter";
 import type { IndicatorObservation } from "../phase3/indicator-catalog";
 
 const CURRENT_YEAR = 2024;
@@ -38,6 +39,7 @@ export interface CensusDemographicsResult {
 }
 
 export async function fetchCensusDemographics(input: { state: "MO" | "KS" | "CO"; location: string }): Promise<CensusDemographicsResult> {
+  if (!process.env.CENSUS_API_KEY?.trim()) return fetchCensusReporterDemographics(input);
   const geography = await resolveGeography(input.state, input.location, CURRENT_YEAR);
   const current = await fetchRow(CURRENT_YEAR, geography);
   const prior = await fetchPriorUnder18(geography).catch(() => null);
@@ -72,7 +74,7 @@ export async function fetchCensusDemographics(input: { state: "MO" | "KS" | "CO"
   };
 }
 
-async function resolveGeography(state: "MO" | "KS", location: string, year: number) {
+async function resolveGeography(state: "MO" | "KS" | "CO", location: string, year: number) {
   const stateFips = STATE_FIPS[state];
   const zip = location.match(/\b\d{5}\b/)?.[0];
   if (zip) return { kind: "zcta" as const, code: zip, stateFips, label: zip };
@@ -111,6 +113,7 @@ async function fetchPriorUnder18(geography: Awaited<ReturnType<typeof resolveGeo
 async function fetchRows(year: number, forClause: string, inClause?: string): Promise<CensusRow[]> {
   const params = new URLSearchParams({ get: VARIABLES.join(","), for: forClause });
   if (inClause) params.set("in", inClause);
+  params.set("key", process.env.CENSUS_API_KEY?.trim() ?? "");
   const url = `https://api.census.gov/data/${year}/acs/acs5?${params.toString()}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 9_000);
@@ -121,7 +124,11 @@ async function fetchRows(year: number, forClause: string, inClause?: string): Pr
       cache: "no-store",
     });
     if (!response.ok) throw new Error(`Census ACS returned ${response.status}`);
-    const payload = await response.json() as string[][];
+    const raw = await response.text();
+    if (/^\s*</.test(raw) || !raw.trim().startsWith("[")) {
+      throw new Error("Census data endpoint returned HTML or invalid JSON; check Census API credentials and service status.");
+    }
+    const payload = JSON.parse(raw) as string[][];
     if (!Array.isArray(payload) || payload.length < 2) throw new Error("Census ACS returned no matching rows");
     const headers = payload[0];
     return payload.slice(1).map((values) => Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""])));
@@ -147,7 +154,7 @@ function nameScore(name: string, target: string) {
   return 0;
 }
 
-function normalizeLocation(value: string, state: "MO" | "KS") {
+function normalizeLocation(value: string, state: "MO" | "KS" | "CO") {
   return value
     .replace(new RegExp(`\\b(${state === "MO" ? "Missouri|MO" : state === "KS" ? "Kansas|KS" : "Colorado|CO"})\\b`, "gi"), "")
     .replace(/[,]+/g, " ")

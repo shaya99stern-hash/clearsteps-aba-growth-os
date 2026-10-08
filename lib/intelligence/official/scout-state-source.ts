@@ -15,7 +15,7 @@ export interface ScoutStateSourceDescriptor {
 }
 
 export interface ScoutStateSourceInput {
-  state: "MO" | "KS";
+  state: "MO" | "KS" | "CO";
   engine: LeadEngine;
   location: string;
   under18Population: number;
@@ -42,13 +42,22 @@ const KANSAS_DESCRIPTOR: ScoutStateSourceDescriptor = {
   errorPrefix: "kansas early intervention",
 };
 
+const COLORADO_DESCRIPTOR: ScoutStateSourceDescriptor = {
+  source: "Colorado CDEC Licensed Child Care",
+  workingDetail: "official Colorado CDEC monthly institutional child-care data",
+  emptyDetail: "0 institutional CDEC facilities matched",
+  errorFallback: "Colorado CDEC source unavailable",
+  errorPrefix: "colorado child care",
+};
+
 export function scoutStateSourceDescriptor(
-  state: "MO" | "KS",
+  state: "MO" | "KS" | "CO",
   engine: LeadEngine,
 ): ScoutStateSourceDescriptor | null {
   const selection = stateSourceSelection(state, engine);
   if (selection.missouriChildCare) return MISSOURI_DESCRIPTOR;
   if (selection.kansasEarlyIntervention) return KANSAS_DESCRIPTOR;
+  if (selection.coloradoChildCare) return COLORADO_DESCRIPTOR;
   return null;
 }
 

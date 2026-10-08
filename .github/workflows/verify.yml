@@ -60,6 +60,16 @@ jobs:
       - name: Verify Phase 3 ABA Engine rules
         run: npm run verify:aba-engine
 
+      - name: Verify Colorado and cross-source public indicators
+        run: npm run verify:colorado-signals
+
+      - name: Verify evidence graph and no-key source mesh
+        run: npm run verify:evidence-mesh
+
+      - name: Smoke real keyless upstream data feeds (non-gating)
+        continue-on-error: true
+        run: npm run smoke:live-acquisition
+
       - name: Verify Missouri/Kansas state sources
         run: npx tsx scripts/verify-state-sources.ts
 

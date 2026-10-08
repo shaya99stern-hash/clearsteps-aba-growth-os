@@ -59,7 +59,7 @@ const CATEGORY_QUERIES: Record<NppesCategory, string> = {
 };
 
 export async function searchNppesLive(input: {
-  state: "MO" | "KS";
+  state: "MO" | "KS" | "CO";
   location: string;
   engine: LeadEngine;
   perCategory?: number;
@@ -95,7 +95,7 @@ export async function searchNppesLive(input: {
 
 async function fetchCategory(input: {
   category: NppesCategory;
-  state: "MO" | "KS";
+  state: "MO" | "KS" | "CO";
   locality: ReturnType<typeof parseLocality>;
   limit: number;
 }) {
@@ -130,7 +130,7 @@ export function parseNppesResponse(json: NppesApiResponse) {
   return { results, errors };
 }
 
-function toSearchHit(result: NppesApiResult, category: NppesCategory, state: "MO" | "KS", locality: string, index: number): PublicSearchHit {
+function toSearchHit(result: NppesApiResult, category: NppesCategory, state: "MO" | "KS" | "CO", locality: string, index: number): PublicSearchHit {
   const npi = String(result.number ?? "");
   const basic = result.basic ?? {};
   const name = basic.organization_name?.trim() || [basic.first_name, basic.middle_name, basic.last_name, basic.credential].filter(Boolean).join(" ").trim() || `NPI ${npi}`;
@@ -164,10 +164,10 @@ function categoriesForEngine(engine: LeadEngine): NppesCategory[] {
   return ["behavior_analyst", "developmental_pediatrics", "child_psychology"];
 }
 
-function parseLocality(location: string, state: "MO" | "KS") {
+function parseLocality(location: string, state: "MO" | "KS" | "CO") {
   const postalCode = location.match(/\b\d{5}\b/)?.[0];
   const cleaned = location
-    .replace(new RegExp(`\\b(${state === "MO" ? "Missouri|MO" : "Kansas|KS"})\\b`, "gi"), "")
+    .replace(new RegExp(`\\b(${state === "MO" ? "Missouri|MO" : state === "KS" ? "Kansas|KS" : "Colorado|CO"})\\b`, "gi"), "")
     .replace(/\b\d{5}(?:-\d{4})?\b/g, "")
     .replace(/\bcounty\b/gi, "")
     .replace(/[,]+/g, " ")
