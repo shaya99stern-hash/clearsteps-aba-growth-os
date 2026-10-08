@@ -87,19 +87,25 @@ export function scanPublicSignals(hits: readonly PublicSearchHit[], capturedAt =
   for (const rule of signalRules) {
     const matched = candidates.filter((item) => rule.keywords.every((keyword) => item.text.includes(keyword)));
     if (!matched.length) continue;
-    // A parent publisher and its subdomains contribute one vote, never two.
-    const publishers=new Map<string,Candidate>();
-    for(const item of matched) {
-      const publisher=publicPublisherId(item.host);
-      if(publisher&&!publishers.has(publisher)) publishers.set(publisher,item);
-    }
-    const independent:Candidate[]=[];
-    for(const item of publishers.values()) {
-      if(independent.some((prior)=>samePublicNarrative(prior.text,item.text)))continue;
-      independent.push(item);
-    }
-    const localized = independent.filter((item) => matchesPublicTerritory(item.text, targetLocation) &&
-      (ageMode !== "2-18" || isAgeAlignedPublicProgram(item.text)));
+    // Preserve all candidate mentions but select a relevant, locally grounded
+    // report PER publisher. An irrelevant first result must not mask later evidence.
+    const independentOf = (pool: Candidate[]): Candidate[] => {
+      const publishers = new Map<string, Candidate>();
+      for (const item of pool) {
+        const publisher = publicPublisherId(item.host);
+        if (publisher && !publishers.has(publisher)) publishers.set(publisher, item);
+      }
+      const unique: Candidate[] = [];
+      for (const item of publishers.values()) {
+        if (unique.some((prior) => samePublicNarrative(prior.text, item.text))) continue;
+        unique.push(item);
+      }
+      return unique;
+    };
+    const independent = independentOf(matched);
+    const localized = independentOf(matched.filter((item) =>
+      matchesPublicTerritory(item.text, targetLocation) &&
+      (ageMode !== "2-18" || isAgeAlignedPublicProgram(item.text))));
     // Published source content, not search query text, must establish an applicable age cohort.
     const ageSupported = ageMode !== "2-18" || localized.length >= 2;
     const sourceTypes = [...new Set(independent.map((item) => item.sourceClass))];
