@@ -20,7 +20,8 @@
     "verify:provider-reputation": "tsx scripts/verify-provider-reputation.ts",
     "verify:youth-qualification": "tsx scripts/verify-youth-qualification.ts",
     "verify:evidence-precision": "tsx scripts/verify-evidence-precision.ts",
-    "verify:institutional-followup": "tsx scripts/verify-institutional-followup.ts"
+    "verify:institutional-followup": "tsx scripts/verify-institutional-followup.ts",
+    "verify:client-growth": "tsx scripts/verify-client-growth.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",
