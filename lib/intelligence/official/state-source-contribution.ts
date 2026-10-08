@@ -14,7 +14,7 @@ import {
   type MissouriChildCareProvider,
 } from "./mo-child-care-gis";
 import { stateSourceSelection } from "./state-source-selection";
-import { searchColoradoChildCare, coloradoChildCareToSearchHits, coloradoChildCareObservations, type ColoradoChildCareFacility } from "./co-childcare";
+import { searchColoradoChildCare, coloradoChildCareToSearchHits, coloradoPublicReferralNetworkHits, coloradoChildCareObservations, type ColoradoChildCareFacility } from "./co-childcare";
 
 export interface StateSourceContributionInput {
   state: "MO" | "KS" | "CO";
@@ -73,9 +73,9 @@ export function buildStateSourceContribution(input: StateSourceContributionInput
     const facilities = input.coloradoChildCare;
     const bounded = !/^(colorado|co|statewide)$/i.test(input.location.trim());
     return {
-      referralHits: coloradoChildCareToSearchHits(facilities, input.location),
+      referralHits: [...coloradoPublicReferralNetworkHits(facilities, input.location), ...coloradoChildCareToSearchHits(facilities, input.location)],
       observations: coloradoChildCareObservations(facilities, input.under18Population, bounded),
-      sourceDetail: facilities.length + " Colorado CDEC institutional facilities" + (bounded ? "" : " (statewide sample only; no density scored)"),
+      sourceDetail: facilities.length + " Colorado CDEC institutional facilities and " + coloradoPublicReferralNetworkHits(facilities, input.location).length + " distinct CCRR/council research connections" + (bounded ? "" : " (statewide sample only; no density scored)"),
     };
   }
   return { referralHits: [], observations: [], sourceDetail: null };
