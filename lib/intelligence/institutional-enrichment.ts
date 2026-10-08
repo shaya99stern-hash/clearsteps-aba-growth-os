@@ -34,6 +34,12 @@ export function matchesPublicOrganization(name:string, published:string) {
   const overlap=distinctive.filter((word)=>body.includes(word));
   return overlap.length>=2 && overlap.length/distinctive.length>=0.60;
 }
+/** A news article about an organization is not the organization's own website. */
+function plausibleOrganizationDomain(name:string,url:string) {
+  const domain=host(url).split(".")[0]?.replace(/[^a-z0-9]/g,"")??"";
+  const nameTokens=[...new Set(tokens(name).filter((word)=>!GENERIC.has(word)&&word.length>=2))];
+  return Boolean(domain && nameTokens.some((word)=>domain.includes(word)));
+}
 export function isPublicInstitutionalLead(lead:ResolvedLead) {
   return ["organization","referral"].includes(lead.kind)
     && lead.evidence.some((item)=>OFFICIAL_FEEDS.has(item.sourceId))
@@ -45,12 +51,14 @@ export function publicInstitutionLookupQuery(name:string,location:string) {
 export function selectOrganizationWebsiteHit(lead:Pick<ResolvedLead,"name"|"evidence">,hits:readonly PublicSearchHit[]) {
   const sourceHosts=new Set(lead.evidence.map((item)=>host(item.url)).filter(Boolean));
   return hits.find((hit)=>!excluded(hit.url)&&!sourceHosts.has(host(hit.url))
+    && plausibleOrganizationDomain(lead.name,hit.url)
     && matchesPublicOrganization(lead.name,hit.title+" "+hit.snippet))??null;
 }
 export function enrichInstitutionalLead(
   lead:ResolvedLead, hit:PublicSearchHit, verifiedSite:EnrichedWebsite|null, capturedAt=new Date().toISOString(),
 ):ResolvedLead {
-  if(excluded(hit.url)||!matchesPublicOrganization(lead.name,hit.title+" "+hit.snippet))return lead;
+  if(excluded(hit.url)||!plausibleOrganizationDomain(lead.name,hit.url)
+    ||!matchesPublicOrganization(lead.name,hit.title+" "+hit.snippet))return lead;
   // Require actual live organization page corroboration before treating public phones or emails as its contacts.
   const verified=verifiedSite&&host(verifiedSite.finalUrl)===host(hit.url)
     && matchesPublicOrganization(lead.name,(verifiedSite.title??"")+" "+verifiedSite.textSample.slice(0,1400))
