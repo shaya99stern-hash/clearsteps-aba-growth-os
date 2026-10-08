@@ -38,7 +38,7 @@ function publisher(url: string): ReviewPublisher {
     if (hostname==="yelp.com" || hostname.endsWith(".yelp.com")) return "Yelp";
     if (hostname==="g.page" || ((hostname==="google.com" || hostname.endsWith(".google.com")) && new URL(url).pathname.startsWith("/maps"))) return "Google Maps";
     if (hostname==="bbb.org" || hostname.endsWith(".bbb.org")) return "BBB";
-    if (/\b(news|gazette|journal|tribune|press|times|post|reporter|radio)\b/i.test(hostname)) return "Independent press";
+    if (/news|gazette|journal|tribune|press|times|post|reporter|radio/i.test(hostname)) return "Independent press";
   } catch { /* Ignore invalid URLs. */ }
   return "Other public source";
 }
