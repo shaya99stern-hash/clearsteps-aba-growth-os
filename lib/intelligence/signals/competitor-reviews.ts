@@ -37,7 +37,7 @@ const THEMES: readonly [ReviewTheme, ReviewSentiment, RegExp][] = [
   ["intake_wait", "concern", /\b(waitlists?|waiting list|months? waiting|intake delays?|long wait)\b/i],
   ["communication", "concern", /\b(unreturned calls?|does not respond|no response|unresponsive|poor communication)\b/i],
   ["appointments", "concern", /\b(repeated cancellations?|schedule(?:ing)? problems?|appointment delays?)\b/i],
-  ["staffing", "concern", /\b(staff turnover|staff shortages?|therapist vacancies|understaffed)\b/i],
+  ["staffing", "concern", /\b(staff turnover|staff(?:ing)? shortages?|therapist vacancies|understaffed)\b/i],
   ["insurance", "concern", /\b(insurance denied|insurance issues?|billing dispute|out.of.network)\b/i],
   ["availability", "concern", /\b(no longer accepting|not taking new clients|intake closed|service unavailable)\b/i],
   ["positive_feedback", "positive", /\b(praised|commended|recognized for|awarded for)\b.{0,70}\b(care|services|staff|team)\b/i],
