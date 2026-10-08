@@ -184,7 +184,8 @@ export async function POST(request: Request) {
       if (result.error) errors.push(`${result.planQuery.lane}: ${result.error}`);
       rows.push(...result.hits.map((hit) => ({ lane: result.planQuery.lane, hit })));
     }
-    if (rows.length >= maxResults * 3) break;
+    // Always execute the bounded public search plan. NPPES hits are registry rows,
+    // not searched publisher corroboration; they must never terminate discovery.
   }
   const webHits = rows.filter((row) => row.hit.sourceId === "duckduckgo-html" || row.hit.sourceId === "bing-rss").length;
   if (webHits === 0) {
