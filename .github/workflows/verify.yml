@@ -66,6 +66,9 @@ jobs:
       - name: Verify evidence graph and no-key source mesh
         run: npm run verify:evidence-mesh
 
+      - name: Verify publisher, geography and source narrative precision
+        run: npm run verify:evidence-precision
+
       - name: Verify age 2–18 tripled source mesh
         run: npm run verify:age-2-18
 

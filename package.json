@@ -18,7 +18,8 @@
     "smoke:live-acquisition": "tsx scripts/smoke-live-acquisition.ts",
     "verify:age-2-18": "tsx scripts/verify-age-2-18.ts",
     "verify:provider-reputation": "tsx scripts/verify-provider-reputation.ts",
-    "verify:youth-qualification": "tsx scripts/verify-youth-qualification.ts"
+    "verify:youth-qualification": "tsx scripts/verify-youth-qualification.ts",
+    "verify:evidence-precision": "tsx scripts/verify-evidence-precision.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",
