@@ -80,6 +80,37 @@
 .segmentButton:focus-visible { outline: 2px solid var(--aba-purple); outline-offset: 1px; }
 .stateControl { min-width: 166px; }
 
+.scoutAgeFocus {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  margin-top: 10px;
+  padding: 7px 10px 7px 13px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: #1a1a1d;
+  color: var(--secondary);
+  font-size: 11px;
+  font-weight: 650;
+}
+.scoutAgeFocus span { min-width: 0; }
+.scoutAgeFocus select {
+  max-width: 62%;
+  min-width: 130px;
+  min-height: 36px;
+  padding: 5px 10px;
+  border: 1px solid var(--aba-purple-line);
+  border-radius: 9px;
+  background: var(--aba-purple-soft);
+  color: #ede5ff;
+  font: inherit;
+  font-size: 12px;
+  outline-offset: 2px;
+}
+.scoutAgeFocus select:focus-visible { outline: 2px solid var(--aba-purple); }
+
 .scoutComposerV3 {
   margin-top: 10px;
   overflow: hidden;
