@@ -60,6 +60,9 @@ jobs:
       - name: Verify Phase 3 ABA Engine rules
         run: npm run verify:aba-engine
 
+      - name: Verify Colorado and cross-source public indicators
+        run: npm run verify:colorado-signals
+
       - name: Verify Missouri/Kansas state sources
         run: npx tsx scripts/verify-state-sources.ts
 
