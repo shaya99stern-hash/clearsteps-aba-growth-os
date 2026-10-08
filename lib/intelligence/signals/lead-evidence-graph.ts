@@ -1,6 +1,7 @@
 import type { ResolvedLead, SearchEvidence } from "../source-types";
+import { publicPublisherId, samePublicNarrative } from "./publisher-evidence";
 
-/** One independent publisher contributes at most one vote per factual claim. */
+/** One independent publisher and one genuinely distinct narrative per factual claim. */
 export type EvidenceClaim =
   | "institution_exists" | "referral_pathway" | "service_available" | "service_unavailable"
   | "hiring" | "not_hiring" | "verified_public_contact";
@@ -21,12 +22,12 @@ export interface LeadEvidenceGraph {
   claims: EvidenceGraphClaim[];
   contradictions: string[];
   posture: "conflicting" | "corroborated" | "single_source" | "no_evidence";
-  /** Capture is NOT the original publication date and not evidence of current availability. */
+  /** Collection date; never substitute for original publication date. */
   observedAt: string | null;
   explanation: string;
 }
 
-const POSITIVE: Array<[EvidenceClaim, RegExp]> = [
+const CLAIMS: readonly [EvidenceClaim, RegExp][] = [
   ["institution_exists", /\b(licensed (child ?care|preschool|facility)|npi\s*\d+|official (facility|provider)|organization directory)\b/i],
   ["referral_pathway", /\b(referral(s)? (accepted|form|partner|process|network)|refer (a|your) patient|accepts referrals)\b/i],
   ["service_available", /\b((now |currently )?accepting new (patients|clients|referrals)|now enrolling|intake reopened|new clinic opened)\b/i],
@@ -38,98 +39,105 @@ const POSITIVE: Array<[EvidenceClaim, RegExp]> = [
 
 function host(url: string) {
   try {
-    const u = new URL(url);
-    if (!["http:", "https:"].includes(u.protocol)) return null;
-    return u.hostname.toLowerCase().replace(/^www\./, "");
+    const parsed = new URL(url);
+    return ["http:", "https:"].includes(parsed.protocol) ? parsed.hostname.toLowerCase().replace(/^www\./, "") : null;
   } catch { return null; }
 }
-function publicationGroup(value: string) {
-  // Subdomains of the same publisher are not treated as independent.
-  const parts = value.split(".");
-  if (parts.length < 3) return value;
-  if (value.endsWith(".gov")) {
-    // An agency's subdomain isn't independent from its parent agency.
-    // State agency hostnames are otherwise kept distinct.
-    return value;
-  }
-  if (value.endsWith(".co.uk")) return parts.slice(-3).join(".");
-  return parts.slice(-2).join(".");
-}
-function category(item: SearchEvidence, domain: string) {
-  if (/\.(gov|edu)$/.test(domain) || item.sourceId.startsWith("cms-") ||
-    item.sourceId.startsWith("mo-dhss") || item.sourceId.startsWith("co-cdec") ||
-    item.sourceId.startsWith("ks-kdhe")) return "government" as const;
-  if (/(reddit|facebook|threads|nextdoor|quora)\.com$/.test(domain)) return "community" as const;
-  if (/(press|times|news|post|tribune|journal|publicradio|sun)\./i.test(domain)) return "press" as const;
-  return "institution" as const;
+
+type PublisherType = "government" | "first_party" | "press" | "community" | "unverified";
+function typeOfPublisher(source: SearchEvidence, domain: string, leadPublisher: string): PublisherType {
+  if (/\.(gov|edu)$/.test(domain) ||
+    /^(cms-|mo-dhss|co-cdec|ks-kdhe|census-)/.test(source.sourceId)) return "government";
+  if (publicPublisherId(domain) === leadPublisher && leadPublisher) return "first_party";
+  if (/(reddit|facebook|threads|nextdoor|quora|instagram|tiktok)\.(com|net)$/.test(domain)) return "community";
+  if (/news|journal|gazette|post|times|tribune|daily|press|radio|publicmedia/.test(domain)) return "press";
+  return "unverified";
 }
 
-/** Evidence is scoped to one organization or a territorial community signal, never a family. */
-export function buildLeadEvidenceGraph(lead: Pick<ResolvedLead, "kind" | "evidence" | "emails" | "phones" | "domain">): LeadEvidenceGraph {
-  const publishers = new Map<string, {items: SearchEvidence[]; type: ReturnType<typeof category>}>();
+/** Unknown .org/.com domains are not automatically authoritative organizations. */
+export function buildLeadEvidenceGraph(
+  lead: Pick<ResolvedLead, "kind" | "evidence" | "emails" | "phones" | "domain">,
+): LeadEvidenceGraph {
+  const leadPublisher = publicPublisherId(lead.domain ?? "");
+  const publishers = new Map<string, { entries: SearchEvidence[]; type: PublisherType }>();
   for (const item of lead.evidence) {
     const domain = host(item.url);
     if (!domain) continue;
-    const key = publicationGroup(domain);
-    const bucket = publishers.get(key) ?? {items: [], type: category(item, domain)};
-    bucket.items.push(item);
-    publishers.set(key, bucket);
+    const publisher = publicPublisherId(domain);
+    if (!publisher) continue;
+    const type = typeOfPublisher(item, domain, leadPublisher);
+    const prior = publishers.get(publisher);
+    if (prior) {
+      prior.entries.push(item);
+      if (type === "government" || type === "first_party") prior.type = type;
+    } else publishers.set(publisher, { entries: [item], type });
   }
-  const claimSources = new Map<EvidenceClaim, Set<string>>();
-  const claimAuthority = new Set<EvidenceClaim>();
-  for (const [domain, publisher] of publishers) {
-    if (lead.kind === "community_signal") continue;
-    for (const entry of publisher.items) {
-      const text = [entry.title, entry.snippet].join(" ").slice(0, 2000);
-      for (const [claim, pattern] of POSITIVE) {
+  const votes = new Map<EvidenceClaim, Set<string>>();
+  const narratives = new Map<EvidenceClaim, string[]>();
+  const authority = new Set<EvidenceClaim>();
+
+  for (const [publisher, item] of publishers) {
+    if (lead.kind === "community_signal" || item.type === "community") continue;
+    for (const entry of item.entries) {
+      const text = (entry.title + " " + entry.snippet).slice(0, 2000);
+      for (const [claim, pattern] of CLAIMS) {
         if (!pattern.test(text)) continue;
         if (claim === "service_available" &&
           /\b(not accepting new|no longer accepting|intake closed|wait ?list closed)\b/i.test(text)) continue;
-        const votes = claimSources.get(claim) ?? new Set();
-        votes.add(domain);
-        claimSources.set(claim, votes);
-        if (publisher.type === "government" || publisher.type === "institution") claimAuthority.add(claim);
+        const set = votes.get(claim) ?? new Set<string>();
+        if (set.has(publisher)) continue;
+        const prior = narratives.get(claim) ?? [];
+        // Republishing the same report on a new domain is not new independent evidence.
+        if (prior.some((candidate) => samePublicNarrative(candidate, text))) continue;
+        prior.push(text);
+        narratives.set(claim, prior);
+        set.add(publisher);
+        votes.set(claim, set);
+        if (item.type === "government" || item.type === "first_party") authority.add(claim);
       }
     }
   }
-  const claims = [...claimSources.entries()].map(([claim, domains]): EvidenceGraphClaim => ({
-    claim,
-    sourceCount: domains.size,
-    sourceDomains: [...domains].slice(0, 10),
-    supported: domains.size >= 2 && claimAuthority.has(claim),
-    authorityPresent: claimAuthority.has(claim),
-  }));
-  const positive = claims.find((c) => c.claim === "service_available")?.sourceCount ?? 0;
-  const negative = claims.find((c) => c.claim === "service_unavailable")?.sourceCount ?? 0;
-  const hire = claims.find((c) => c.claim === "hiring")?.sourceCount ?? 0;
-  const noHire = claims.find((c) => c.claim === "not_hiring")?.sourceCount ?? 0;
-  const contradictions = [
-    ...(positive && negative ? ["Conflicting published intake-availability claims; confirm effective dates directly"] : []),
-    ...(hire && noHire ? ["Conflicting public hiring status; confirm with employer"] : []),
+  const published = (claim: EvidenceClaim) => (votes.get(claim)?.size ?? 0) > 0;
+  const contradictions: string[] = [
+    ...(published("service_available") && published("service_unavailable")
+      ? ["Conflicting published intake-availability claims; confirm applicable dates directly"] : []),
+    ...(published("hiring") && published("not_hiring")
+      ? ["Conflicting public hiring status; confirm with employer"] : []),
   ];
-  const numberOfPublishers = publishers.size;
-  const governmentSources = [...publishers.values()].filter((p) => p.type === "government").length;
-  const institutionalSources = [...publishers.values()].filter((p) => p.type === "institution").length;
-  const communitySources = [...publishers.values()].filter((p) => p.type === "community").length;
-  const supportedCount = claims.filter((c) => c.supported).length;
+  const conflictingClaims = new Set<EvidenceClaim>();
+  if (published("service_available") && published("service_unavailable")) {
+    conflictingClaims.add("service_available"); conflictingClaims.add("service_unavailable");
+  }
+  if (published("hiring") && published("not_hiring")) {
+    conflictingClaims.add("hiring"); conflictingClaims.add("not_hiring");
+  }
+  const claims = [...votes.entries()].map(([claim, domains]): EvidenceGraphClaim => ({
+    claim, sourceCount: domains.size, sourceDomains: [...domains].slice(0, 10),
+    supported: domains.size >= 2 && authority.has(claim) && !conflictingClaims.has(claim),
+    authorityPresent: authority.has(claim),
+  }));
+  const count = publishers.size;
+  const firstPartySources = [...publishers.values()].filter((item) => item.type === "first_party").length;
+  const governmentSources = [...publishers.values()].filter((item) => item.type === "government").length;
+  const communitySources = [...publishers.values()].filter((item) => item.type === "community").length;
+  const confirmed = claims.filter((claim) => claim.supported).length;
   const posture: LeadEvidenceGraph["posture"] = contradictions.length ? "conflicting" :
-    numberOfPublishers === 0 ? "no_evidence" :
-    numberOfPublishers >= 2 && supportedCount > 0 ? "corroborated" : "single_source";
-  const dates = lead.evidence.map((item) => item.capturedAt).filter((x) => Number.isFinite(Date.parse(x))).sort();
+    count === 0 ? "no_evidence" : confirmed > 0 ? "corroborated" : "single_source";
+  const dates = lead.evidence.map((item) => item.capturedAt).filter((item) => Number.isFinite(Date.parse(item))).sort();
   return {
-    publishers: numberOfPublishers,
-    firstPartySources: lead.domain ? [...publishers.keys()].filter((publisher) => publisher === publicationGroup(lead.domain!)).length : 0,
+    publishers: count,
+    firstPartySources,
     governmentSources,
-    institutionalSources,
+    institutionalSources: firstPartySources,
     communitySources,
     claims,
     contradictions,
     posture,
     observedAt: dates.at(-1) ?? null,
     explanation: posture === "conflicting"
-      ? "Public sources disagree. Resolve before qualification or outreach."
+      ? "Public sources disagree. Resolve dated conflicts before qualification or outreach."
       : posture === "corroborated"
-      ? supportedCount + " claim(s) confirmed by multiple independent publishers."
-      : "Insufficient independent confirmation. This is a research candidate, not a verified opportunity.",
+      ? confirmed + " distinct claim(s) have both primary-source evidence and independent corroboration."
+      : "Independent, non-duplicated primary-source corroboration is insufficient; research candidate only.",
   };
 }
