@@ -89,7 +89,7 @@ export function buildClientGrowthPlan(input:{
         purpose:"Conversion",
         description:"Publish an agency-verified callback/secure intake destination and service-area/payer information before promoting availability. Do not collect children's diagnoses or contact details in Scout.",
         metric:"Consented family inquiries from your own channels",
-        url:null,
+        url:"/families",
         dependency:"A verified business telephone or secure intake URL, approved operational/privacy process, real intake capacity.",
       },
       {
