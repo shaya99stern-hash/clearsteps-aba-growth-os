@@ -34,7 +34,7 @@ export function buildSearchPlan(input: string, location: string, engine?: LeadEn
   for (const lane of selected) queries.push(...laneQueries(lane, input, place, engine));
 
   const targeted = state && engine
-    ? choosePublicSourceChannels(state, engine, place, 5).map((channel) => ({
+    ? choosePublicSourceChannels(state, engine, place, 8).map((channel) => ({
         lane: (channel.kind === "workforce" ? "talent" : channel.kind === "press" || channel.kind === "community" ? "community" : "referral") as SearchLane,
         query: queryForPublicSource(channel, place, engine),
       }))
