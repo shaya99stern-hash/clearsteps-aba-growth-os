@@ -22,7 +22,9 @@ const plan=buildSearchPlan("find public referral organizations", "Denver, CO", "
 assert(plan.queries.some((row)=>row.query.startsWith("site:")), "Engine must actually schedule registered source discovery");
 assert(plan.queries.some((row)=>row.query.includes("Denver")), "All public source searches must contain locality");
 
-assert.equal(matchesPublicTerritory("Published Denver ABA waitlist", "Denver, CO"),true);
+assert.equal(matchesPublicTerritory("Published Denver ABA waitlist", "Denver, CO"),false,
+  "City-only ambiguous text does not establish the requested state");
+assert.equal(matchesPublicTerritory("Published Denver CO ABA waitlist", "Denver, CO"),true);
 assert.equal(matchesPublicTerritory("Published Boulder ABA waitlist", "Denver, CO"),false);
 assert.equal(matchesPublicTerritory("80202 public resource", "80202"),true);
 assert.equal(matchesPublicTerritory("Different ZIP 80203", "80202"),false);
@@ -31,7 +33,7 @@ const hit=(host:string, snippet:string)=>({
 });
 const misleading=scanPublicSignals([hit("one.gov","ABA waitlist in Boulder"), hit("localnews.com","ABA waitlist in Boulder")], "2026-10-08", "Denver, CO");
 assert.equal(misleading.observations.length,0, "Cross-source agreement without geographic evidence must never score");
-const localized=scanPublicSignals([hit("one.gov","ABA waitlist in Denver for local schools"), hit("localnews.com","ABA waitlist in Denver at regional child clinic")], "2026-10-08", "Denver, CO");
+const localized=scanPublicSignals([hit("one.gov","ABA waitlist in Denver CO for local schools"), hit("localnews.com","ABA waitlist in Denver Colorado at regional child clinic")], "2026-10-08", "Denver, CO");
 assert(localized.observations.some(x=>x.indicatorId==="service-capacity.01"));
 
 const geoResult={results:[{full_geoid:"16000US0820000",full_name:"Denver, CO",sumlevel:"160"},{full_geoid:"16000US2940000",full_name:"Denver, MO",sumlevel:"160"}]};
@@ -65,7 +67,7 @@ assert.equal(single.governmentSources,1);
 assert.equal(single.firstPartySources,0);
 const corroborated=buildLeadEvidenceGraph({kind:"referral",domain:"example.org",emails:[],phones:[],evidence:[
  evidence("mo-dhss-child-care-gis","https://gis.mo.gov/arcgis/0","Official facility licensed child care"),
- evidence("public-website","https://example.org/school","Official facility licensed child care"),
+ evidence("public-website","https://example.org/school","Example preschool license independently listed by the organization as a licensed child care facility"),
 ]});
 assert.equal(corroborated.publishers,2);
 assert.equal(corroborated.posture,"corroborated");
