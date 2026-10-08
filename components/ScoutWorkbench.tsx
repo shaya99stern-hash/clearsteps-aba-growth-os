@@ -19,6 +19,7 @@ import type { ResolvedLead } from "@/lib/intelligence/source-types";
 import { canSaveToCrm, saveCrmLead } from "@/lib/crm/local-store";
 import { recordScoutRun } from "@/lib/intelligence/scout-history";
 import { buildLeadEvidenceGraph } from "@/lib/intelligence/signals/lead-evidence-graph";
+import { AGE_BANDS, type YouthAgeBand, type YouthLeadQualification } from "@/lib/intelligence/signals/youth-qualification";
 
 type Engine = "client" | "rbt" | "bcba";
 type TargetState = "MO" | "KS" | "CO";
@@ -54,6 +55,8 @@ type SearchResponse = {
   browser?: SourceState;
   screened?: number;
   leads?: ResolvedLead[];
+  ageBand?: YouthAgeBand | null;
+  youthQualifications?: Record<string, YouthLeadQualification>;
   demographics?: {
     geographyName: string;
     geographyKind: string;
@@ -159,6 +162,7 @@ export function ScoutWorkbench({
 }) {
   const [engine, setEngine] = useState<Engine>(initialEngine);
   const [targetState, setTargetState] = useState<TargetState>(initialState);
+  const [ageBand, setAgeBand] = useState<YouthAgeBand>("2-18");
   const [query, setQuery] = useState(initialQuery || ENGINE_PROMPTS[initialEngine]);
   const [location, setLocation] = useState(initialLocation || STATE_NAMES[initialState]);
   const [running, setRunning] = useState(false);
@@ -215,7 +219,7 @@ export function ScoutWorkbench({
       const result = await fetch("/api/intelligence/search", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ query, location, state: targetState, engine, maxResults: 20 }),
+        body: JSON.stringify({ query, location, state: targetState, engine, ageBand, maxResults: 20 }),
         signal: controller.signal,
       });
       const json = await result.json() as SearchResponse;
@@ -277,6 +281,28 @@ export function ScoutWorkbench({
             ))}
           </div>
         </div>
+
+        {engine === "client" && (
+          <label className="scoutAgeFocus" htmlFor="scout-age-focus">
+            <span>Children&apos;s service age focus</span>
+            <select
+              id="scout-age-focus"
+              aria-label="Client age focus"
+              value={ageBand}
+              onChange={(event) => {
+                controllerRef.current?.abort();
+                setRunning(false);
+                setResponse(null);
+                setSelected(null);
+                setAgeBand(event.target.value as YouthAgeBand);
+              }}
+            >
+              {(Object.keys(AGE_BANDS) as YouthAgeBand[]).map((band) => (
+                <option key={band} value={band}>{AGE_BANDS[band].label}</option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <div className="scoutComposerV3">
           <textarea
@@ -451,7 +477,10 @@ export function ScoutWorkbench({
                     <h2>{lead.name}</h2>
                     <p>{lead.domain || lead.location || "Public source"}</p>
                     <div className="signalRow">
-                      <span>{lead.evidence.length} evidence</span>
+                      {engine === "client" && response?.youthQualifications?.[lead.id] && (
+                          <span>{response.youthQualifications[lead.id].organizationRole.replaceAll("_", " ")} · {response.youthQualifications[lead.id].ageStatus} age fit</span>
+                        )}
+                        <span>{lead.evidence.length} evidence</span>
                       <span>{lead.confidence}% confidence</span>
                       <span>{lead.emails.length + lead.phones.length} contacts</span>
                       {lead.signals.slice(0, 2).map((signal) => <span key={signal}>{signal}</span>)}
@@ -475,7 +504,7 @@ export function ScoutWorkbench({
         </section>
       )}
 
-      {selected && <LeadDossier lead={selected} reputation={response?.providerReputation?.[selected.id]} onClose={() => setSelected(null)} onSave={() => saveLead(selected)} saved={savedIds.has(selected.id)} />}
+      {selected && <LeadDossier lead={selected} youthFit={response?.youthQualifications?.[selected.id]} reputation={response?.providerReputation?.[selected.id]} onClose={() => setSelected(null)} onSave={() => saveLead(selected)} saved={savedIds.has(selected.id)} />}
     </div>
   );
 }
@@ -489,7 +518,7 @@ function SourceRow({ source }: { source: SourceState }) {
   );
 }
 
-function LeadDossier({ lead, reputation, onClose, onSave, saved }: { lead: ResolvedLead; reputation?: NonNullable<SearchResponse["providerReputation"]>[string]; onClose: () => void; onSave: () => void; saved: boolean }) {
+function LeadDossier({ lead, reputation, youthFit, onClose, onSave, saved }: { lead: ResolvedLead; reputation?: NonNullable<SearchResponse["providerReputation"]>[string]; youthFit?: YouthLeadQualification; onClose: () => void; onSave: () => void; saved: boolean }) {
   const evidenceGraph = buildLeadEvidenceGraph(lead);
   return (
     <div className="sheetBackdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
@@ -513,6 +542,22 @@ function LeadDossier({ lead, reputation, onClose, onSave, saved }: { lead: Resol
           <span className="statusChip"><Users size={12} /> {lead.emails.length + lead.phones.length} contacts</span>
           <span className="statusChip"><Database size={12} /> {lead.domain || "domain unresolved"}</span>
         </div>
+
+        {youthFit && (
+          <section className="dossierSection" aria-label="Youth program and referral qualification">
+            <h3>Age & referral qualification</h3>
+            <div className="factCard">
+              <div><span>Target</span><b>Ages {youthFit.targetBand}</b></div>
+              <div><span>Age evidence</span><b>{youthFit.ageStatus.replaceAll("_", " ")}</b></div>
+              <div><span>Organization</span><b>{youthFit.organizationRole.replaceAll("_", " ")}</b></div>
+              <div><span>Age-published sources</span><b>{youthFit.supportingPublishers}</b></div>
+            </div>
+            <p>{youthFit.documentedAgeRanges.length
+              ? "Published program age ranges: " + youthFit.documentedAgeRanges.map(({min,max}) => min + "–" + max).join(", ")
+              : "No exact program age range independently documented. A school or preschool label is only a research clue."}</p>
+            <p>Research candidate only until organizational referral suitability is confirmed. No individual children or households are profiled.</p>
+          </section>
+        )}
 
         <section className="dossierSection" aria-label="Independent evidence corroboration">
           <h3>Independent evidence review</h3>

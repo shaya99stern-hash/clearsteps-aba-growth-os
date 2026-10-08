@@ -25,7 +25,7 @@ import {
 import { REGULATORY_RULES, type AbaRole } from "@/lib/intelligence/phase3/regulatory-rules";
 import type { ResolvedLead } from "@/lib/intelligence/source-types";
 import { scanPublicSignals } from "@/lib/intelligence/signals/public-signal-scan";
-import { assessPublicAgeFit } from "@/lib/intelligence/signals/target-ages";
+import { qualifyYouthLead, youthLeadPriority, ageBandSearchQueries, type YouthAgeBand } from "@/lib/intelligence/signals/youth-qualification";
 import { buildProviderReviewDossier, providerReviewQuery, providerReviewQueries, isRestrictedReviewSite } from "@/lib/intelligence/signals/provider-reputation";
 import { summarizeCompanyReviewEvidence } from "@/lib/intelligence/signals/competitor-reviews";
 import { assessOpportunityReliability } from "@/lib/intelligence/score-reliability";
@@ -48,6 +48,7 @@ const requestSchema = z.object({
   location: z.string().trim().max(160).optional().default(""),
   state: z.enum(["MO", "KS", "CO"]).optional().default("MO"),
   engine: z.enum(["client", "rbt", "bcba"]).optional().default("client"),
+  ageBand: z.enum(["2-18", "2-5", "6-11", "12-18"]).optional().default("2-18"),
   maxResults: z.coerce.number().int().min(3).max(40).optional().default(18),
 });
 
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Enter a valid Missouri, Kansas or Colorado research request." }, { status: 400 });
   }
 
-  const { query, location, state, engine, maxResults } = parsed.data;
+  const { query, location, state, engine, ageBand, maxResults } = parsed.data;
   const policy = evaluateResearchRequest(query);
   if (!policy.allowed) return NextResponse.json({ ok: false, error: policy.reason }, { status: 400 });
 
@@ -135,7 +136,7 @@ export async function POST(request: Request) {
         state,
         engine,
         location: targetLocation,
-        under18Population: 0, // Exact ages 2–18 denominator unavailable: no misleading density score.
+        under18Population: census?.metrics.ages2to18 ?? 0, // Only verified exact age cohort; no substitution of under-18 estimates.
       });
       if (stateSource) {
         stateContribution = stateSource.contribution;
@@ -161,6 +162,11 @@ export async function POST(request: Request) {
     }
   }
 
+  if (engine === "client") {
+    const focused = ageBandSearchQueries(ageBand,targetLocation).map((value) =>
+      ({ lane:"referral" as const, query:value }));
+    plan.queries = [...focused,...plan.queries].slice(0,20);
+  }
   const searchQueries = plan.queries.slice(0, 15);
   let queriesAttempted = 0;
   for (let index = 0; index < searchQueries.length; index += 5) {
@@ -233,18 +239,32 @@ export async function POST(request: Request) {
     targetLocation,
   ).slice(0, maxResults);
   const unqualified = mergeStateSourceLeads(resolvedPublic, stateContribution, targetLocation, maxResults);
-  const resolved = engine === "client" ? unqualified.map((lead) => {
-    const fit = assessPublicAgeFit(lead.evidence.map((item) => item.title + " " + item.snippet).join(" "));
-    if (fit === "explicit_target" || fit === "target_subset") return lead;
+  const classified = engine === "client" ? unqualified.map((lead) => {
+    const fit = qualifyYouthLead(lead,ageBand as YouthAgeBand);
+    const documented = fit.ageStatus === "documented";
+    const competitor = fit.organizationRole === "aba_competitor";
     return {
-      ...lead,
-      score: Math.min(lead.score, 35),
-      confidence: Math.min(lead.confidence, 40),
-      unknowns: [...lead.unknowns, fit === "outside"
-        ? "Published program ages exclude ages 2–18; not a qualified client referral opportunity"
-        : "Serving ages 2–18 has not been verified; research candidate only"],
+      lead: {
+        ...lead,
+        score: Math.min(lead.score, documented ? competitor ? 30 : 60 : 35),
+        confidence: Math.min(lead.confidence, documented ? fit.supportingPublishers >= 2 ? 75 : 55 : 40),
+        unknowns: [...lead.unknowns,...fit.missingChecks.filter((item) => !lead.unknowns.includes(item))],
+      },
+      fit,
     };
-  }) : unqualified;
+  }).filter((item) => item.fit.ageStatus !== "outside")
+    .sort((a,b) => youthLeadPriority(b.fit) - youthLeadPriority(a.fit) || b.lead.score - a.lead.score) : [];
+  const resolved = engine === "client" ? classified.map((item) => item.lead) : unqualified;
+  const youthQualifications = Object.fromEntries(classified.map((item) => [item.lead.id,item.fit]));
+  if (engine === "client") sourceStatus.push({
+    source:"Child age and organization qualification",
+    status:classified.some((item) => item.fit.ageStatus === "documented") ? "complete" : "unavailable",
+    detail:"Ages " + ageBand + " · " + classified.filter((item) => item.fit.ageStatus === "documented").length +
+      " organization age matches documented, " +
+      classified.filter((item) => item.fit.organizationRole === "aba_competitor").length +
+      " competitor(s), " + classified.filter((item) => item.fit.ageStatus !== "documented").length +
+      " research-only candidates; no individual families collected",
+  });
 
   // Review discovery is capped to real named competitor organizations. Do not crawl
   // the reviews themselves or enrich Google/Yelp pages; links are verification-only.
@@ -276,7 +296,7 @@ export async function POST(request: Request) {
       " independent cross-publisher themes (Google/Yelp link-only)",
   });
 
-  const publicSignals = scanPublicSignals(rows.map((item) => item.hit), new Date().toISOString(), targetLocation, engine === "client" ? "2-18" : "all");
+  const publicSignals = scanPublicSignals(rows.map((item) => item.hit), new Date().toISOString(), targetLocation, engine === "client" ? ageBand : "all");
   observations.push(...publicSignals.observations);
   sourceStatus.push({
     source: "Public multi-source signal correlations",
@@ -333,6 +353,8 @@ export async function POST(request: Request) {
       },
       screened,
       leads: resolved,
+      youthQualifications,
+      ageBand: engine === "client" ? ageBand : null,
       providerReputation,
       demographics: census ? { geographyName: census.geographyName, geographyKind: census.geographyKind, year: census.year, metrics: census.metrics } : null,
       indicatorSummary: {

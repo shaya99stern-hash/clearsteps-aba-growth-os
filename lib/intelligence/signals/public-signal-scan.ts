@@ -3,6 +3,7 @@ import type { PublicSearchHit } from "../source-types";
 import { PUBLIC_SIGNAL_RULES, CROSS_SOURCE_CHECKS } from "./extended-catalog";
 import { AGES_2_TO_18_RULES, AGES_2_TO_18_CHECKS } from "./age-2-18-catalog";
 import { isAgeAlignedPublicProgram } from "./target-ages";
+import { publicTextCoversYouthAgeBand, type YouthAgeBand } from "./youth-qualification";
 
 export interface PublicSignalClue {
   indicatorId: string;
@@ -30,7 +31,7 @@ export interface PublicSignalScan {
   observations: IndicatorObservation[];
   crossChecks: PublicSignalCrossCheck[];
   supportedChecks: number;
-  ageRange: [2,18] | null;
+  ageRange: [2,18] | [2,5] | [6,11] | [12,18] | null;
 }
 
 type Candidate = { text: string; host: string; sourceClass: "official" | "organization" | "press" | "community" | "other" };
@@ -86,7 +87,7 @@ export function matchesPublicTerritory(text: string, targetLocation: string): bo
 }
 
 /** Pure, deterministic, bounded cross-reference stage. Uncorroborated signals never raise a score. */
-export function scanPublicSignals(hits: readonly PublicSearchHit[], capturedAt = new Date().toISOString(), targetLocation = "", ageMode: "all" | "2-18" = "all"): PublicSignalScan {
+export function scanPublicSignals(hits: readonly PublicSearchHit[], capturedAt = new Date().toISOString(), targetLocation = "", ageMode: "all" | YouthAgeBand = "all"): PublicSignalScan {
   const candidates = hits.slice(0, 250).map(createCandidate).filter((item): item is Candidate => Boolean(item));
   const clues: PublicSignalClue[] = [];
   const observations: IndicatorObservation[] = [];
@@ -108,9 +109,11 @@ export function scanPublicSignals(hits: readonly PublicSearchHit[], capturedAt =
       return true;
     });
     const localized = independent.filter((item) => matchesPublicTerritory(item.text, targetLocation) &&
-      (ageMode !== "2-18" || isAgeAlignedPublicProgram(item.text)));
+      (ageMode === "all" || (ageMode === "2-18"
+        ? isAgeAlignedPublicProgram(item.text)
+        : publicTextCoversYouthAgeBand(item.text,ageMode))));
     // Published source content, not search query text, must establish an applicable age cohort.
-    const ageSupported = ageMode !== "2-18" || localized.length >= 2;
+    const ageSupported = ageMode === "all" || localized.length >= 2;
     const sourceTypes = [...new Set(independent.map((item) => item.sourceClass))];
     const institutional = localized.some((item) => item.sourceClass !== "community" && item.sourceClass !== "other");
     const corroborated = rule.community
@@ -166,6 +169,8 @@ export function scanPublicSignals(hits: readonly PublicSearchHit[], capturedAt =
     observations,
     crossChecks,
     supportedChecks: crossChecks.filter((item) => item.status === "supported").length,
-    ageRange: ageMode === "2-18" ? [2,18] : null,
+    ageRange: ageMode === "all" ? null :
+      ageMode === "2-5" ? [2,5] : ageMode === "6-11" ? [6,11] :
+      ageMode === "12-18" ? [12,18] : [2,18],
   };
 }
