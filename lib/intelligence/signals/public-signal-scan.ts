@@ -3,6 +3,7 @@ import type { PublicSearchHit } from "../source-types";
 import { PUBLIC_SIGNAL_RULES, CROSS_SOURCE_CHECKS } from "./extended-catalog";
 import { AGES_2_TO_18_RULES, AGES_2_TO_18_CHECKS } from "./age-2-18-catalog";
 import { isAgeAlignedPublicProgram } from "./target-ages";
+import { publicPublisherId, samePublicNarrative, matchesPublishedArea } from "./publisher-evidence";
 
 export interface PublicSignalClue {
   indicatorId: string;
@@ -70,19 +71,9 @@ function createCandidate(hit: PublicSearchHit): Candidate | null {
   return { text: text.toLowerCase(), host, sourceClass: classify(host) };
 }
 
-/** Search query terms never count as geography evidence. Require published place text. */
-export function matchesPublicTerritory(text: string, targetLocation: string): boolean {
-  const cleaned = targetLocation.trim().replace(/,\s*(missouri|kansas|colorado|mo|ks|co)$/i, "").trim();
-  if (!cleaned || /^statewide$/i.test(cleaned)) return true;
-  const postal = cleaned.match(/\b\d{5}\b/)?.[0];
-  if (postal) return new RegExp("\\b" + postal + "\\b").test(text);
-  const target = cleaned.replace(/\bcounty\b/gi, "").trim();
-  if (!target) return true;
-  const names: Record<string,string> = {MO:"Missouri",KS:"Kansas",CO:"Colorado"};
-  const region = names[target.toUpperCase()] ?? target;
-  const words = region.split(/\s+/).map((word) => word.replace(/[^a-z0-9]/gi, "")).filter(Boolean);
-  if (!words.length) return false;
-  return new RegExp("\\b" + words.join("\\s+") + "\\b", "i").test(text);
+/** Only the published title/snippet may establish a location, never query metadata. */
+export function matchesPublicTerritory(text:string,targetLocation:string) {
+  return matchesPublishedArea(text,targetLocation);
 }
 
 /** Pure, deterministic, bounded cross-reference stage. Uncorroborated signals never raise a score. */
@@ -96,17 +87,17 @@ export function scanPublicSignals(hits: readonly PublicSearchHit[], capturedAt =
   for (const rule of signalRules) {
     const matched = candidates.filter((item) => rule.keywords.every((keyword) => item.text.includes(keyword)));
     if (!matched.length) continue;
-    // Multiple search hits from a single website are one source, not corroboration.
-    const hosts = new Map(matched.map((item) => [item.host, item]));
-    // A syndicated, byte-identical press release is ONE narrative even across several domains.
-    // One source cannot be its own independent corroboration by repeated search indexing.
-    const seenContent = new Set<string>();
-    const independent = [...hosts.values()].filter((item) => {
-      const fingerprint = item.text.replace(/\s+/g, " ").trim();
-      if (seenContent.has(fingerprint)) return false;
-      seenContent.add(fingerprint);
-      return true;
-    });
+    // A parent publisher and its subdomains contribute one vote, never two.
+    const publishers=new Map<string,Candidate>();
+    for(const item of matched) {
+      const publisher=publicPublisherId(item.host);
+      if(publisher&&!publishers.has(publisher)) publishers.set(publisher,item);
+    }
+    const independent:Candidate[]=[];
+    for(const item of publishers.values()) {
+      if(independent.some((prior)=>samePublicNarrative(prior.text,item.text)))continue;
+      independent.push(item);
+    }
     const localized = independent.filter((item) => matchesPublicTerritory(item.text, targetLocation) &&
       (ageMode !== "2-18" || isAgeAlignedPublicProgram(item.text)));
     // Published source content, not search query text, must establish an applicable age cohort.
@@ -116,8 +107,9 @@ export function scanPublicSignals(hits: readonly PublicSearchHit[], capturedAt =
     const corroborated = rule.community
       ? localized.length >= 3 && institutional
       : localized.length >= 2 && institutional;
-    const hostSet = new Set(independent.map((item) => item.host));
-    hostsByIndicator.set(rule.id, hostSet);
+    const hostSet = new Set(independent.map((item) => publicPublisherId(item.host)));
+    const eligibleSet = new Set(localized.map((item)=>publicPublisherId(item.host)));
+    hostsByIndicator.set(rule.id, eligibleSet);
 
     clues.push({
       indicatorId: rule.id,
@@ -138,7 +130,7 @@ export function scanPublicSignals(hits: readonly PublicSearchHit[], capturedAt =
         indicatorId: rule.id,
         value: Math.min(85, 50 + 7 * localized.length),
         confidence,
-        sourceIds: localized.map((item) => item.host).slice(0, 8),
+        sourceIds: [...eligibleSet].slice(0, 8),
         capturedAt,
       });
     }
