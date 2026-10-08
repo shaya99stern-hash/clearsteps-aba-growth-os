@@ -7,7 +7,10 @@ export function publicPublisherId(domain: string): string {
   if (!/^[a-z0-9.-]+$/.test(host)) return "";
   const parts=host.split(".").filter(Boolean);
   if(parts.length<2) return "";
-  const special=["co.uk","org.uk","gov.uk","ac.uk","com.au","org.au","co.nz","com.br","co.jp","state.co.us"];
+  const special=[
+    "co.uk","org.uk","gov.uk","ac.uk","com.au","org.au","co.nz","com.br","co.jp",
+    "k12.mo.us","k12.ks.us","k12.co.us","state.co.us","state.mo.us","state.ks.us",
+  ];
   const suffix=special.find((value)=>host.endsWith("."+value));
   return parts.slice(-(suffix?suffix.split(".").length+1:2)).join(".");
 }
