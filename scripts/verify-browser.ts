@@ -65,7 +65,7 @@ async function verifyDesktopCrm(baseUrl: string) {
   try {
     await page.goto(`${baseUrl}/pipeline`, { waitUntil: "domcontentloaded" });
     await assertNoBodyOverflow(page, "Referral CRM desktop");
-    await assertActiveNavigation(page, "Referral CRM");
+    await assertActiveNavigation(page, "Market Sources");
 
     const rail = page.locator(".workspaceRail");
     assert.equal(await rail.count(), 1, "desktop CRM should expose one persistent workspace rail");
