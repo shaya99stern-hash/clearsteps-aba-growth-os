@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { parseSingleAgeCountyCsv, censusSingleAgeCsvUrl } from "../lib/intelligence/official/census-county-single-age";
 import { PUBLIC_SOURCE_CHANNELS, choosePublicSourceChannels } from "../lib/intelligence/signals/source-channel-catalog";
 import { PUBLIC_SIGNAL_RULES, CROSS_SOURCE_CHECKS } from "../lib/intelligence/signals/extended-catalog";
 import { AGES_2_TO_18_PILLARS, AGES_2_TO_18_RULES, AGES_2_TO_18_CHECKS } from "../lib/intelligence/signals/age-2-18-catalog";
@@ -71,4 +72,18 @@ for(const state of ["MO","KS","CO"] as const) {
   assert(client.some((c)=>c.scope===state),"Must look at local official and community publishers");
   assert(client.every((c)=>["federal","national",state].includes(c.scope)),"No unrelated state sources");
 }
+// Exact 2025 Census county ages must be computed from single-year published age cells.
+const censusHeader="SUMLEV,STATE,COUNTY,STNAME,CTYNAME,YEAR,AGE,TOT_POP,TOT_MALE,TOT_FEMALE";
+const censusRows=[...Array.from({length:86},(_,age)=>`050,08,031,Colorado,Denver County,7,${age},${100+age},0,0`)];
+const csv=[censusHeader,...censusRows].join("\n");
+const county=parseSingleAgeCountyCsv(csv,"CO","Denver County, CO");
+assert.equal(county.ages2to18,Array.from({length:17},(_,i)=>102+i).reduce((a,b)=>a+b,0));
+assert.equal(county.ages2to5,102+103+104+105);
+assert.equal(county.geographyKind,"county");
+assert.equal(county.counties,1);
+assert.equal(county.year,2025);
+assert.match(censusSingleAgeCsvUrl("CO"),/syasex-08\.csv$/);
+assert.throws(()=>parseSingleAgeCountyCsv(csv,"CO","Denver, CO"),/explicit County/);
+assert.throws(()=>parseSingleAgeCountyCsv([censusHeader,...censusRows.slice(0,70)].join("\n"),"CO","Denver County, CO"),/Missing Census age/);
+
 console.log("2–18 institutional intelligence: 274 candidate channels, 300 indicator definitions, 180 text rules, 60 checks, age/syndication/privacy safeguards.");
