@@ -1,4 +1,4 @@
-export type AbaState = "MO" | "KS";
+export type AbaState = "MO" | "KS" | "CO";
 export type AbaRole = "client" | "rbt" | "bcba" | "laba" | "organization";
 export type PayerContext = "commercial" | "medicaid" | "mo-healthnet" | "kancare" | "self-funded" | "unknown";
 export type GateStatus = "PASS" | "REVIEW" | "BLOCK" | "INFO";
