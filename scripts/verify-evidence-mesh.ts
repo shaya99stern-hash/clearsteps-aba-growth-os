@@ -67,7 +67,7 @@ assert.equal(single.governmentSources,1);
 assert.equal(single.firstPartySources,0);
 const corroborated=buildLeadEvidenceGraph({kind:"referral",domain:"example.org",emails:[],phones:[],evidence:[
  evidence("mo-dhss-child-care-gis","https://gis.mo.gov/arcgis/0","Official facility licensed child care"),
- evidence("public-website","https://example.org/school","Official facility licensed child care"),
+ evidence("public-website","https://example.org/school","Example preschool license independently listed by the organization as a licensed child care facility"),
 ]});
 assert.equal(corroborated.publishers,2);
 assert.equal(corroborated.posture,"corroborated");
