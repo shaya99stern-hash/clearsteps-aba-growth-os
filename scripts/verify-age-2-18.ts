@@ -29,7 +29,7 @@ assert.equal(assessPublicAgeFit("program ages 13-18"),"target_subset");
 assert.equal(assessPublicAgeFit("program ages 0-21"),"mixed_ages");
 assert.equal(assessPublicAgeFit("preschool program"),"target_subset");
 assert.equal(assessPublicAgeFit("ages 19-25 only"),"outside");
-assert.equal(assessPublicAgeFit("children ages 0-2 only"),"outside");
+assert.equal(assessPublicAgeFit("children ages 0-2 only"),"mixed_ages"); // Age 2 overlaps but ages 0–1 must be excluded.
 assert(!isAgeAlignedPublicProgram("autism awareness road sign outside a particular home"));
 const age3to17=safeMeasuredPopulation3To17({age3to5:1500,age6to11:3500,age12to17:2500});
 assert.equal(age3to17.ages3to17,7500);
