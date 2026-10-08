@@ -33,6 +33,8 @@ import { summarizeCompanyReviewEvidence } from "@/lib/intelligence/signals/compe
 import { assessOpportunityReliability } from "@/lib/intelligence/score-reliability";
 import { buildClientGrowthPlan } from "@/lib/intelligence/client-growth";
 import { PUBLIC_SOURCE_CHANNELS, matchedPublicSourceChannels } from "@/lib/intelligence/signals/source-channel-catalog";
+import { getStateCountyBundle } from "@/lib/intelligence/joins/collectors";
+import { scoutDataJoins, type ScoutDataJoins } from "@/lib/intelligence/joins/scout";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -89,6 +91,10 @@ export async function POST(request: Request) {
   }> = [];
   const errors: string[] = [];
   const observations: IndicatorObservation[] = [];
+
+  // Statewide county joins run alongside the other collectors (cached per server instance).
+  const countyBundle = engine === "client" ? getStateCountyBundle(state) : null;
+  countyBundle?.catch(() => undefined);
 
   const [censusSettled, nppesSettled] = await Promise.allSettled([
     fetchCensusDemographics({ state, location: targetLocation }),
@@ -372,6 +378,24 @@ export async function POST(request: Request) {
     detail: publicSignals.clues.length + " observed clues, " + publicSignals.observations.length +
       " age-aligned independently supported indicators, " + publicSignals.supportedChecks + "/60 cross-checks",
   });
+  let dataJoins: ScoutDataJoins | null = null;
+  if (countyBundle) {
+    try {
+      const joined = scoutDataJoins(await countyBundle, targetLocation);
+      dataJoins = joined.dataJoins;
+      observations.push(...joined.observations);
+      const completePrograms = joined.dataJoins.programs.filter((program) => program.status === "complete").length;
+      sourceStatus.push({
+        source: "County data joins (40 cross-program)",
+        status: joined.dataJoins.status === "county_matched" ? "complete" : "unavailable",
+        detail: joined.dataJoins.status === "county_matched" && joined.dataJoins.county
+          ? `${joined.dataJoins.county.name}: ${joined.dataJoins.county.computedJoins}/40 joins, rank ${joined.dataJoins.county.rank ?? "—"} of ${joined.dataJoins.county.rankedOf}; ${completePrograms}/${joined.dataJoins.programs.length} statistical programs`
+          : joined.dataJoins.note,
+      });
+    } catch (error) {
+      errors.push(`county joins: ${errorMessage(error, "county data joins failed")}`);
+    }
+  }
   observations.push(...observationsFromResolvedLeads(resolved, engine));
   observations.push(...evidenceQualityObservations(resolved, sourceStatus));
   const dedupedObservations = dedupeObservations(observations);
@@ -439,6 +463,7 @@ export async function POST(request: Request) {
       engineScores,
       scoreReliability,
       publicSignals,
+      dataJoins,
       regulatoryRules: rules.map((rule) => ({
         id: rule.id,
         domain: rule.domain,

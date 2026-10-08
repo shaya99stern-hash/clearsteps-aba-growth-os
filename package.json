@@ -24,7 +24,9 @@
     "verify:client-growth": "tsx scripts/verify-client-growth.ts",
     "verify:family-contact": "tsx scripts/verify-family-contact.ts",
     "verify:adaptive-followup": "tsx scripts/verify-adaptive-followup.ts",
-    "verify:colorado-networks": "tsx scripts/verify-colorado-networks.ts"
+    "verify:colorado-networks": "tsx scripts/verify-colorado-networks.ts",
+    "verify:data-joins": "tsx scripts/verify-data-joins.ts",
+    "smoke:data-joins": "tsx scripts/smoke-data-joins.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",

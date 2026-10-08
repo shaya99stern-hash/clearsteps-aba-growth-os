@@ -18,6 +18,8 @@ import {
 import type { ResolvedLead } from "@/lib/intelligence/source-types";
 import type { ClientGrowthPlan } from "@/lib/intelligence/client-growth";
 import { ClientGrowthPanel } from "./ClientGrowthPanel";
+import { CountyJoinsPanel } from "./CountyJoinsPanel";
+import type { ScoutDataJoins } from "@/lib/intelligence/joins/scout";
 import { canSaveToCrm, saveCrmLead } from "@/lib/crm/local-store";
 import { recordScoutRun } from "@/lib/intelligence/scout-history";
 import { buildLeadEvidenceGraph } from "@/lib/intelligence/signals/lead-evidence-graph";
@@ -123,6 +125,7 @@ type SearchResponse = {
       note:string;
     };
   }>;
+  dataJoins?: ScoutDataJoins | null;
   publicSignals?: {
     inspected: number;
     supportedChecks: number;
@@ -465,6 +468,10 @@ export function ScoutWorkbench({
                 </details>
               </div>
             </details>
+          )}
+
+          {response?.dataJoins && (
+            <CountyJoinsPanel dataJoins={response.dataJoins} onUseCounty={(county) => setLocation(county + ", " + targetState)} />
           )}
 
           {response?.regulatoryRules && response.regulatoryRules.length > 0 && (
