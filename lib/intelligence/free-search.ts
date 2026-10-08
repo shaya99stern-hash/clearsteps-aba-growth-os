@@ -27,7 +27,7 @@ export async function searchPublicWeb(query: string, limit = 8): Promise<PublicS
       const rssUrl = "https://www.bing.com/search?" + new URLSearchParams({format:"rss",q:query,count:String(requested)});
       const response = await fetch(rssUrl, {
         headers: { accept: "application/rss+xml, application/xml, text/xml" },
-        signal: controller.signal, cache: "no-store",
+        signal: AbortSignal.timeout(5000), cache: "no-store",
       });
       if (!response.ok) throw new Error("HTTP " + response.status);
       const results = parseBingRss(await response.text(),query);
