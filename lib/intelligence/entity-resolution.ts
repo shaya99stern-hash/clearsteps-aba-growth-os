@@ -56,7 +56,8 @@ function toLead(
   const text = matches.map((row) => `${row.hit.title} ${row.hit.snippet} ${row.enrichment?.textSample ?? ""}`).join(" ").toLowerCase();
   const authoritativeReferral = matches.every((row) =>
     row.hit.sourceId === "co-cdec-licensed-childcare" ||
-    row.hit.sourceId === "mo-dhss-child-care-gis");
+    row.hit.sourceId === "mo-dhss-child-care-gis" ||
+    row.hit.sourceId === "co-cdec-referral-network");
   const kind = authoritativeReferral ? "referral" : lanes.has("talent")
     ? looksLikeIndividualCandidate(text) ? "candidate" : "talent_signal"
     : lanes.has("community") && lanes.size === 1
@@ -115,6 +116,7 @@ function toLead(
 function entityKey(hit: PublicSearchHit, lane: SearchLane) {
   if (hit.sourceId === "mo-dhss-child-care-gis") return "mo-facility-" + slug(hit.query.split(" facility ").at(-1) || hit.title);
   if (hit.sourceId === "co-cdec-licensed-childcare") return "co-facility-" + slug(hit.query);
+  if (hit.sourceId === "co-cdec-referral-network") return "co-network-" + slug(hit.title);
   if (lane === "community") return `community-${slug(hit.url)}`;
   const domain = getDomain(hit.url);
   if (domain && !isAggregatorDomain(domain)) return `domain-${slug(domain)}`;
