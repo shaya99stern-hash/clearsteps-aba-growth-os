@@ -54,7 +54,7 @@ type NppesApiResponse = {
 const CATEGORY_QUERIES: Record<NppesCategory, string> = {
   pediatrics: "Pediatrics",
   developmental_pediatrics: "Developmental - Behavioral Pediatrics",
-  child_psychology: "Clinical Child & Adolescent Psychologist",
+  child_psychology: "Clinical Child & Adolescent",
   speech: "Speech-Language Pathologist",
   occupational: "Occupational Therapist",
   behavior_analyst: "Behavior Analyst",
@@ -133,6 +133,7 @@ async function fetchCategory(input: {
 
 export function parseNppesResponse(json: NppesApiResponse) {
   const errors = (json.Errors ?? []).map((error) => error.description ?? "NPPES reported an error").filter(Boolean);
+  if (json.result_count === undefined && errors.length === 0) errors.push("NPPES response omitted result_count; cannot distinguish rejected request from empty search");
   const results = (json.results ?? []).filter((result) => result.number && result.basic?.status !== "D");
   return { results, errors };
 }
