@@ -63,6 +63,9 @@ jobs:
       - name: Verify Colorado and cross-source public indicators
         run: npm run verify:colorado-signals
 
+      - name: Verify official Colorado CCRR/council network discovery
+        run: npm run verify:colorado-networks
+
       - name: Verify evidence graph and no-key source mesh
         run: npm run verify:evidence-mesh
 
