@@ -1,6 +1,8 @@
 import type { IndicatorObservation } from "../phase3/indicator-catalog";
 import type { PublicSearchHit } from "../source-types";
 import { PUBLIC_SIGNAL_RULES, CROSS_SOURCE_CHECKS } from "./extended-catalog";
+import { AGES_2_TO_18_RULES, AGES_2_TO_18_CHECKS } from "./age-2-18-catalog";
+import { isAgeAlignedPublicProgram } from "./target-ages";
 
 export interface PublicSignalClue {
   indicatorId: string;
@@ -12,6 +14,7 @@ export interface PublicSignalClue {
   /** Sources are domains only; never provide direct links to family posts. */
   sourceDomains: string[];
   geographySupported: boolean;
+  ageSupported: boolean;
 }
 
 export interface PublicSignalCrossCheck {
@@ -27,6 +30,7 @@ export interface PublicSignalScan {
   observations: IndicatorObservation[];
   crossChecks: PublicSignalCrossCheck[];
   supportedChecks: number;
+  ageRange: [2,18] | null;
 }
 
 type Candidate = { text: string; host: string; sourceClass: "official" | "organization" | "press" | "community" | "other" };
@@ -82,19 +86,31 @@ export function matchesPublicTerritory(text: string, targetLocation: string): bo
 }
 
 /** Pure, deterministic, bounded cross-reference stage. Uncorroborated signals never raise a score. */
-export function scanPublicSignals(hits: readonly PublicSearchHit[], capturedAt = new Date().toISOString(), targetLocation = ""): PublicSignalScan {
+export function scanPublicSignals(hits: readonly PublicSearchHit[], capturedAt = new Date().toISOString(), targetLocation = "", ageMode: "all" | "2-18" = "all"): PublicSignalScan {
   const candidates = hits.slice(0, 250).map(createCandidate).filter((item): item is Candidate => Boolean(item));
   const clues: PublicSignalClue[] = [];
   const observations: IndicatorObservation[] = [];
   const hostsByIndicator = new Map<string, Set<string>>();
 
-  for (const rule of PUBLIC_SIGNAL_RULES) {
+  const signalRules = [...PUBLIC_SIGNAL_RULES, ...AGES_2_TO_18_RULES];
+  for (const rule of signalRules) {
     const matched = candidates.filter((item) => rule.keywords.every((keyword) => item.text.includes(keyword)));
     if (!matched.length) continue;
     // Multiple search hits from a single website are one source, not corroboration.
     const hosts = new Map(matched.map((item) => [item.host, item]));
-    const independent = [...hosts.values()];
-    const localized = independent.filter((item) => matchesPublicTerritory(item.text, targetLocation));
+    // A syndicated, byte-identical press release is ONE narrative even across several domains.
+    // One source cannot be its own independent corroboration by repeated search indexing.
+    const seenContent = new Set<string>();
+    const independent = [...hosts.values()].filter((item) => {
+      const fingerprint = item.text.replace(/\s+/g, " ").trim();
+      if (seenContent.has(fingerprint)) return false;
+      seenContent.add(fingerprint);
+      return true;
+    });
+    const localized = independent.filter((item) => matchesPublicTerritory(item.text, targetLocation) &&
+      (ageMode !== "2-18" || isAgeAlignedPublicProgram(item.text)));
+    // Published source content, not search query text, must establish an applicable age cohort.
+    const ageSupported = ageMode !== "2-18" || localized.length >= 2;
     const sourceTypes = [...new Set(independent.map((item) => item.sourceClass))];
     const institutional = localized.some((item) => item.sourceClass !== "community" && item.sourceClass !== "other");
     const corroborated = rule.community
@@ -112,6 +128,7 @@ export function scanPublicSignals(hits: readonly PublicSearchHit[], capturedAt =
       evidenceTypes: sourceTypes,
       sourceDomains: [...hostSet].slice(0, 8),
       geographySupported: localized.length >= 2,
+      ageSupported,
     });
 
     if (corroborated) {
@@ -128,7 +145,7 @@ export function scanPublicSignals(hits: readonly PublicSearchHit[], capturedAt =
   }
 
   const verifiedIndicators = new Set(observations.map((item) => item.indicatorId));
-  const crossChecks: PublicSignalCrossCheck[] = CROSS_SOURCE_CHECKS.map((check) => {
+  const crossChecks: PublicSignalCrossCheck[] = [...CROSS_SOURCE_CHECKS, ...AGES_2_TO_18_CHECKS].map((check) => {
     const left = hostsByIndicator.get(check.left) ?? new Set<string>();
     const right = hostsByIndicator.get(check.right) ?? new Set<string>();
     const union = new Set([...left, ...right]);
@@ -149,5 +166,6 @@ export function scanPublicSignals(hits: readonly PublicSearchHit[], capturedAt =
     observations,
     crossChecks,
     supportedChecks: crossChecks.filter((item) => item.status === "supported").length,
+    ageRange: ageMode === "2-18" ? [2,18] : null,
   };
 }

@@ -11,9 +11,9 @@ import { scoutStateSourceDescriptor } from "../lib/intelligence/official/scout-s
 import { REGULATORY_RULES } from "../lib/intelligence/phase3/regulatory-rules";
 import type { PublicSearchHit } from "../lib/intelligence/source-types";
 
-assert.equal(INDICATOR_PILLARS.length, 18);
-assert.equal(INDICATOR_CATALOG.length, 180);
-assert.equal(new Set(INDICATOR_CATALOG.map((x) => x.id)).size, 180);
+assert.equal(INDICATOR_PILLARS.length, 30);
+assert.equal(INDICATOR_CATALOG.length, 300);
+assert.equal(new Set(INDICATOR_CATALOG.map((x) => x.id)).size, 300);
 assert.equal(PUBLIC_SIGNAL_RULES.length, 60);
 assert.equal(CROSS_SOURCE_CHECKS.length, 20);
 assert.equal(new Set(CROSS_SOURCE_CHECKS.map((x) => x.id)).size, 20);
@@ -48,9 +48,9 @@ const corroborated=scanPublicSignals([
 assert(corroborated.observations.some(x=>x.indicatorId==="service-capacity.01"));
 assert(corroborated.observations.some(x=>x.indicatorId==="institutional-demand.10"));
 assert.equal(corroborated.crossChecks.find(x=>x.id==="X01")?.status,"supported");
-assert.equal(corroborated.crossChecks.length,20);
+assert.equal(corroborated.crossChecks.length,60);
 const privateClue=scanPublicSignals([
  hit("forum.org","My autistic son lives at our house on 123 Main Street; ABA waitlist"),
 ]);
 assert.equal(privateClue.clues.length,0,"Household-level signals must not be included");
-console.log("Colorado institutional collector, 60 signals, 20 cross-checks and privacy checks passed.");
+console.log("Colorado institutional collector, 180 public hypotheses, 60 cross-checks and privacy checks passed.");

@@ -25,6 +25,9 @@ import {
 import { REGULATORY_RULES, type AbaRole } from "@/lib/intelligence/phase3/regulatory-rules";
 import type { ResolvedLead } from "@/lib/intelligence/source-types";
 import { scanPublicSignals } from "@/lib/intelligence/signals/public-signal-scan";
+import { assessPublicAgeFit } from "@/lib/intelligence/signals/target-ages";
+import { buildProviderReviewDossier, providerReviewQuery, providerReviewQueries, isRestrictedReviewSite } from "@/lib/intelligence/signals/provider-reputation";
+import { summarizeCompanyReviewEvidence } from "@/lib/intelligence/signals/competitor-reviews";
 import { assessOpportunityReliability } from "@/lib/intelligence/score-reliability";
 import { PUBLIC_SOURCE_CHANNELS, matchedPublicSourceChannels } from "@/lib/intelligence/signals/source-channel-catalog";
 
@@ -62,7 +65,7 @@ export async function POST(request: Request) {
   const plan = buildSearchPlan(query, targetLocation, engine, state);
   const stateSourceDescriptor = scoutStateSourceDescriptor(state, engine);
   const sourceStatus: SourceState[] = [
-    { source: "U.S. Census ACS", status: "working", detail: "child population + five-year demographic context" },
+    { source: "U.S. Census population", status: "working", detail: "2025 official exact ages 2–18 county/state CSV, with limited ACS fallback" },
     { source: "CMS NPPES", status: "working", detail: "bounded provider/referral cross-reference; NPI is not licensure" },
     { source: "Public Web Search", status: "working", detail: "fallback discovery and market/hiring signals" },
     { source: "Public Website Enrichment", status: "working", detail: "public contact/service cross-reference" },
@@ -91,12 +94,14 @@ export async function POST(request: Request) {
   const census = censusSettled.status === "fulfilled" ? censusSettled.value : null;
   if (census) {
     observations.push(...census.observations);
-    completeSource(sourceStatus, "U.S. Census ACS", `${census.geographyName} · ${formatNumber(census.metrics.under18)} residents under 18 · ACS ${census.year}`);
+    completeSource(sourceStatus, "U.S. Census population", census.metrics.ages2to18 != null
+      ? census.geographyName + " · exact ages 2–18: " + formatNumber(census.metrics.ages2to18) + " · Census " + census.year
+      : census.geographyName + " · ages 3–17 measured; 2 and 18 unavailable · grouped ACS " + census.year);
   } else {
     const detail = censusSettled.status === "rejected"
       ? errorMessage(censusSettled.reason, "Census demographic source failed")
       : "Census demographic source failed";
-    unavailableSource(sourceStatus, "U.S. Census ACS", detail);
+    unavailableSource(sourceStatus, "U.S. Census population", detail);
     errors.push(`census: ${detail}`);
   }
 
@@ -130,7 +135,7 @@ export async function POST(request: Request) {
         state,
         engine,
         location: targetLocation,
-        under18Population: census?.metrics.under18 ?? 0,
+        under18Population: 0, // Exact ages 2–18 denominator unavailable: no misleading density score.
       });
       if (stateSource) {
         stateContribution = stateSource.contribution;
@@ -194,7 +199,7 @@ export async function POST(request: Request) {
 
   const uniqueForEnrichment = Array.from(
     new Map(rows
-      .filter((row) => !row.hit.sourceId.startsWith("cms-nppes-"))
+      .filter((row) => !row.hit.sourceId.startsWith("cms-nppes-") && !isRestrictedReviewSite(row.hit.url))
       .map((row) => [safeDomain(row.hit.url) ?? row.hit.url, row])).values(),
   ).slice(0, 6);
   const browserReady = await playwrightAvailable();
@@ -218,22 +223,66 @@ export async function POST(request: Request) {
   }
 
   const enrichmentByDomain = new Map(uniqueForEnrichment.map((row) => [safeDomain(row.hit.url), row.enrichment]));
+  // Public discussion is aggregate context; a forum poster must never become a family-level CRM lead.
+  const researchOnlyCommunity = (url: string) => /(^|\.)(reddit\.com|facebook\.com|nextdoor\.com|threads\.net|instagram\.com|tiktok\.com|x\.com)$/i.test(safeDomain(url) ?? "");
   const resolvedPublic = resolveSearchHits(
-    rows.map((row) => ({
+    rows.filter((row) => !researchOnlyCommunity(row.hit.url) && !isRestrictedReviewSite(row.hit.url)).map((row) => ({
       ...row,
       enrichment: row.enrichment ?? enrichmentByDomain.get(safeDomain(row.hit.url)) ?? null,
     })),
     targetLocation,
   ).slice(0, maxResults);
-  const resolved = mergeStateSourceLeads(resolvedPublic, stateContribution, targetLocation, maxResults);
+  const unqualified = mergeStateSourceLeads(resolvedPublic, stateContribution, targetLocation, maxResults);
+  const resolved = engine === "client" ? unqualified.map((lead) => {
+    const fit = assessPublicAgeFit(lead.evidence.map((item) => item.title + " " + item.snippet).join(" "));
+    if (fit === "explicit_target" || fit === "target_subset") return lead;
+    return {
+      ...lead,
+      score: Math.min(lead.score, 35),
+      confidence: Math.min(lead.confidence, 40),
+      unknowns: [...lead.unknowns, fit === "outside"
+        ? "Published program ages exclude ages 2–18; not a qualified client referral opportunity"
+        : "Serving ages 2–18 has not been verified; research candidate only"],
+    };
+  }) : unqualified;
 
-  const publicSignals = scanPublicSignals(rows.map((item) => item.hit), new Date().toISOString(), targetLocation);
+  // Review discovery is capped to real named competitor organizations. Do not crawl
+  // the reviews themselves or enrich Google/Yelp pages; links are verification-only.
+  const competitors = resolved.filter((lead) => providerReviewQuery(lead,targetLocation)).slice(0,3);
+  const reputationEntries = await Promise.all(competitors.map(async (lead) => {
+    try {
+      const queries = providerReviewQueries(lead,targetLocation);
+      const gathered = await Promise.allSettled(queries.map((query) => searchPublicWeb(query,4)));
+      const hits = gathered.flatMap((result) => result.status === "fulfilled" ? result.value : []);
+      return [lead.id,{
+        ...buildProviderReviewDossier(lead,hits),
+        independentThemes:summarizeCompanyReviewEvidence(lead,hits,targetLocation),
+      }] as const;
+    } catch {
+      return [lead.id,{
+        ...buildProviderReviewDossier(lead,[]),
+        independentThemes:summarizeCompanyReviewEvidence(lead,[],targetLocation),
+      }] as const;
+    }
+  }));
+  const providerReputation = Object.fromEntries(reputationEntries);
+  sourceStatus.push({
+    source:"Public competitor review discovery",
+    status: reputationEntries.some(([,summary]) => summary.reviews.length > 0) ? "complete" : "unavailable",
+    detail: competitors.length + " named organizations queried; " +
+      reputationEntries.reduce((sum,[,summary]) => sum + summary.reviews.length,0) +
+      " review/press URLs indexed, " +
+      reputationEntries.filter(([,entry])=>entry.independentThemes.status==="corroborated").length +
+      " independent cross-publisher themes (Google/Yelp link-only)",
+  });
+
+  const publicSignals = scanPublicSignals(rows.map((item) => item.hit), new Date().toISOString(), targetLocation, engine === "client" ? "2-18" : "all");
   observations.push(...publicSignals.observations);
   sourceStatus.push({
     source: "Public multi-source signal correlations",
     status: publicSignals.observations.length ? "complete" : "unavailable",
     detail: publicSignals.clues.length + " observed clues, " + publicSignals.observations.length +
-      " independently supported indicators, " + publicSignals.supportedChecks + "/20 cross-checks",
+      " age-aligned independently supported indicators, " + publicSignals.supportedChecks + "/60 cross-checks",
   });
   observations.push(...observationsFromResolvedLeads(resolved, engine));
   observations.push(...evidenceQualityObservations(resolved, sourceStatus));
@@ -284,6 +333,7 @@ export async function POST(request: Request) {
       },
       screened,
       leads: resolved,
+      providerReputation,
       demographics: census ? { geographyName: census.geographyName, geographyKind: census.geographyKind, year: census.year, metrics: census.metrics } : null,
       indicatorSummary: {
         modelTotal: INDICATOR_CATALOG.length,

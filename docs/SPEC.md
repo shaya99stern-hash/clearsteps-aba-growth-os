@@ -18,7 +18,7 @@ Scout is not a single web search. A research run must produce an evidence graph:
 
 `public sources -> normalized observations -> entity resolution -> regulatory/payer gates -> engine scores -> explainable lead dossier`
 
-The target model contains **180 independently addressable indicators** across eighteen pillars:
+The target model contains **300 independently addressable indicator hypotheses** across thirty pillars:
 
 - child/demographic demand
 - developmental and public-program demand
@@ -85,9 +85,9 @@ The installed application is labeled **ABA Engine** while the in-product brand r
 - The product may encode official legal/payer requirements, but uncertain applicability must be surfaced as `REVIEW`, not guessed.
 ## Cross-source public intelligence expansion (October 2026)
 
-- 120 initial model indicators plus 60 additional public/institutional hypotheses across six added pillars.
-- 20 explicitly paired cross-source tests, status supported, partial, or unobserved based on actual evidence.
-- 76 registered public domain/channel candidates across Missouri, Kansas, Colorado, federal, and national sources. Registered does NOT mean queried, accessible, verified, or integrated.
+- 120 initial model indicators plus 60 broad institutional hypotheses plus 120 age-2–18 public institutional hypotheses across 30 pillars.
+- 60 explicitly paired cross-source tests, status supported, partial, or unobserved based on actual evidence.
+- 274 registered candidate public publisher domains across Missouri, Kansas, Colorado, federal, and national sources. Registered does NOT mean queried, accessible, verified, or integrated.
 - Discovery without user API keys: bounded public HTML search, public RSS fallback, direct official agency datasets, NPPES, and keyless Census Reporter ACS.
 - City/county matching is required before public discussion can contribute to local market scoring.
 - Multiple search snippets from one publisher count as ONE source. Strong corroboration requires independent domains and relevant first-party or authoritative evidence.
@@ -99,3 +99,12 @@ The installed application is labeled **ABA Engine** while the in-product brand r
 
 Tests include verify:aba-engine, verify:colorado-signals, verify:evidence-mesh, state-source checks, production build, mobile Playwright and a non-gating real public-source smoke.
 Green code tests do not prove public hosts return live results, cross-device database persistence or active daily monitoring. Always report live source status independently.
+
+## Age-2–18 research scope and tripled discovery catalog (October 2026)
+
+- The **Client** research engine requires independent, geographically matching public **institutional** evidence aligned to ages 2–18 or a clearly contained age subrange. Recruitment for adult RBT/BCBA professionals is not age-filtered.
+- Age-only community signs near a household, personal family stories, posts and household coordinates are never contact leads. Public municipal campaigns, city budgets, district programs, accessible transit and local press can inform **aggregate** market context.
+- Two independent domain names repeating identical published copy are **not** independent corroboration; contradictory evidence is retained for review.
+- Registering 274 candidate sites is not 274 working API collectors. Source status must reveal the number actually searched, returned and independently corroborated; keyless-only and public pages.
+- The current ACS data groups ages 0–2 and 3–17. Ages 2 and 18 cannot be separated from those tables, so Clear Steps currently only displays observed ages 3–17; exact age-2–18 census population remains **unknown**, never estimated without single-year age data.
+- The 60 crosschecks test relationship hypotheses; they do not claim confirmed relationships without corroborating sources.

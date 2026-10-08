@@ -31,7 +31,7 @@ const hit=(host:string, snippet:string)=>({
 });
 const misleading=scanPublicSignals([hit("one.gov","ABA waitlist in Boulder"), hit("localnews.com","ABA waitlist in Boulder")], "2026-10-08", "Denver, CO");
 assert.equal(misleading.observations.length,0, "Cross-source agreement without geographic evidence must never score");
-const localized=scanPublicSignals([hit("one.gov","ABA waitlist in Denver"), hit("localnews.com","ABA waitlist in Denver")], "2026-10-08", "Denver, CO");
+const localized=scanPublicSignals([hit("one.gov","ABA waitlist in Denver for local schools"), hit("localnews.com","ABA waitlist in Denver at regional child clinic")], "2026-10-08", "Denver, CO");
 assert(localized.observations.some(x=>x.indicatorId==="service-capacity.01"));
 
 const geoResult={results:[{full_geoid:"16000US0820000",full_name:"Denver, CO",sumlevel:"160"},{full_geoid:"16000US2940000",full_name:"Denver, MO",sumlevel:"160"}]};

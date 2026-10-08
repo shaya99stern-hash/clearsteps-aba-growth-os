@@ -208,6 +208,9 @@ export interface PublicSignalRule {
   group: string;
   keywords: readonly string[];
   community: boolean;
+  /** Institutional program age interval, never an individual patient attribute. */
+  ageRange?: readonly [number, number];
+  requiresAgeAlignment?: boolean;
 }
 export const PUBLIC_SIGNAL_RULES: readonly PublicSignalRule[] = [
   {

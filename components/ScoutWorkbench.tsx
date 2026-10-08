@@ -67,6 +67,9 @@ type SearchResponse = {
       age12to17: number;
       under18Share: number;
       under18FiveYearGrowth: number | null;
+      age3to17: number;
+      ages2to18: number | null;
+      ageCohortNote: string;
     };
   } | null;
   indicatorSummary?: {
@@ -93,6 +96,26 @@ type SearchResponse = {
     reasoning: string[];
   };
   errors?: string[];
+  providerReputation?: Record<string,{
+    organizationId:string;
+    organizationName:string;
+    distinctPublishers:number;
+    verifiedReviewCount:0;
+    finding:"unverified";
+    guidance:string;
+    reviews:Array<{
+      url:string;
+      publisher:string;
+      access:"link_only"|"third_party_context";
+      verification:"not_verified";
+    }>;
+    independentThemes?: {
+      status:"corroborated"|"unconfirmed"|"no_public_evidence";
+      reviewLinks:Array<{platform:string;url:string;linkOnly:true;source:"indexed_business_page"|"external_search"}>;
+      publicThemes:Array<{theme:string;sentiment:"positive"|"concern"|"mixed";publishers:number;sources:string[];independentlyCorroborated:boolean}>;
+      note:string;
+    };
+  }>;
   publicSignals?: {
     inspected: number;
     supportedChecks: number;
@@ -100,7 +123,7 @@ type SearchResponse = {
     clues: Array<{
       indicatorId: string; name: string; group: string;
       sourceCount: number; corroborated: boolean;
-      sourceDomains: string[]; geographySupported: boolean;
+      sourceDomains: string[]; geographySupported: boolean; ageSupported: boolean;
     }>;
     crossChecks: Array<{
       id: string; title: string; status: "supported" | "partial" | "unobserved"; sourceCount: number;
@@ -109,7 +132,7 @@ type SearchResponse = {
 };
 
 const ENGINE_PROMPTS: Record<Engine, string> = {
-  client: "Find the strongest client-growth territories and public referral organizations, and explain the evidence behind each opportunity.",
+  client: "Find public organizational referral opportunities and programs serving ages 2–18, with evidence from independent sources.",
   rbt: "Find RBT hiring pressure, talent supply, employers, training signals and recruiting opportunities, with Missouri/Kansas/Colorado compliance context.",
   bcba: "Find BCBA/LBA hiring pressure, licensed analyst supply, employers and recruiting opportunities, with state licensure context.",
 };
@@ -327,9 +350,13 @@ export function ScoutWorkbench({
 
               {response.demographics && (
                 <div className="demographicStrip" aria-label={`${response.demographics.geographyName} demographic context`}>
-                  <div className="demographicCard"><span>Under 18</span><b>{formatCount(response.demographics.metrics.under18)}</b></div>
-                  <div className="demographicCard"><span>Age 0–5</span><b>{formatCount(response.demographics.metrics.age0to2 + response.demographics.metrics.age3to5)}</b></div>
-                  <div className="demographicCard"><span>5-year child trend</span><b>{formatGrowth(response.demographics.metrics.under18FiveYearGrowth)}</b></div>
+                  {response.demographics.metrics.ages2to18 != null && (
+                    <div className="demographicCard"><span>Exact ages 2–18</span><b>{formatCount(response.demographics.metrics.ages2to18)}</b></div>
+                  )}
+                  <div className="demographicCard"><span>Ages 3–5</span><b>{formatCount(response.demographics.metrics.age3to5)}</b></div>
+                  <div className="demographicCard"><span>Ages 6–11</span><b>{formatCount(response.demographics.metrics.age6to11)}</b></div>
+                  <div className="demographicCard"><span>Ages 12–17</span><b>{formatCount(response.demographics.metrics.age12to17)}</b></div>
+                  <p className="demographicNote" role="note">{response.demographics.metrics.ageCohortNote ?? "Population age 2 and age 18 not available from this grouped source. No exact 2–18 total inferred."}</p>
                 </div>
               )}
 
@@ -357,8 +384,8 @@ export function ScoutWorkbench({
           {response?.publicSignals && (
             <details className="sourceDisclosure">
               <summary>
-                <span>60 public market indicators + 20 cross-checks</span>
-                <span>{response.publicSignals.observations.length} supported · {response.publicSignals.supportedChecks}/20 linked</span>
+                <span>180 public signal hypotheses + 60 cross-checks</span>
+                <span>{response.publicSignals.observations.length} supported · {response.publicSignals.supportedChecks}/60 linked</span>
               </summary>
               <div className="sourceRail">
                 <p>Every clue is screened against distinct public sources. Unconfirmed reports remain leads for additional research and do not add points to the market score. Personal residential details are excluded.</p>
@@ -367,12 +394,12 @@ export function ScoutWorkbench({
                     <i className={`sourceDot ${clue.corroborated ? "complete" : "unavailable"}`} />
                     <div>
                       <b>{clue.name} · {clue.corroborated ? "Corroborated" : "Needs independent evidence"}</b>
-                      <span>{clue.sourceCount} distinct domains · {clue.geographySupported ? "Area verified" : "Location not corroborated"} · {clue.sourceDomains.join(", ")}</span>
+                      <span>{clue.sourceCount} distinct domains · {clue.geographySupported ? "Area verified" : "Location not corroborated"} · {clue.ageSupported ? "Target ages supported" : "Age not confirmed"} · {clue.sourceDomains.join(", ")}</span>
                     </div>
                   </div>
                 ))}
                 <details className="ruleDisclosure">
-                  <summary>All 20 relationship checks</summary>
+                  <summary>All 60 relationship checks</summary>
                   <div className="ruleList">
                     {response.publicSignals.crossChecks.map((check) => (
                       <div className="ruleRow" key={check.id}>
@@ -448,7 +475,7 @@ export function ScoutWorkbench({
         </section>
       )}
 
-      {selected && <LeadDossier lead={selected} onClose={() => setSelected(null)} onSave={() => saveLead(selected)} saved={savedIds.has(selected.id)} />}
+      {selected && <LeadDossier lead={selected} reputation={response?.providerReputation?.[selected.id]} onClose={() => setSelected(null)} onSave={() => saveLead(selected)} saved={savedIds.has(selected.id)} />}
     </div>
   );
 }
@@ -462,7 +489,7 @@ function SourceRow({ source }: { source: SourceState }) {
   );
 }
 
-function LeadDossier({ lead, onClose, onSave, saved }: { lead: ResolvedLead; onClose: () => void; onSave: () => void; saved: boolean }) {
+function LeadDossier({ lead, reputation, onClose, onSave, saved }: { lead: ResolvedLead; reputation?: NonNullable<SearchResponse["providerReputation"]>[string]; onClose: () => void; onSave: () => void; saved: boolean }) {
   const evidenceGraph = buildLeadEvidenceGraph(lead);
   return (
     <div className="sheetBackdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
@@ -519,6 +546,55 @@ function LeadDossier({ lead, onClose, onSave, saved }: { lead: ResolvedLead; onC
           )}
         </section>
 
+        {reputation && (
+          <section className="dossierSection" aria-label="Public competitor reputation sources">
+            <h3>Public reputation / competitor reviews</h3>
+            <p>{reputation.reviews.length
+              ? reputation.reviews.length + " review or public press links found across " + reputation.distinctPublishers + " source type(s). None has been treated as independently verified."
+              : "No review-source links verified for this organization. An empty result is not a positive or negative rating."}</p>
+            <div className="stackList">
+              {reputation.reviews.map((review) => (
+                <a className="stackRow evidenceRow" href={review.url} target="_blank" rel="noopener noreferrer" key={review.url}>
+                  <div>
+                    <b>{review.publisher} · Open original source</b>
+                    <span>{review.access === "link_only" ? "Direct verification only; reviews not scraped" : "Public media context; not independently verified"}</span>
+                  </div>
+                  <ExternalLink size={16} aria-hidden="true" />
+                </a>
+              ))}
+            </div>
+            {reputation.independentThemes && (
+              <>
+                <h3>Cross-publisher reputation themes</h3>
+                <p>{reputation.independentThemes.status === "corroborated"
+                  ? "Some organization-level themes appear in multiple independent public reports. These are research findings, not clinical service-quality determinations."
+                  : "No independently verified reputation pattern established. Single-source mentions are research leads, not market conclusions."}</p>
+                <div className="stackList">
+                  {reputation.independentThemes.publicThemes.map((theme) => (
+                    <div className="stackRow" key={theme.theme}>
+                      <div>
+                        <b>{theme.theme.replaceAll("_"," ")} · {theme.independentlyCorroborated ? "Cross-referenced" : "Unconfirmed"}</b>
+                        <span>{theme.publishers} independent public publisher{theme.publishers===1?"":"s"} · {theme.sentiment} report · {theme.sources.join(", ")}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <h3>Open Google / Yelp review search</h3>
+                <p>External search links only. Platform ratings and individual review text are not scraped or stored.</p>
+                <div className="stackList">
+                  {reputation.independentThemes.reviewLinks.map((item) => (
+                    <a className="stackRow evidenceRow" href={item.url} key={item.platform} target="_blank" rel="noopener noreferrer">
+                      <div><b>{item.platform}</b><span>{item.source==="indexed_business_page"?"Indexed organization page · verify directly":"Search by organization and locality · verify the business match"}</span></div>
+                      <ExternalLink size={16} aria-hidden="true" />
+                    </a>
+                  ))}
+                </div>
+              </>
+            )}
+            <p>Reviewer identities, children, medical details and individual experiences are never added to CRM leads. Cross-check service claims with separate public sources.</p>
+          </section>
+        )}
+
         <section className="dossierSection">
           <div className="sectionTitleRow">
             <h3>Public contact & qualification</h3>
@@ -555,7 +631,3 @@ function formatCount(value: number) {
   return new Intl.NumberFormat("en-US", { notation: value >= 100_000 ? "compact" : "standard", maximumFractionDigits: 1 }).format(value);
 }
 
-function formatGrowth(value: number | null) {
-  if (value === null || !Number.isFinite(value)) return "Needs history";
-  return `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
-}

@@ -15,7 +15,9 @@
     "verify:command-center": "tsx scripts/verify-command-center.ts",
     "verify:colorado-signals": "tsx scripts/verify-colorado-signals.ts",
     "verify:evidence-mesh": "tsx scripts/verify-evidence-mesh.ts",
-    "smoke:live-acquisition": "tsx scripts/smoke-live-acquisition.ts"
+    "smoke:live-acquisition": "tsx scripts/smoke-live-acquisition.ts",
+    "verify:age-2-18": "tsx scripts/verify-age-2-18.ts",
+    "verify:provider-reputation": "tsx scripts/verify-provider-reputation.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",

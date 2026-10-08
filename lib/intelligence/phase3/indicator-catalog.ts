@@ -1,3 +1,4 @@
+import { AGES_2_TO_18_PILLARS } from "../signals/age-2-18-catalog";
 import { EXTRA_SIGNAL_PILLARS } from "../signals/extended-catalog";
 
 export type LeadEngine = "client" | "rbt" | "bcba";
@@ -294,6 +295,7 @@ export const INDICATOR_PILLARS: readonly IndicatorPillar[] = [
     ],
   },
   ...EXTRA_SIGNAL_PILLARS,
+  ...AGES_2_TO_18_PILLARS,
 ] as const;
 
 export const INDICATOR_CATALOG: readonly IndicatorDefinition[] = INDICATOR_PILLARS.flatMap((pillar) =>
