@@ -34,10 +34,10 @@ export interface ClientGrowthPlan {
   populationBasis:string;
   demandStatus:"documented_public_capacity_signal"|"unverified";
   independentCapacityPublishers:number;
-  directFamilyInquiries:0;
+  directFamilyInquiries:null;
   staffReady:"unverified";
   secureIntakeReady:false;
-  ageQualifiedFamiliesFound:0;
+  ageQualifiedFamiliesFound:null;
   actions:ClientGrowthAction[];
   ethicalBoundary:string;
 }
@@ -57,8 +57,17 @@ export function buildClientGrowthPlan(input:{
   const place=safePlace(input.location,state);
   const population=demographics?.metrics;
   // County/state total is NOT a city or ZIP denominator. Never borrow county totals.
+  // Require the requested boundary to match the measured boundary.
+  // A state fallback must NOT be mislabeled as a county/city total.
+  const countyRequested=/\bcounty\b/i.test(place);
+  const stateRequested=/^(?:Missouri|Kansas|Colorado|MO|KS|CO|statewide)$/i.test(place);
+  const explicitCounty=place.replace(/\bcounty\b/i,"")
+    .replace(/\b(?:Missouri|Kansas|Colorado|MO|KS|CO)\b/gi,"").replace(/[,]/g," ").trim();
+  const matchingCounty=Boolean(explicitCounty && demographics?.geographyName.toLowerCase()
+    .split(",")[0].includes(explicitCounty.toLowerCase()));
   const populationApplies=Boolean(demographics &&
-    (demographics.geographyKind==="state" || demographics.geographyKind==="county") &&
+    ((demographics.geographyKind==="state" && stateRequested) ||
+      (demographics.geographyKind==="county" && countyRequested && matchingCounty)) &&
     (ageBand==="2-18") &&
     population?.ages2to18 != null &&
     Number.isFinite(population.ages2to18) &&
@@ -79,8 +88,8 @@ export function buildClientGrowthPlan(input:{
     mode:"family_acquisition",
     location:place,state,ageBand,
     verifiedTargetPopulation,populationBasis,demandStatus,independentCapacityPublishers,
-    directFamilyInquiries:0,staffReady:"unverified",secureIntakeReady:false,
-    ageQualifiedFamiliesFound:0,
+    directFamilyInquiries:null,staffReady:"unverified",secureIntakeReady:false,
+    ageQualifiedFamiliesFound:null,
     actions:[
       {
         id:"activate_intake",
@@ -151,6 +160,6 @@ export function clientGrowthTaskBrief(plan:ClientGrowthPlan):string {
     "\nAge scope: "+plan.ageBand+"\nPublic population: "+
     (plan.verifiedTargetPopulation===null?"Not established for this exact age/geography":plan.verifiedTargetPopulation.toLocaleString("en-US"))+
     "\nSource status: "+plan.demandStatus+
-    "\nDirect family inquiries found via public research: 0 (not a failure of intake; public research does not search families)"+
+    "\nDirect family inquiries: Not tracked by public research (not zero)"+
     "\n\n"+a+"\n\n"+plan.ethicalBoundary;
 }

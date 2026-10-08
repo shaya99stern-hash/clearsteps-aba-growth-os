@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ArrowUpRight, Check, ClipboardCopy, ClipboardList, SearchCheck } from "lucide-react";
-import { createTask } from "@/lib/tasks/local-store";
+import { createTask, loadTasks } from "@/lib/tasks/local-store";
 import { clientGrowthTaskBrief, type ClientGrowthPlan } from "@/lib/intelligence/client-growth";
 
 export function ClientGrowthPanel({ plan }: { plan: ClientGrowthPlan }) {
@@ -22,9 +22,14 @@ export function ClientGrowthPanel({ plan }: { plan: ClientGrowthPlan }) {
   function addTasks() {
     try {
       const locationId=plan.state+":"+plan.location.toLowerCase()+":"+plan.ageBand;
+      const existing=new Set(loadTasks().filter((task)=>
+        task.entityType==="territory" && task.entityId===locationId
+      ).map((task)=>task.title));
       for(const item of plan.actions) {
+        const title="Client growth · "+item.title;
+        if(existing.has(title))continue;
         createTask({
-          title:"Client growth · "+item.title,
+          title,
           description:item.description+"\n\nMeasurement: "+item.metric+
             (item.dependency?"\n\nRequired verification: "+item.dependency:"")+
             (item.url?"\n\nResearch URL: "+item.url:"")+
@@ -61,7 +66,7 @@ export function ClientGrowthPanel({ plan }: { plan: ClientGrowthPlan }) {
           <button type="button" disabled={added} onClick={addTasks}
             className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-zinc-950 disabled:opacity-70">
             {added?<Check size={16}/>:<ClipboardList size={16}/>}
-            {added?"Five tasks added":"Create 5 tasks"}
+            {added?"Tasks in workspace":`Create ${plan.actions.length} tasks`}
           </button>
         </div>
       </div>
