@@ -72,7 +72,7 @@ export async function fetchCensusDemographics(input: { state: "MO" | "KS" | "CO"
   };
 }
 
-async function resolveGeography(state: "MO" | "KS", location: string, year: number) {
+async function resolveGeography(state: "MO" | "KS" | "CO", location: string, year: number) {
   const stateFips = STATE_FIPS[state];
   const zip = location.match(/\b\d{5}\b/)?.[0];
   if (zip) return { kind: "zcta" as const, code: zip, stateFips, label: zip };
@@ -147,7 +147,7 @@ function nameScore(name: string, target: string) {
   return 0;
 }
 
-function normalizeLocation(value: string, state: "MO" | "KS") {
+function normalizeLocation(value: string, state: "MO" | "KS" | "CO") {
   return value
     .replace(new RegExp(`\\b(${state === "MO" ? "Missouri|MO" : state === "KS" ? "Kansas|KS" : "Colorado|CO"})\\b`, "gi"), "")
     .replace(/[,]+/g, " ")
