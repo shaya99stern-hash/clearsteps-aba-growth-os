@@ -335,7 +335,8 @@ function observationsFromNppes(nppes: NppesSearchResult): IndicatorObservation[]
     ...(finished.has("child_psychology") ? [make("referral-ecosystem.03", nppes.counts.child_psychology, 10)] : []),
     ...(finished.has("speech") ? [make("referral-ecosystem.05", nppes.counts.speech, 20)] : []),
     ...(finished.has("occupational") ? [make("referral-ecosystem.06", nppes.counts.occupational, 20)] : []),
-    ...(finished.has("behavior_analyst") ? [make("aba-supply.01", nppes.counts.behavior_analyst, 25, 72)] : []),
+    // A maximum-12-record NPPES sample cannot establish total ABA supply or scarcity.
+    // Retain the raw records as context only; never reverse them into a high-need claim.
   ];
 }
 
