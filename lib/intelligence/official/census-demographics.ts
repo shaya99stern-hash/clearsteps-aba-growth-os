@@ -2,7 +2,7 @@ import type { IndicatorObservation } from "../phase3/indicator-catalog";
 
 const CURRENT_YEAR = 2024;
 const PRIOR_YEAR = 2019;
-const STATE_FIPS = { MO: "29", KS: "20" } as const;
+const STATE_FIPS = { MO: "29", KS: "20", CO: "08" } as const;
 const VARIABLES = [
   "NAME",
   "B01003_001E",
@@ -37,7 +37,7 @@ export interface CensusDemographicsResult {
   sourceUrl: string;
 }
 
-export async function fetchCensusDemographics(input: { state: "MO" | "KS"; location: string }): Promise<CensusDemographicsResult> {
+export async function fetchCensusDemographics(input: { state: "MO" | "KS" | "CO" | "CO" | "CO" | "CO"; location: string }): Promise<CensusDemographicsResult> {
   const geography = await resolveGeography(input.state, input.location, CURRENT_YEAR);
   const current = await fetchRow(CURRENT_YEAR, geography);
   const prior = await fetchPriorUnder18(geography).catch(() => null);
@@ -78,7 +78,7 @@ async function resolveGeography(state: "MO" | "KS", location: string, year: numb
   if (zip) return { kind: "zcta" as const, code: zip, stateFips, label: zip };
 
   const cleaned = normalizeLocation(location, state);
-  if (!cleaned || /^(missouri|kansas|statewide)$/i.test(cleaned)) {
+  if (!cleaned || /^(missouri|kansas|colorado|statewide)$/i.test(cleaned)) {
     return { kind: "state" as const, code: stateFips, stateFips, label: state };
   }
 
@@ -149,7 +149,7 @@ function nameScore(name: string, target: string) {
 
 function normalizeLocation(value: string, state: "MO" | "KS") {
   return value
-    .replace(new RegExp(`\\b(${state === "MO" ? "Missouri|MO" : "Kansas|KS"})\\b`, "gi"), "")
+    .replace(new RegExp(`\\b(${state === "MO" ? "Missouri|MO" : state === "KS" ? "Kansas|KS" : "Colorado|CO"})\\b`, "gi"), "")
     .replace(/[,]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
