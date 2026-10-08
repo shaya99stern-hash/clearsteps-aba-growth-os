@@ -10,6 +10,8 @@ export interface NppesSearchResult {
   hits: PublicSearchHit[];
   counts: Record<NppesCategory, number>;
   attempted: NppesCategory[];
+  /** Categories with a valid successful response, including valid empty searches. */
+  successful: NppesCategory[];
   errors: string[];
 }
 
@@ -67,6 +69,7 @@ export async function searchNppesLive(input: {
   const categories = categoriesForEngine(input.engine);
   const counts = emptyCounts();
   const errors: string[] = [];
+  const successful: NppesCategory[] = [];
   const hits: PublicSearchHit[] = [];
   const perCategory = Math.max(3, Math.min(input.perCategory ?? 12, 25));
   const locality = parseLocality(input.location, input.state);
@@ -85,12 +88,16 @@ export async function searchNppesLive(input: {
       errors.push(`${batch.category}: ${batch.error ?? "unavailable"}`);
       continue;
     }
+    if (batch.response.errors.length > 0) {
+      errors.push(...batch.response.errors.map((error) => `${batch.category}: ${error}`));
+      continue;
+    }
+    successful.push(batch.category);
     counts[batch.category] = batch.response.results.length;
     hits.push(...batch.response.results.map((result, index) => toSearchHit(result, batch.category, input.state, locality.label, index)));
-    errors.push(...batch.response.errors.map((error) => `${batch.category}: ${error}`));
   }
 
-  return { hits: dedupeByNpi(hits), counts, attempted: categories, errors };
+  return { hits: dedupeByNpi(hits), counts, attempted: categories, successful, errors };
 }
 
 async function fetchCategory(input: {
