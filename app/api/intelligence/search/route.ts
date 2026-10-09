@@ -367,6 +367,13 @@ export async function POST(request: Request) {
       "independent publisher + published geography + target age still required before scoring",
   });
   observations.push(...publicSignals.observations);
+  sourceStatus.push({
+    source: "30 public-document parsers and cross-references",
+    status: publicSignals.parsedDocumentCategories > 0 ? "complete" : "unavailable",
+    detail: publicSignals.parsedDocumentCategories + " observed service themes; " +
+      publicSignals.crossChecks.filter((check) => check.id.startsWith("D") && check.status === "supported").length +
+      "/30 independent-publisher document checks supported (research context only; no child leads)",
+  });
   const clientGrowth = engine === "client" ? buildClientGrowthPlan({
     state,location:targetLocation,ageBand,
     demographics:census ? {geographyName:census.geographyName,geographyKind:census.geographyKind,year:census.year,metrics:census.metrics} : null,
@@ -376,7 +383,8 @@ export async function POST(request: Request) {
     source: "Public multi-source signal correlations",
     status: publicSignals.observations.length ? "complete" : "unavailable",
     detail: publicSignals.clues.length + " observed clues, " + publicSignals.observations.length +
-      " age-aligned independently supported indicators, " + publicSignals.supportedChecks + "/60 cross-checks",
+      " age-aligned independently supported indicators, " + publicSignals.parsedDocumentCategories +
+      " independently parsed public-document themes, " + publicSignals.supportedChecks + "/" + publicSignals.crossChecks.length + " cross-checks",
   });
   let dataJoins: ScoutDataJoins | null = null;
   if (countyBundle) {
