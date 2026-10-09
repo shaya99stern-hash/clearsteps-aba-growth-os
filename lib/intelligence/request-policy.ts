@@ -1,3 +1,5 @@
+import { understandAbaRequest } from "./aba-language";
+
 export type ResearchPolicyDecision =
   | { allowed: true }
   | { allowed: false; reason: string };
@@ -21,9 +23,13 @@ const INDIVIDUAL_TARGETING = [
 ];
 
 export function evaluateResearchRequest(query: string): ResearchPolicyDecision {
-  const normalized = query.toLowerCase().replace(/\s+/g, " ").trim();
+  const reading = understandAbaRequest(query);
+  const normalized = (query.toLowerCase() + " " + reading.corrected).replace(/\s+/g, " ").trim();
   const sensitive = SENSITIVE_CONTEXT.some((term) => normalized.includes(term));
-  const targetsIndividual = INDIVIDUAL_TARGETING.some((term) => normalized.includes(term));
+  const targetsIndividual = INDIVIDUAL_TARGETING.some((term) => normalized.includes(term)) ||
+    (/\b(?:find|locate|identify|list|target|contact|collect|give me)\b.{0,100}\b(?:autistic|autism|asd|disabled|diagnosed)\b.{0,90}\b(?:children|kids|families|parents|homes|houses|households|addresses|phone numbers)\b/i.test(normalized) &&
+      /\b(?:homes?|houses?|households?|addresses|phone numbers?|names?|private|personal)\b/i.test(normalized)) ||
+    (/\b(?:home address|street address|residential address|personal phone|private contact)\b.{0,100}\b(?:autism|autistic|asd|disabled|diagnos\w*)\b/i.test(normalized));
 
   if (sensitive && targetsIndividual) {
     return {
