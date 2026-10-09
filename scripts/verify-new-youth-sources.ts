@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { ADDITIONAL_YOUTH_SOURCE_CHANNELS } from "../lib/intelligence/signals/additional-youth-source-channels";
-import { PUBLIC_SOURCE_CHANNELS, choosePublicSourceChannels, matchedPublicSourceChannels, queryForPublicSource } from "../lib/intelligence/signals/source-channel-catalog";
+import { PUBLIC_SOURCE_CHANNELS, choosePublicSourceChannels, matchedPublicSourceChannels, queryForPublicSource, isAggregateOnlyPublicSourceUrl } from "../lib/intelligence/signals/source-channel-catalog";
 import { SERVICE_DOCUMENT_PARSERS, SERVICE_DOCUMENT_CHECKS, runServiceDocumentChecks } from "../lib/intelligence/signals/service-document-checks";
 import { scanPublicSignals } from "../lib/intelligence/signals/public-signal-scan";
 
@@ -24,6 +24,9 @@ for(const state of ["MO","KS","CO"] as const){
 }
 assert.equal(ADDITIONAL_YOUTH_SOURCE_CHANNELS.filter((x)=>x.access==="aggregate-only").length,2);
 assert.deepEqual(matchedPublicSourceChannels(["https://koec.ks.gov/about","https://www.1800childrenks.org/","https://unknown.invalid"]),["1800childrenks.org","koec.ks.gov"]);
+assert(isAggregateOnlyPublicSourceUrl("https://ks.childcareaware.org/data-research/"));
+assert(isAggregateOnlyPublicSourceUrl("https://web.mhanet.com/health-equity-dashboards/"));
+assert(!isAggregateOnlyPublicSourceUrl("https://ecclacolorado.org/councilmap"));
 const official={host:"publicagency.gov",text:"Denver CO ages 2-18 ABA therapy waitlist pediatric service shortage"};
 const hospital={host:"localclinic.org",text:"Denver Colorado ages 2-18 ABA therapy waitlist pediatric service shortage"};
 const newspaper={host:"localdaily.com",text:"Denver CO ages 2-18 ABA therapy waitlist pediatric service shortage"};
