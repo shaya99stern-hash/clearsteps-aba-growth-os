@@ -110,10 +110,12 @@ function nppesRecords(counties: County[], taxonomy: string, enumeration: string)
 }
 
 /** Statewide Overpass fixture: facilities placed inside each county square. */
-export function fixturePost(stateFips: string, overrides: { failKeyless?: boolean } = {}) {
+export function fixturePost(stateFips: string, overrides: { failKeyless?: boolean; failSchools?: boolean } = {}) {
   return async (url: string, body: string) => {
     requested.push(url);
     if (overrides.failKeyless) throw new Error("HTTP 429");
+    const schoolsOnly = decodeURIComponent(body).includes('nwr(area.s)["amenity"="school"];out');
+    if (schoolsOnly && overrides.failSchools) throw new Error("HTTP 504");
     assert(url.includes("overpass") && body.includes(encodeURIComponent('area["ISO3166-2"="US-')), "Statewide Overpass area query");
     const elements: unknown[] = [];
     let id = 1;
@@ -130,7 +132,8 @@ export function fixturePost(stateFips: string, overrides: { failKeyless?: boolea
       add(Math.round(c.cbp["621330"] / 20), { amenity: "clinic", name: "Autism Center" });
     }
     elements.push({ type: "node", id: id++, lat: 45, lon: -100, tags: { amenity: "school", name: "Outside every county" } });
-    return JSON.stringify({ elements });
+    const isSchool = (element: unknown) => (element as { tags: Record<string, string> }).tags.amenity === "school";
+    return JSON.stringify({ elements: elements.filter((element) => schoolsOnly === isSchool(element)) });
   };
 }
 

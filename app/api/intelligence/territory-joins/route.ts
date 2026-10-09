@@ -15,7 +15,7 @@ const QUERY = z.object({
 });
 
 /**
- * Ranks every county in a state with 90 cross-program data joins (52 run without a Census API key).
+ * Ranks every county in a state with 90 cross-program data joins (51 run without a Census API key).
  * Area-level public statistics only: no family, child or household records exist in this pipeline.
  */
 export async function GET(request: NextRequest) {

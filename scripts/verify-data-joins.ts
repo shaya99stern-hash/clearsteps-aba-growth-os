@@ -218,6 +218,12 @@ async function main() {
   assert.equal(noKeyless.programs.find((p) => p.program === "osm-county")!.status, "unavailable");
   for (const county of noKeyless.counties) for (const id of ["J41", "J61", "J64"]) assert.equal(county.joins.find((join) => join.id === id)!.status, "insufficient_data", "Failed registry/map never zero-fills");
 
+  const noSchools = await collectStateCountyBundle("MO", { fetchText: fixtureFetch("29"), postText: fixturePost("29", { failSchools: true }) });
+  const ns = noSchools.frames.find((item) => item.fips === "29095")!;
+  assert.equal(ns.metrics["osm.schools"], undefined, "A failed school query leaves school counts blank, not zero");
+  assert.equal(ns.metrics["osm.childcare"], 130, "Other facility kinds still count");
+  assert.match(noSchools.programs.find((p) => p.program === "osm-county")!.detail, /1 of 2 Overpass queries failed/);
+
   // Failure modes: an unavailable program degrades joins to insufficient_data, never to invented values.
   const noHpsa = rankStateCounties(await collectStateCountyBundle("MO", { fetchText: fixtureFetch("29", { failHpsa: true }), postText: fixturePost("29") }));
   assert.equal(noHpsa.programs.find((program) => program.program === "hrsa-hpsa-mh")!.status, "unavailable");

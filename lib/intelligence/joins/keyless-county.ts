@@ -219,31 +219,54 @@ export async function collectKeylessCountyCounts(input: {
     return `${notes.join(", ")}; ${zipCounty.size} ZIP areas mapped${unassigned ? `; ${unassigned} registrations outside mapped ZIP areas` : ""}`;
   })();
 
+  // Overpass starts immediately (it does not need county outlines until assignment) and is split so the
+  // numerous schools do not hold up child care, clinics and hospitals. Each query zero-fills only its own kinds.
+  const area = `[out:json][timeout:40];area["ISO3166-2"="US-${input.state}"]["admin_level"="4"]->.s;`;
+  const osmQueries: Array<{ kinds: PlaceKind[]; text: Promise<string> }> = [
+    {
+      kinds: ["daycare", "hospital", "pediatrics", "therapy", "aba_provider"],
+      text: input.post(OVERPASS, "data=" + encodeURIComponent(area + "(" +
+        `nwr(area.s)["amenity"~"^(childcare|kindergarten|hospital)$"];` +
+        `nwr(area.s)["amenity"~"^(doctors|clinic)$"]["name"~"pediatric|paediatric|children|kids|autism|ABA|behavio",i];` +
+        `nwr(area.s)["healthcare"~"^(speech_therapist|occupational_therapist|psychotherapist)$"];` +
+        ");out center tags;")),
+    },
+    { kinds: ["school"], text: input.post(OVERPASS, "data=" + encodeURIComponent(area + `nwr(area.s)["amenity"="school"];out center tags;`)) },
+  ];
+  for (const query of osmQueries) query.text.catch(() => undefined);
   const osm = (async () => {
     const shapes = await input.shapes;
     if (!shapes.length) throw new Error("county boundaries unavailable");
-    const query = `[out:json][timeout:60];area["ISO3166-2"="US-${input.state}"]["admin_level"="4"]->.s;(` +
-      `nwr(area.s)["amenity"~"^(childcare|kindergarten|school|hospital)$"];` +
-      `nwr(area.s)["amenity"~"^(doctors|clinic)$"]["name"~"pediatric|paediatric|children|kids|autism|ABA|behavio",i];` +
-      `nwr(area.s)["healthcare"~"^(speech_therapist|occupational_therapist|psychotherapist)$"];` +
-      `);out center tags;`;
-    const places = parseOverpassPlaces(JSON.parse(await input.post(OVERPASS, "data=" + encodeURIComponent(query))));
-    let outside = 0;
+    const settled = await Promise.allSettled(osmQueries.map(async (query) => ({ kinds: query.kinds, places: parseOverpassPlaces(JSON.parse(await query.text)) })));
+    const succeeded = settled.flatMap((item) => item.status === "fulfilled" ? [item.value] : []);
+    if (!succeeded.length) throw new Error((settled[0] as PromiseRejectedResult).reason instanceof Error ? errorText((settled[0] as PromiseRejectedResult).reason) : "Overpass failed");
+    let outside = 0, assigned = 0;
     const counts: Partial<Record<PlaceKind, number>> = {};
-    for (const place of places) {
+    const seen = new Set<string>();
+    for (const { places } of succeeded) for (const place of places) {
+      if (seen.has(place.id)) continue;
+      seen.add(place.id);
       const fips = countyForPoint(shapes, place.lat, place.lon);
       if (!fips) { outside++; continue; }
+      assigned++;
       bump(fips, OSM_COUNTY_METRICS[place.kind]);
       counts[place.kind] = (counts[place.kind] ?? 0) + 1;
     }
+    const covered = new Set(succeeded.flatMap((item) => item.kinds));
     for (const shape of shapes) {
       const entry = metrics.get(shape.fips) ?? {};
-      for (const metric of Object.values(OSM_COUNTY_METRICS)) entry[metric] ??= 0;
+      for (const kind of covered) entry[OSM_COUNTY_METRICS[kind]] ??= 0;
       metrics.set(shape.fips, entry);
     }
-    if (!places.length) throw new Error("no facilities returned");
-    return `${places.length - outside} named facilities assigned to counties (` +
-      Object.entries(counts).map(([kind, n]) => `${n} ${kind}`).join(", ") + ")";
+    // A kind whose query failed must not keep partial counts that would read as complete.
+    for (const kind of Object.keys(OSM_COUNTY_METRICS) as PlaceKind[]) {
+      if (covered.has(kind)) continue;
+      for (const entry of metrics.values()) delete entry[OSM_COUNTY_METRICS[kind]];
+    }
+    const failed = settled.length - succeeded.length;
+    return `${assigned} named facilities assigned to counties (` + Object.entries(counts).map(([kind, n]) => `${n} ${kind}`).join(", ") + ")" +
+      (outside ? `; ${outside} outside county outlines` : "") +
+      (failed ? `; ${failed} of ${settled.length} Overpass queries failed` : "");
   })();
 
   const [nppesR, osmR] = await Promise.allSettled([nppes, osm]);
