@@ -402,6 +402,8 @@ async function verifySeamlessRouting(baseUrl: string) {
       await row.waitFor({ state: "visible" });
       await row.click();
       await page.waitForURL((url) => url.pathname === path, { timeout: 15_000 });
+      // The URL changes before streamed page content is committed. Wait for its shell.
+      await page.locator(".csMobileHeader").waitFor({ state: "visible", timeout: 15_000 });
       assert.equal(await page.locator(".csMobileHeader").isVisible(), true, path + " has mobile shell");
       await page.goBack({ waitUntil: "domcontentloaded" });
       await page.waitForURL((url) => url.pathname === "/more");
