@@ -142,12 +142,6 @@ type SearchResponse = {
   };
 };
 
-const ENGINE_PROMPTS: Record<Engine, string> = {
-  client: "Find areas where families can access your ABA services, validate public demand and staffing, and create actions that attract consenting family inquiries for ages 2–18.",
-  rbt: "Find RBT hiring pressure, talent supply, employers, training signals and recruiting opportunities, with Missouri/Kansas/Colorado compliance context.",
-  bcba: "Find BCBA/LBA hiring pressure, licensed analyst supply, employers and recruiting opportunities, with state licensure context.",
-};
-
 const ENGINE_LABELS: Record<Engine, string> = { client: "Clients", rbt: "RBTs", bcba: "BCBAs" };
 const STATE_NAMES: Record<TargetState, string> = { MO: "Missouri", KS: "Kansas", CO: "Colorado" };
 const DEFAULT_SOURCE_STATES: SourceState[] = [
@@ -171,7 +165,7 @@ export function ScoutWorkbench({
   const [engine, setEngine] = useState<Engine>(initialEngine);
   const [targetState, setTargetState] = useState<TargetState>(initialState);
   const [ageBand, setAgeBand] = useState<YouthAgeBand>("2-18");
-  const [query, setQuery] = useState(initialQuery || ENGINE_PROMPTS[initialEngine]);
+  const [query, setQuery] = useState(initialQuery);
   const [location, setLocation] = useState(initialLocation || STATE_NAMES[initialState]);
   const [running, setRunning] = useState(false);
   const [response, setResponse] = useState<SearchResponse | null>(null);
@@ -187,9 +181,7 @@ export function ScoutWorkbench({
     controllerRef.current?.abort();
     setRunning(false);
     setHistoryResult(null);
-    const queryIsPreset = Object.values(ENGINE_PROMPTS).includes(query);
     setEngine(next);
-    if (queryIsPreset) setQuery(ENGINE_PROMPTS[next]);
     setResponse(null);
     setSelected(null);
   }
@@ -209,7 +201,7 @@ export function ScoutWorkbench({
     controllerRef.current?.abort();
     setRunning(false);
     setHistoryResult(null);
-    setQuery(ENGINE_PROMPTS[engine]);
+    setQuery("");
     setLocation(STATE_NAMES[targetState]);
     setResponse(null);
     setSelected(null);
@@ -318,7 +310,7 @@ export function ScoutWorkbench({
             rows={3}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder={`Research ${ENGINE_LABELS[engine].toLowerCase()} in ${STATE_NAMES[targetState]}...`}
+            placeholder={`Describe what to find in ${STATE_NAMES[targetState]}…`}
           />
           <div className="scoutComposerFooter">
             <label className="scoutLocation">
