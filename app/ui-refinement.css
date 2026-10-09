@@ -265,3 +265,22 @@ body { overflow-x: clip; }
   .scoutHeadlineRow p { font-size: 8.5px; }
   .segmentButton { font-size: 8px; }
 }
+
+/* Research interpretation is compact and collapsible; never blocks Scout. */
+.scoutReading {
+  margin: 7px 0 10px;
+  border: 1px solid rgba(187,166,236,.16);
+  border-radius: 10px;
+  background: rgba(187,166,236,.045);
+}
+.scoutReading summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  min-height: 34px; padding: 6px 10px; cursor: pointer;
+  list-style: none; color: #c3b7e5; font-size: 10px; font-weight: 650;
+}
+.scoutReading summary::-webkit-details-marker { display: none; }
+.scoutReading summary span:first-child { display: inline-flex; align-items: center; min-width: 0; gap: 6px; text-transform: capitalize; }
+.scoutReading summary span:last-child { white-space: nowrap; color: #9b96ac; font-size: 9px; font-weight: 500; }
+.scoutReadingDetails { border-top: 1px solid var(--workspace-line); padding: 7px 11px; }
+.scoutReadingDetails p { margin: 5px 0; color: var(--secondary); font-size: 10px; line-height: 1.42; overflow-wrap: anywhere; }
+.scoutReadingDetails b { color: #ddd5ed; }
