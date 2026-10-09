@@ -231,3 +231,37 @@ body { overflow-x: clip; }
 @media (prefers-reduced-motion: reduce) {
   .csDrawer { animation: none; }
 }
+
+/* Scout home: high-density iPhone typography without shrinking touch targets. */
+@media (max-width: 900px) {
+  .scoutShellV3 { width: min(100%, 720px); }
+  .scoutHeroV3 { padding-top: 10px; padding-bottom: 5px; }
+  .scoutHeroV3 .eyebrow { font-size: 7.5px; letter-spacing: .065em; }
+  .scoutHeadlineRow { display: flex; gap: 10px; align-items: center; margin-top: 5px; }
+  .scoutHeadlineRow h1 { flex: 0 0 auto; font-size: 25px; line-height: 1; letter-spacing: -.04em; }
+  .scoutHeadlineRow p { flex: 1; margin: 0; max-width: 270px; font-size: 9px; line-height: 1.32; }
+  .scoutControlDeck { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); margin-top: 10px; gap: 6px; }
+  .segmentedControl { min-width: 0; padding: 2px; gap: 1px; border-radius: 9px; }
+  .segmentButton { min-width: 0; min-height: 36px; padding: 0 2px; font-size: 9px; letter-spacing: -.015em; }
+  .scoutAgeFocus { margin-top: 7px; min-height: 36px; padding: 3px 5px 3px 9px; }
+  .scoutAgeFocus span { font-size: 9px; }
+  .scoutAgeFocus select { min-width: 112px; min-height: 29px; font-size: 10px; }
+  .scoutComposerV3 { margin-top: 7px; }
+  .scoutComposerV3 textarea { min-height: 65px; max-height: 160px; font-size: 13px; line-height: 1.33; padding: 10px 11px 5px; }
+  .scoutComposerFooter { min-height: 41px; padding: 3px 5px 4px 8px; }
+  .scoutLocationInput { height: 34px; min-height: 34px; font-size: 10px; }
+  .scoutResetButton, .scoutRunButton, .scoutStopButton { min-height: 35px; }
+  .scoutRunButton { width: 36px; }
+  .researchResults { padding-top: 5px; }
+  .engineMetric { padding: 8px; }
+  .engineMetric strong { font-size: 19px; }
+  .leadMain h2 { font-size: 12px; }
+  .leadMain > p { font-size: 10px; }
+  .sourceDisclosure summary,.ruleDisclosure summary { font-size: 10px; padding: 7px 10px; }
+}
+@media (max-width: 370px) {
+  .scoutHeadlineRow { align-items: flex-start; gap: 8px; }
+  .scoutHeadlineRow h1 { font-size: 23px; }
+  .scoutHeadlineRow p { font-size: 8.5px; }
+  .segmentButton { font-size: 8px; }
+}
