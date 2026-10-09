@@ -228,7 +228,8 @@ export async function collectKeylessCountyCounts(input: {
     { kinds: ["daycare"], body: `nwr(area.s)["amenity"~"^(childcare|kindergarten)$"];` },
     { kinds: ["school"], body: `nwr(area.s)["amenity"="school"];` },
     { kinds: ["hospital", "therapy"], body: `(nwr(area.s)["amenity"="hospital"];nwr(area.s)["healthcare"~"^(speech_therapist|occupational_therapist|psychotherapist)$"];);` },
-    { kinds: ["pediatrics", "aba_provider"], body: `nwr(area.s)["amenity"~"^(doctors|clinic)$"]["name"~"pediatric|paediatric|children|kids|autism|ABA|behavio",i];` },
+    // Explicit case variants instead of the ",i" flag: case-insensitive regex across a whole state times out.
+    { kinds: ["pediatrics", "aba_provider"], body: `(nwr(area.s)["amenity"~"^(doctors|clinic)$"]["name"~"[Pp]a?ediatric|PEDIATRIC|[Cc]hildren|CHILDREN|[Kk]ids|[Aa]utism|AUTISM|ABA|[Bb]ehavio"];nwr(area.s)["healthcare:speciality"~"paediatrics"];);` },
   ];
   const osmTexts = limitedSettled(osmSpecs, 2, (spec) => input.post(OVERPASS, "data=" + encodeURIComponent(area + spec.body + "out center tags;")));
   const osmQueries = osmSpecs.map((spec, index) => ({
