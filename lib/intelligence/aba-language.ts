@@ -85,6 +85,7 @@ export const ABA_COMMON_MISSPELLINGS: Readonly<Record<string, string>> = {
   autisim:"autism", autsim:"autism", autsism:"autism", autstic:"autistic", austistic:"autistic",
   develpmental:"developmental", developemental:"developmental", devlopmental:"developmental",
   waitlsit:"waitlist", wailist:"waitlist", waitliist:"waitlist", waitlits:"waitlist",
+  whaitlists:"waitlists", waitlsits:"waitlists", wailists:"waitlists",
   whaitlist:"waitlist", shortgage:"shortage", shoratge:"shortage", demmand:"demand",
   rbts:"rbt", rbtss:"rbt", rbtz:"rbt", rbtt:"rbt", rtb:"rbt", rbtsn:"rbt",
   bcabs:"bcba", bcbas:"bcba", bcbba:"bcba", bcbaas:"bcba", bcab:"bcba", bcca:"bcba",
