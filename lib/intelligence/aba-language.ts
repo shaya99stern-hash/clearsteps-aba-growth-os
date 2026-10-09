@@ -72,6 +72,7 @@ export const ABA_COMMON_MISSPELLINGS: Readonly<Record<string, string>> = {
   behavor:"behavior", behavoir:"behavior", behavorial:"behavioral", behavoiral:"behavioral",
   behavorist:"behaviorist", theraphy:"therapy", therpy:"therapy", therapie:"therapy",
   referal:"referral", referals:"referrals", refferal:"referral", refferals:"referrals",
+  adress:"address", adresses:"addresses", adrdress:"address", famlies:"families", familys:"families", cliets:"clients",
   referrel:"referral", referrral:"referral", refferred:"referred", refering:"referring",
   pedatric:"pediatric", pediatrican:"pediatrician", pediatrition:"pediatrician",
   pediatritian:"pediatrician", pedatrician:"pediatrician", pediatrian:"pediatrician",
@@ -192,6 +193,7 @@ export function understandAbaRequest(input: string, engine?: AbaResearchEngine):
   const interpretedGoal = mode === "rbt" ? "rbt_recruiting" :
     mode === "bcba" ? "bcba_recruiting" :
     mode === "client" || kinds.has("client") || kinds.has("referral") ? "client_acquisition" :
+    recognized.some((term) => term.id === "bcba") ? "bcba_recruiting" :
     kinds.has("staffing") ? "rbt_recruiting" : "public_market_research";
   const suggestions: string[] = [];
   if (interpretedGoal === "client_acquisition") {
