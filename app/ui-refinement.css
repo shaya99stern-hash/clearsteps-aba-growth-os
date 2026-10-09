@@ -1,0 +1,233 @@
+/* Clear Steps · unified 2026 workspace polish.
+   Only presentation and mobile navigation change; research/data APIs remain untouched. */
+:root {
+  --aba-purple: #bba6ec;
+  --aba-purple-strong: #a18bdd;
+  --aba-purple-soft: rgba(187,166,236,.11);
+  --aba-purple-line: rgba(187,166,236,.25);
+  --workspace-focus: #bba6ec;
+  --workspace-bg: #0e0f12;
+  --workspace-raised: #191a1e;
+  --workspace-hover: #202127;
+  --workspace-line: rgba(235,233,255,.085);
+  --app: #101115;
+  --surface: #17181d;
+  --card: #202126;
+  --soft: #1c1d22;
+  --border: rgba(235,233,255,.085);
+  --text: #f1f0f6;
+  --secondary: #b6b5c1;
+  --tertiary: #878693;
+  --accent: #bba6ec;
+}
+html { -webkit-text-size-adjust: 100%; }
+body { overflow-x: clip; }
+:where(a,button,input,textarea,select,summary):focus-visible {
+  outline: 2px solid var(--aba-purple);
+  outline-offset: 2px;
+}
+:where(button, a) { -webkit-tap-highlight-color: transparent; }
+:where(button) { touch-action: manipulation; }
+:where(.workspaceSurface,.pageContent,.researchResults,.scoutShellV3,.crmWorkspace) { min-width: 0; }
+.workspaceRail { background: #0d0e12; }
+.workspaceSurface { background: #101115; }
+.navItem.active { background: rgba(187,166,236,.10); box-shadow: inset 0 0 0 1px rgba(187,166,236,.15); }
+.navItem.active::before { background: var(--aba-purple); }
+.navItem { border-radius: 9px; }
+.brandWords i, .pageIntro h1 { font-family: inherit; font-weight: 680; letter-spacing: -.035em; }
+.topbarPrimary { color: #e7dcff; background: rgba(187,166,236,.12); border-color: rgba(187,166,236,.22); }
+.workspaceTopbar { background: rgba(16,17,21,.94); }
+.pageIntro h1 { font-size: clamp(25px,3vw,34px); }
+.pageIntroWrap { padding-top: 18px; }
+.pageIntro { padding-top: 6px; padding-bottom: 4px; }
+.pageContent { padding-top: 12px; }
+.scoutHeroV3 { padding-top: 22px; }
+.scoutHeadlineRow h1 { font-family: inherit; font-size: clamp(32px,4vw,43px); font-weight: 700; letter-spacing: -.05em; }
+.scoutHeadlineRow p { font-size: 11px; color: #a5a4b0; }
+.scoutControlDeck { margin-top: 14px; }
+.segmentedControl { background: #17181d; border-color: rgba(235,233,255,.09); }
+.segmentButton { font-weight: 640; }
+.segmentButton.active { color: #f1eaff; background: #302a41; border-color: rgba(187,166,236,.25); }
+.scoutAgeFocus { background: #17181d; }
+.scoutComposerV3 { background: #1b1c23; box-shadow: 0 12px 30px rgba(0,0,0,.12); }
+.scoutRunButton { color: #14121b; background: #c2aff3; }
+.scoutRunButton:disabled { opacity: .38; cursor: not-allowed; }
+.scoutResetButton:hover,.scoutStopButton:hover { background: #282830; }
+.territoryInsight { background: rgba(187,166,236,.065); border-color: rgba(187,166,236,.18); }
+.territoryInsight h2, .sheetHeader h2, .emptyDark h2 { font-family: inherit; font-weight: 650; letter-spacing: -.025em; }
+.scoreOrb strong,.engineMetric strong,.bigScore { font-family: inherit; font-variant-numeric: tabular-nums; font-weight: 650; }
+.leadCard, .sourceDisclosure, .ruleDisclosure { border-radius: 12px; }
+.leadCard:focus-within { border-color: rgba(187,166,236,.36); }
+.csMobileHeader,.csDrawerLayer { display: none; }
+
+@media (max-width: 900px) {
+  .appFrame { display: block; min-height: 100dvh; }
+  .workspaceRail,.workspaceTopbar,.mobileTabBar { display: none !important; }
+  .workspaceSurface { min-height: calc(100dvh - 52px); padding-top: 0; background: #101115; }
+  .csMobileHeader {
+    position: sticky;
+    top: 0;
+    z-index: 45;
+    display: grid;
+    grid-template-columns: 40px minmax(0,1fr) 40px;
+    align-items: center;
+    gap: 8px;
+    height: calc(54px + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) 14px 0;
+    border-bottom: 1px solid rgba(235,233,255,.09);
+    background: rgba(16,17,21,.98);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+  }
+  .csMobileIconButton {
+    width: 38px;
+    height: 38px;
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    border: 1px solid rgba(235,233,255,.09);
+    border-radius: 11px;
+    background: #1c1d23;
+    color: #dedde5;
+    cursor: pointer;
+  }
+  .csMobileIconButton:active { background: #2a2933; }
+  .csMobileIdentity {
+    display: flex;
+    align-items: center;
+    justify-self: start;
+    min-width: 0;
+    gap: 9px;
+    max-width: 100%;
+  }
+  .csMobileIdentity img { width: 28px; height: 28px; border-radius: 9px; object-fit: cover; }
+  .csMobileIdentityText { display: grid; min-width: 0; gap: 1px; }
+  .csMobileIdentityText strong {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    line-height: 1.25;
+    font-weight: 760;
+    letter-spacing: -.02em;
+  }
+  .csMobileIdentityText small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 9px;
+    line-height: 1.3;
+    font-weight: 550;
+    color: #928fa2;
+  }
+  .csDrawerLayer { position: fixed; inset: 0; z-index: 100; display: block; }
+  .csDrawerScrim {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    border: 0;
+    background: rgba(3,3,7,.66);
+    -webkit-backdrop-filter: blur(5px);
+    backdrop-filter: blur(5px);
+  }
+  .csDrawer {
+    position: absolute; inset: 0 auto 0 0;
+    display: flex; flex-direction: column;
+    width: min(298px, 86vw);
+    max-height: 100dvh;
+    overflow-y: auto;
+    padding: calc(18px + env(safe-area-inset-top)) 14px max(22px,env(safe-area-inset-bottom));
+    border-right: 1px solid rgba(235,233,255,.14);
+    background: #14151b;
+    box-shadow: 20px 0 75px rgba(0,0,0,.42);
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    animation: csDrawerIn 180ms cubic-bezier(.2,.75,.3,1) both;
+  }
+  @keyframes csDrawerIn { from { transform: translateX(-12px); opacity: .5; } to { transform: translateX(0); opacity: 1; } }
+  .csDrawerHeading { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 0 2px 16px; }
+  .csDrawerName > span { color: #918aaa; font-size: 9px; font-weight: 750; letter-spacing: .14em; }
+  .csDrawerName h2 { margin: 3px 0 0; font-size: 21px; font-weight: 720; letter-spacing: -.045em; }
+  .csDrawerGroup { padding: 10px 0 13px; border-top: 1px solid rgba(235,233,255,.075); }
+  .csDrawerGroup h3 { margin: 3px 9px 7px; font-size: 9px; font-weight: 720; color: #777484; letter-spacing: .12em; text-transform: uppercase; }
+  .csDrawerLink {
+    display: flex; align-items: center; gap: 11px;
+    min-height: 41px;
+    margin-bottom: 2px; padding: 0 11px;
+    border-radius: 9px;
+    color: #aaa9b6; font-size: 12px; font-weight: 620;
+  }
+  .csDrawerLink svg { flex: 0 0 auto; }
+  .csDrawerLink > span:nth-child(2) { flex: 1; }
+  .csDrawerLink.isActive { color: #eee8fc; background: rgba(187,166,236,.13); }
+  .csDrawerLink.isActive svg { color: #c4b1f5; }
+  .csDrawerActiveMarker { width: 5px; height: 5px; border-radius: 50%; background: #bda8f3; }
+  .csDrawerFooter { margin-top: auto; padding: 16px 10px 0; border-top: 1px solid rgba(235,233,255,.08); }
+  .csDrawerFooter > span { display: flex; align-items: center; gap: 7px; color: #9a98a7; font-size: 10px; }
+  .csDrawerFooter > span i { width: 6px; height: 6px; background: #8fc8a8; border-radius: 50%; }
+  .csDrawerFooter a { display: flex; align-items: center; gap: 3px; margin-top: 9px; font-size: 10px; color: #bca7f2; }
+  .pageIntroWrap,.pageContent { padding-left: 13px; padding-right: 13px; }
+  .pageIntroWrap { padding-top: 13px; }
+  .pageIntro { padding: 0 0 5px; }
+  .pageIntro h1 { font-size: 25px; margin: 5px 0 6px; letter-spacing: -.035em; }
+  .pageIntro p { font-size: 11px; line-height: 1.42; }
+  .pageContent,.pageContent.compact { padding-top: 0; padding-bottom: max(30px,env(safe-area-inset-bottom)); }
+  .scoutHeroV3 { padding: 15px 0 9px; }
+  .scoutHeroV3 .eyebrow { font-size: 8px; line-height: 1.2; letter-spacing: .10em; }
+  .scoutHeadlineRow { display: block; margin-top: 4px; }
+  .scoutHeadlineRow h1 { font-size: 30px; line-height: 1.1; }
+  .scoutHeadlineRow p { max-width: none; margin-top: 4px; font-size: 10px; line-height: 1.35; }
+  .scoutControlDeck { grid-template-columns: 1fr; gap: 7px; margin-top: 11px; }
+  .segmentedControl { gap: 3px; padding: 3px; border-radius: 10px; }
+  .segmentButton { min-height: 33px; padding: 0 7px; border-radius: 7px; font-size: 10px; }
+  .stateControl { min-width: 0; width: 100%; }
+  .scoutAgeFocus { min-height: 42px; margin-top: 8px; padding: 4px 5px 4px 10px; border-radius: 10px; font-size: 10px; }
+  .scoutAgeFocus select { min-height: 32px; min-width: 125px; max-width: 58%; font-size: 10px; padding: 3px 8px; border-radius: 7px; }
+  .scoutComposerV3 { margin-top: 8px; border-radius: 12px; }
+  .scoutComposerV3 textarea {
+    min-height: 76px; max-height: 180px; padding: 12px 12px 7px;
+    resize: vertical; font-size: 14px; line-height: 1.42;
+  }
+  .scoutComposerFooter { min-height: 46px; gap: 5px; padding: 4px 6px 6px 9px; border-top: 1px solid rgba(235,233,255,.06); }
+  .scoutLocation { gap: 5px; }
+  .scoutLocation svg { width: 14px; height: 14px; flex: 0 0 auto; }
+  .scoutLocationInput { height: 35px; min-height: 35px; padding: 0 2px; font-size: 11px; }
+  .scoutResetButton,.scoutRunButton,.scoutStopButton { min-height: 36px; border-radius: 9px; }
+  .scoutResetButton { min-width: 36px; padding: 0 9px; }
+  .scoutRunButton { width: 38px; }
+  .scoutComposerButtons { gap: 2px; }
+  .engineScoreStrip { gap: 1px; margin: 9px 0; border-radius: 11px; }
+  .engineMetric { padding: 9px 10px; }
+  .engineMetric span { font-size: 8px; }
+  .engineMetric strong { font-size: 21px; }
+  .crossEngineCard,.demographicCard { border-radius: 9px; padding: 8px; }
+  .leadCard,.sourceDisclosure,.ruleDisclosure { border-radius: 10px; }
+  .sourceDisclosure summary,.ruleDisclosure summary { min-height: 40px; }
+  .sourceDisclosure summary span:last-child,.ruleDisclosure summary span:last-child { font-size: 9px; color: #9692a3; }
+  .mobileMoreGrid { gap: 6px; }
+  .mobileMoreRow { min-height: 53px; padding: 7px 9px; border-radius: 11px; gap: 8px; }
+  .mobileMoreIcon { width: 31px; height: 31px; border-radius: 8px; }
+  .mobileMoreCopy b { font-size: 11px; }
+  .mobileMoreCopy small { font-size: 9px; }
+  .crmKpiStrip { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1px; border-radius: 10px; }
+  .crmKpi { padding: 9px 11px; }
+  .crmKpi strong { font-size: 22px; font-family: inherit; }
+  .crmToolbar { flex-wrap: wrap; }
+  .crmSearchField { min-width: 0; flex-basis: 100%; max-width: none; }
+  .sheet { max-height: 88dvh; }
+  .sheetHeader h2 { font-size: 23px; }
+  .scoreHero { grid-template-columns: 64px 1fr; gap: 11px; }
+  .bigScore { font-size: 42px; }
+}
+@media (max-width: 360px) {
+  .csMobileHeader { padding-left: 10px; padding-right: 10px; }
+  .pageIntroWrap,.pageContent { padding-left: 10px; padding-right: 10px; }
+  .scoutComposerFooter { flex-wrap: nowrap; }
+  .scoutLocation { min-width: 0; flex-basis: auto; }
+  .scoutComposerButtons { margin-left: 0; }
+  .scoutLocationInput { font-size: 10px; }
+  .scoutAgeFocus { gap: 4px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .csDrawer { animation: none; }
+}
