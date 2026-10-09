@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import type { ResolvedLead } from "@/lib/intelligence/source-types";
+import type { AbaLanguageReading } from "@/lib/intelligence/aba-language";
 import type { ClientGrowthPlan } from "@/lib/intelligence/client-growth";
 import { ClientGrowthPanel } from "./ClientGrowthPanel";
 import { CountyJoinsPanel } from "./CountyJoinsPanel";
@@ -54,7 +55,7 @@ type SearchResponse = {
   error?: string;
   state?: TargetState;
   engine?: Engine;
-  plan?: { lanes: string[]; queries: Array<{ lane: string; query: string }>; safeguards: string[] };
+  plan?: { lanes: string[]; queries: Array<{ lane: string; query: string }>; safeguards: string[]; interpretation?: AbaLanguageReading };
   sourceStatus?: SourceState[];
   browser?: SourceState;
   screened?: number;
@@ -348,6 +349,20 @@ export function ScoutWorkbench({
 
       {(running || response) && (
         <section className="researchResults" aria-live="polite">
+          {response?.plan?.interpretation && (
+            <details className="scoutReading" aria-label="How Scout understood your request">
+              <summary>
+                <span><Check size={13} aria-hidden="true" /> Interpreted: {response.plan.interpretation.interpretedGoal.replaceAll("_", " ")}</span>
+                <span>{response.plan.interpretation.corrections.length ? response.plan.interpretation.corrections.length + " corrections" : response.plan.interpretation.recognized.length + " concepts"}</span>
+              </summary>
+              <div className="scoutReadingDetails">
+                <p><b>Research wording:</b> {response.plan.interpretation.corrected}</p>
+                {response.plan.interpretation.corrections.map((correction) => <p key={correction.from}><b>Spelling:</b> {correction.from} → {correction.to}</p>)}
+                {response.plan.interpretation.warnings.map((warning) => <p key={warning}><b>Interpretation check:</b> {warning}</p>)}
+                <p>Original names, numbers and unsupported terminology are not silently replaced. Public sources still require independent verification.</p>
+              </div>
+            </details>
+          )}
           {response?.error && <div className="errorCard">{response.error}</div>}
           {response?.errors && response.errors.length > 0 && (
             <div className="warningCard">{response.errors.slice(0, 4).map((error) => <p key={error}>{error}</p>)}</div>
