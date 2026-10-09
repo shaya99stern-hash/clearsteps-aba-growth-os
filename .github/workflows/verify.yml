@@ -57,6 +57,9 @@ jobs:
       - name: Verify intelligence rules
         run: npm run verify:intelligence
 
+      - name: Verify ABA language, typos and intent cross-checks
+        run: npm run verify:aba-language
+
       - name: Verify Phase 3 ABA Engine rules
         run: npm run verify:aba-engine
 
