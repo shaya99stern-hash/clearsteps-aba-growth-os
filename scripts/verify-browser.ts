@@ -300,9 +300,10 @@ async function verifyClientGrowthOnIphone(baseUrl:string) {
   });
   try {
     await page.goto(baseUrl+"/?state=CO&engine=client&location=Denver%20County%2C%20CO",{
-      waitUntil:"domcontentloaded",
+      waitUntil:"networkidle",
     });
     await page.locator('textarea[aria-label="Research request"]').fill("Find ABA opportunities for children ages 2–18 in Denver County");
+    await page.waitForFunction(() => !(document.querySelector('button[aria-label="Run research"]') as HTMLButtonElement)?.disabled,undefined,{timeout:10_000});
     await page.getByRole("button",{name:"Run research"}).click();
     await page.getByRole("heading",{name:"Where new families can find your agency"}).waitFor();
     assert.equal(await page.getByText("124,416",{exact:true}).count(),1);
@@ -359,7 +360,7 @@ async function verifySeamlessRouting(baseUrl: string) {
   const failed: string[] = [];
   page.on("pageerror", (error) => failed.push(error.message));
   try {
-    await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
+    await page.goto(baseUrl, { waitUntil: "networkidle" });
     const input = page.locator('textarea[aria-label="Research request"]');
     assert.equal(await input.inputValue(), "", "Fresh Scout input starts blank");
     await input.fill("Find family inquiries in Denver");
