@@ -26,7 +26,7 @@ export function evaluateResearchRequest(query: string): ResearchPolicyDecision {
   const reading = understandAbaRequest(query);
   // Inspect raw and corrected requests separately; concatenation can create
   // fabricated adjacency ("autism ... find ... addresses") and false blocks.
-  const variants = [query.toLowerCase().replace(/\\s+/g, " ").trim(), reading.corrected];
+  const variants = [query.toLowerCase().replace(/\s+/g, " ").trim(), reading.corrected];
   const sensitive = variants.some((variant) => SENSITIVE_CONTEXT.some((term) => variant.includes(term)));
   const targetsIndividual = variants.some((normalized) =>
     INDIVIDUAL_TARGETING.some((term) => normalized.includes(term)) ||
