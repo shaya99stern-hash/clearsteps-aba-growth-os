@@ -48,7 +48,7 @@ const valid=scanPublicSignals([
 ],"2026-10-08","Denver, CO","2-18");
 assert(valid.observations.some((x)=>x.indicatorId==="service-capacity.01"),
   "Independent age-qualified reports from the same verified locality should qualify");
-assert.equal(valid.crossChecks.length,60);
+assert.equal(valid.crossChecks.length,90);
 assert.notEqual(publicPublisherId("one.k12.mo.us"),publicPublisherId("two.k12.mo.us"),
   "Separate school districts must be distinct publishers");
 const lateRelevant=scanPublicSignals([

@@ -26,6 +26,7 @@ async function verifyClearStepsUi(baseUrl: string) {
   await verifyMobilePwa(baseUrl);
   await verifyClientGrowthOnIphone(baseUrl);
   await verifyPublicFamilyEntry(baseUrl);
+  await verifySeamlessRouting(baseUrl);
 }
 
 async function verifyDesktopCrm(baseUrl: string) {
@@ -183,7 +184,7 @@ async function verifyMobilePwa(baseUrl: string) {
     const drawer = page.getByRole("dialog", { name: "Workspace navigation" });
     await drawer.waitFor({ state: "visible" });
     assert.equal(await drawer.getByRole("link", { name: "Scout", exact: true }).getAttribute("aria-current"), "page");
-    assert.equal(await drawer.getByRole("link").count(), 11, "all ten workspaces plus source status should remain reachable");
+    assert.equal(await drawer.getByRole("link").count(), 12, "all eleven primary workspaces plus source status should remain reachable");
     await page.keyboard.press("Escape");
     await drawer.waitFor({ state: "detached" });
     assert.equal(await openNavigation.evaluate((button) => document.activeElement === button), true, "closing drawer returns focus to hamburger");
@@ -212,6 +213,7 @@ async function verifyMobilePwa(baseUrl: string) {
     const locationInput = page.getByLabel("Target city, ZIP, county or state");
     assert.equal(await locationInput.inputValue(), "Missouri", "Scout should default new research to Missouri");
 
+    assert.equal(await page.locator('textarea[aria-label="Research request"]').inputValue(), "", "Scout input must start blank");
     const composer = page.locator(".scoutComposerV3");
     const composerBox = await composer.boundingBox();
     assert.ok(composerBox && composerBox.y < 500, "Scout composer should appear in the first mobile viewport without scrolling through oversized chrome");
@@ -298,8 +300,10 @@ async function verifyClientGrowthOnIphone(baseUrl:string) {
   });
   try {
     await page.goto(baseUrl+"/?state=CO&engine=client&location=Denver%20County%2C%20CO",{
-      waitUntil:"domcontentloaded",
+      waitUntil:"networkidle",
     });
+    await page.locator('textarea[aria-label="Research request"]').fill("Find ABA opportunities for children ages 2–18 in Denver County");
+    await page.waitForFunction(() => !(document.querySelector('button[aria-label="Run research"]') as HTMLButtonElement)?.disabled,undefined,{timeout:10_000});
     await page.getByRole("button",{name:"Run research"}).click();
     await page.getByRole("heading",{name:"Where new families can find your agency"}).waitFor();
     assert.equal(await page.getByText("124,416",{exact:true}).count(),1);
@@ -346,6 +350,81 @@ async function verifyPublicFamilyEntry(baseUrl:string) {
         assert(callOrIntake>0,"A published service page must expose a verified agency contact destination");
       }
     } finally {await page.close();}
+  }
+}
+
+/** Drive real Next.js links and browser history across every shipped workspace. */
+async function verifySeamlessRouting(baseUrl: string) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: "reduce" });
+  const page = await context.newPage();
+  const failed: string[] = [];
+  page.on("pageerror", (error) => failed.push(error.message));
+  try {
+    await page.goto(baseUrl, { waitUntil: "networkidle" });
+    const input = page.locator('textarea[aria-label="Research request"]');
+    assert.equal(await input.inputValue(), "", "Fresh Scout input starts blank");
+    await input.fill("Find family inquiries in Denver");
+    await page.getByRole("button", { name: "RBTs", exact: true }).click();
+    assert.equal(await input.inputValue(), "Find family inquiries in Denver", "Mode switching never overwrites user input");
+    await page.getByRole("button", { name: "Reset Scout" }).click();
+    assert.equal(await input.inputValue(), "", "Reset makes the input empty");
+    await page.getByRole("button", { name: "Clients", exact: true }).click();
+    assert.equal(await input.inputValue(), "", "Empty input stays empty after mode changes");
+    assert.equal(await page.getByRole("button", { name: "Run research" }).isDisabled(), true, "Blank request cannot run");
+
+    const primary: Array<[string, string, string]> = [
+      ["Territories", "/territories", "Territories"],
+      ["Map", "/map", "Map"],
+      ["Intelligence", "/intelligence", "Intelligence"],
+      ["Market Sources", "/pipeline", "Market Sources"],
+      ["Talent CRM", "/talent", "Talent"],
+      ["Outreach", "/outreach", "Outreach"],
+      ["Tasks", "/tasks", "Tasks"],
+      ["Sources", "/connectors", "Sources"],
+      ["Settings", "/settings", "Settings"],
+      ["More tools", "/more", "More"],
+      ["Scout", "/", "Scout"],
+    ];
+    for (const [label, path, title] of primary) {
+      await page.getByRole("button", { name: "Open navigation" }).click();
+      const drawer = page.getByRole("dialog", { name: "Workspace navigation" });
+      await drawer.waitFor({ state: "visible" });
+      await drawer.getByRole("link", { name: label, exact: true }).click();
+      await page.waitForURL((url) => url.pathname === path, { timeout: 15_000 });
+      await drawer.waitFor({ state: "detached", timeout: 10_000 });
+      assert.equal((await page.locator(".csMobileIdentityText small").innerText()).trim(), title, "Mobile route title for " + path);
+      assert.equal(await page.getByRole("button", { name: "Open navigation" }).getAttribute("aria-expanded"), "false", "Drawer closed on " + path);
+      await assertNoBodyOverflow(page, "Navigation route " + path);
+    }
+    await page.goto(baseUrl + "/more", { waitUntil: "domcontentloaded" });
+    for(const path of ["/research-runs","/lead-discovery","/referral-sources","/organizations","/contacts","/demand-signals","/competitor-signals","/follow-ups","/csv-imports"]) {
+      const row = page.locator('a.mobileMoreRow[href="' + path + '"]');
+      await row.waitFor({ state: "visible" });
+      await row.click();
+      await page.waitForURL((url) => url.pathname === path, { timeout: 15_000 });
+      // The URL changes before streamed page content is committed. Wait for its shell.
+      await page.locator(".csMobileHeader").waitFor({ state: "visible", timeout: 15_000 });
+      assert.equal(await page.locator(".csMobileHeader").isVisible(), true, path + " has mobile shell");
+      await page.goBack({ waitUntil: "domcontentloaded" });
+      await page.waitForURL((url) => url.pathname === "/more");
+    }
+    await page.locator('a.mobileMoreRow[href="/research-runs"]').click();
+    await page.waitForURL((url) => url.pathname === "/research-runs");
+    await page.goBack({ waitUntil: "domcontentloaded" });
+    await page.waitForURL((url) => url.pathname === "/more", { timeout: 15_000 });
+    assert.equal(new URL(page.url()).pathname,"/more");
+    await page.goForward({ waitUntil: "domcontentloaded" });
+    // Client-side history updates are asynchronous in the App Router.
+    await page.waitForURL((url) => url.pathname === "/research-runs", { timeout: 15_000 });
+    assert.equal(new URL(page.url()).pathname,"/research-runs");
+    await page.goto(baseUrl + "/missing-clearsteps-route-404", { waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { name: "Screen not found" }).waitFor({ state: "visible" });
+    await page.getByRole("link", { name: "Return to Scout" }).click();
+    await page.waitForURL((url) => url.pathname === "/");
+    assert.equal(await page.locator('textarea[aria-label="Research request"]').inputValue(), "");
+    assert.deepEqual(failed, [], "No client-side uncaught exceptions during route and history tests");
+  } finally {
+    await context.close();
   }
 }
 

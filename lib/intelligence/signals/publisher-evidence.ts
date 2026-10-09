@@ -5,6 +5,9 @@
 export function publicPublisherId(domain: string): string {
   const host=domain.toLowerCase().trim().replace(/^www\./,"").replace(/\.$/,"");
   if (!/^[a-z0-9.-]+$/.test(host)) return "";
+  // Two public domains belonging to the same publisher do not corroborate each other.
+  if (host === "nschdata.org") return "childhealthdata.org";
+  if (host === "kschildrenscabinet.gov") return "ks.gov";
   const parts=host.split(".").filter(Boolean);
   if(parts.length<2) return "";
   const special=[

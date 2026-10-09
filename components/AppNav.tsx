@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Database, KanbanSquare, Mail, Map, Search, Settings, SquareCheckBig, Users, type LucideIcon, MapPinned } from "lucide-react";
+import { Activity, Database, KanbanSquare, Mail, Map, Search, Settings, SquareCheckBig, Users, LayoutGrid, type LucideIcon, MapPinned } from "lucide-react";
 
 type WorkspaceNavItem = {
   label: string;
@@ -39,6 +39,7 @@ export const navGroups: WorkspaceNavGroup[] = [
       { label: "Tasks", href: "/tasks", icon: SquareCheckBig },
       { label: "Sources", href: "/connectors", icon: Database },
       { label: "Settings", href: "/settings", icon: Settings },
+      { label: "More tools", href: "/more", icon: LayoutGrid },
     ],
   },
 ];
@@ -56,7 +57,7 @@ export function AppNav() {
           <div className="navGroupItems">
             {group.items.map((item) => {
               const Icon = item.icon;
-              const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+              const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href + "/"));
               return (
                 <Link
                   key={item.href}

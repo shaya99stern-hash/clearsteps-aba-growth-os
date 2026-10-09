@@ -1,10 +1,13 @@
 import { EXPANDED_PUBLIC_SOURCE_CHANNELS } from "./expanded-source-channels";
+import { ADDITIONAL_YOUTH_SOURCE_CHANNELS } from "./additional-youth-source-channels";
 import type { LeadEngine } from "../phase3/indicator-catalog";
 export interface PublicSourceChannel {
   host: string;
   scope: "MO" | "KS" | "CO" | "federal" | "national";
   kind: string;
   method: "site-search";
+  focus?: string;
+  access?: "public-index" | "aggregate-only";
 }
 /** Sites are discoverable candidates, not claims of an active integration or confirmed hits. */
 const ORIGINAL_PUBLIC_SOURCE_CHANNELS: readonly PublicSourceChannel[] = [
@@ -470,6 +473,7 @@ const ORIGINAL_PUBLIC_SOURCE_CHANNELS: readonly PublicSourceChannel[] = [
 export const PUBLIC_SOURCE_CHANNELS: readonly PublicSourceChannel[] = [
   ...ORIGINAL_PUBLIC_SOURCE_CHANNELS,
   ...EXPANDED_PUBLIC_SOURCE_CHANNELS,
+  ...ADDITIONAL_YOUTH_SOURCE_CHANNELS,
 ];
 
 function relevant(item: PublicSourceChannel, engine: LeadEngine) {
@@ -483,11 +487,16 @@ export function choosePublicSourceChannels(
   const local = PUBLIC_SOURCE_CHANNELS.filter((item)=>item.scope===state && relevant(item,engine));
   const federal = PUBLIC_SOURCE_CHANNELS.filter((item)=>item.scope==="federal" && relevant(item,engine));
   const national = PUBLIC_SOURCE_CHANNELS.filter((item)=>item.scope==="national" && relevant(item,engine));
+  const newLocal = ADDITIONAL_YOUTH_SOURCE_CHANNELS.filter((item) => item.scope === state && relevant(item, engine));
+  const newBroad = ADDITIONAL_YOUTH_SOURCE_CHANNELS.filter((item) =>
+    ["national", "federal"].includes(item.scope) && relevant(item, engine));
   const seed = [...location.toLowerCase()].reduce((value,char)=>((value*31)+char.charCodeAt(0))>>>0,17) +
     Math.max(0, Math.floor(rotation)) * 101;
   const rotated=(entries: PublicSourceChannel[],number:number,offset:number)=>
     entries.length ? Array.from({length:Math.min(number,entries.length)},(_,i)=>entries[(seed+offset+i)%entries.length]) : [];
   return [...new Map([
+    ...rotated(newLocal,Math.min(1,max),31),
+    ...rotated(newBroad,Math.min(1,Math.max(0,max-1)),47),
     ...rotated(local,Math.ceil(max * 0.5),0),
     ...rotated(federal,Math.max(1,Math.floor(max * 0.25)),7),
     ...rotated(national,Math.max(1,Math.floor(max * 0.25)),19),
@@ -502,7 +511,7 @@ export function queryForPublicSource(channel:PublicSourceChannel,location:string
     channel.kind==="license"?"behavior analyst licensing professional":
     channel.kind==="demographic"?"children ages 2 to 18 population county":
     "pediatric developmental services ages 2-18 referral organizations";
-  return "site:"+channel.host+" "+term+" "+location;
+  return "site:"+channel.host+" "+(channel.focus ?? term)+" "+location;
 }
 export function matchedPublicSourceChannels(urls:readonly string[]) {
   const matched=new Set<string>();
@@ -518,4 +527,19 @@ export function matchedPublicSourceChannels(urls:readonly string[]) {
     if(matches[0])matched.add(matches[0].host);
   }
   return [...matched].sort();
+}
+
+/** Aggregate-only publishers may inform public market context but never seed CRM records. */
+export function isAggregateOnlyPublicSourceUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return false;
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    return ADDITIONAL_YOUTH_SOURCE_CHANNELS.some((channel) =>
+      channel.access === "aggregate-only" &&
+      (host === channel.host || host.endsWith("." + channel.host))
+    );
+  } catch {
+    return false;
+  }
 }

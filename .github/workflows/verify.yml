@@ -87,6 +87,9 @@ jobs:
       - name: Verify safe family contact activation
         run: npm run verify:family-contact
 
+      - name: Verify 20 public youth channels and 30 document cross-checks
+        run: npm run verify:new-youth-sources
+
       - name: Verify age 2–18 tripled source mesh
         run: npm run verify:age-2-18
 

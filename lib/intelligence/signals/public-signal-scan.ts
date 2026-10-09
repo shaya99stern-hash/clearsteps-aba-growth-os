@@ -5,6 +5,7 @@ import { AGES_2_TO_18_RULES, AGES_2_TO_18_CHECKS } from "./age-2-18-catalog";
 import { isAgeAlignedPublicProgram } from "./target-ages";
 import { publicTextCoversYouthAgeBand, type YouthAgeBand } from "./youth-qualification";
 import { publicPublisherId, samePublicNarrative, matchesPublishedArea } from "./publisher-evidence";
+import { runServiceDocumentChecks } from "./service-document-checks";
 
 export interface PublicSignalClue {
   indicatorId: string;
@@ -32,6 +33,7 @@ export interface PublicSignalScan {
   observations: IndicatorObservation[];
   crossChecks: PublicSignalCrossCheck[];
   supportedChecks: number;
+  parsedDocumentCategories: number;
   ageRange: [2,18] | [2,5] | [6,11] | [12,18] | null;
 }
 
@@ -80,6 +82,7 @@ export function matchesPublicTerritory(text: string, targetLocation: string): bo
 /** Pure, deterministic, bounded cross-reference stage. Uncorroborated signals never raise a score. */
 export function scanPublicSignals(hits: readonly PublicSearchHit[], capturedAt = new Date().toISOString(), targetLocation = "", ageMode: "all" | YouthAgeBand = "all"): PublicSignalScan {
   const candidates = hits.slice(0, 250).map(createCandidate).filter((item): item is Candidate => Boolean(item));
+  const documentChecks = runServiceDocumentChecks(candidates, targetLocation, ageMode);
   const clues: PublicSignalClue[] = [];
   const observations: IndicatorObservation[] = [];
   const hostsByIndicator = new Map<string, Set<string>>();
@@ -146,7 +149,7 @@ export function scanPublicSignals(hits: readonly PublicSearchHit[], capturedAt =
   }
 
   const verifiedIndicators = new Set(observations.map((item) => item.indicatorId));
-  const crossChecks: PublicSignalCrossCheck[] = [...CROSS_SOURCE_CHECKS, ...AGES_2_TO_18_CHECKS].map((check) => {
+  const baseCrossChecks: PublicSignalCrossCheck[] = [...CROSS_SOURCE_CHECKS, ...AGES_2_TO_18_CHECKS].map((check) => {
     const left = hostsByIndicator.get(check.left) ?? new Set<string>();
     const right = hostsByIndicator.get(check.right) ?? new Set<string>();
     const union = new Set([...left, ...right]);
@@ -161,12 +164,17 @@ export function scanPublicSignals(hits: readonly PublicSearchHit[], capturedAt =
     };
   });
 
+  const crossChecks: PublicSignalCrossCheck[] = [
+    ...baseCrossChecks,
+    ...documentChecks.findings.map((check) => ({ id: check.id, title: check.title, status: check.status, sourceCount: check.publishers })),
+  ];
   return {
     inspected: candidates.length,
     clues: clues.sort((a, b) => Number(b.corroborated) - Number(a.corroborated) || b.sourceCount - a.sourceCount).slice(0, 180),
     observations,
     crossChecks,
     supportedChecks: crossChecks.filter((item) => item.status === "supported").length,
+    parsedDocumentCategories: documentChecks.parsedCategories.length,
     ageRange: ageMode === "all" ? null :
       ageMode === "2-5" ? [2,5] : ageMode === "6-11" ? [6,11] :
       ageMode === "12-18" ? [12,18] : [2,18],

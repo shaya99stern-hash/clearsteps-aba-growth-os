@@ -28,7 +28,8 @@
     "verify:data-joins": "tsx scripts/verify-data-joins.ts",
     "smoke:data-joins": "tsx scripts/smoke-data-joins.ts",
     "verify:site-map": "tsx scripts/verify-site-map.ts",
-    "verify:aba-language": "tsx scripts/verify-aba-language.ts"
+    "verify:aba-language": "tsx scripts/verify-aba-language.ts",
+    "verify:new-youth-sources": "tsx scripts/verify-new-youth-sources.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",

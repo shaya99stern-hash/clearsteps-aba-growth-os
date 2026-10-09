@@ -9,7 +9,8 @@ import { navGroups } from "./AppNav";
 
 export function MobileDrawer({ title }: { title: string }) {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
+  const [openedForPath, setOpenedForPath] = useState<string | null>(null);
+  const open = openedForPath === pathname;
   const menuButton = useRef<HTMLButtonElement>(null);
   const dialog = useRef<HTMLElement>(null);
 
@@ -23,7 +24,7 @@ export function MobileDrawer({ title }: { title: string }) {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
-        setOpen(false);
+        setOpenedForPath(null);
         menuButton.current?.focus();
       }
       if (event.key !== "Tab" || !dialog.current) return;
@@ -56,7 +57,7 @@ export function MobileDrawer({ title }: { title: string }) {
           aria-label="Open navigation"
           aria-haspopup="dialog"
           aria-expanded={open}
-          onClick={() => setOpen(true)}
+          onClick={() => setOpenedForPath(pathname)}
         >
           <Menu size={19} strokeWidth={1.8} aria-hidden="true" />
         </button>
@@ -73,14 +74,14 @@ export function MobileDrawer({ title }: { title: string }) {
       </header>
       {open && (
         <div className="csDrawerLayer">
-          <button className="csDrawerScrim" type="button" aria-label="Close navigation" onClick={() => setOpen(false)} />
+          <button className="csDrawerScrim" type="button" aria-label="Close navigation" onClick={() => setOpenedForPath(null)} />
           <aside className="csDrawer" ref={dialog} role="dialog" aria-modal="true" aria-label="Workspace navigation">
             <header className="csDrawerHeading">
               <div className="csDrawerName">
                 <span>WORKSPACE</span>
                 <h2>Clear Steps</h2>
               </div>
-              <button type="button" className="csMobileIconButton" aria-label="Close menu" onClick={() => { setOpen(false); menuButton.current?.focus(); }}>
+              <button type="button" className="csMobileIconButton" aria-label="Close menu" onClick={() => { setOpenedForPath(null); menuButton.current?.focus(); }}>
                 <X size={19} aria-hidden="true" />
               </button>
             </header>
@@ -97,7 +98,7 @@ export function MobileDrawer({ title }: { title: string }) {
                         href={item.href}
                         className={active ? "csDrawerLink isActive" : "csDrawerLink"}
                         aria-current={active ? "page" : undefined}
-                        onClick={() => setOpen(false)}
+                        onClick={() => setOpenedForPath(null)}
                       >
                         <Icon size={17} strokeWidth={1.7} aria-hidden="true" />
                         <span>{item.label}</span>
@@ -110,7 +111,7 @@ export function MobileDrawer({ title }: { title: string }) {
             </nav>
             <footer className="csDrawerFooter">
               <span><i /> Missouri · Kansas · Colorado</span>
-              <Link href="/connectors" onClick={() => setOpen(false)}>Source status <ArrowUpRight size={13} aria-hidden="true" /></Link>
+              <Link href="/connectors" onClick={() => setOpenedForPath(null)}>Source status <ArrowUpRight size={13} aria-hidden="true" /></Link>
             </footer>
           </aside>
         </div>
