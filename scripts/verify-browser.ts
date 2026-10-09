@@ -411,8 +411,11 @@ async function verifySeamlessRouting(baseUrl: string) {
     await page.locator('a.mobileMoreRow[href="/research-runs"]').click();
     await page.waitForURL((url) => url.pathname === "/research-runs");
     await page.goBack({ waitUntil: "domcontentloaded" });
+    await page.waitForURL((url) => url.pathname === "/more", { timeout: 15_000 });
     assert.equal(new URL(page.url()).pathname,"/more");
     await page.goForward({ waitUntil: "domcontentloaded" });
+    // Client-side history updates are asynchronous in the App Router.
+    await page.waitForURL((url) => url.pathname === "/research-runs", { timeout: 15_000 });
     assert.equal(new URL(page.url()).pathname,"/research-runs");
     await page.goto(baseUrl + "/missing-clearsteps-route-404", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { name: "Screen not found" }).waitFor({ state: "visible" });
