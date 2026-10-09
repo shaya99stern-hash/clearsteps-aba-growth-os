@@ -528,3 +528,18 @@ export function matchedPublicSourceChannels(urls:readonly string[]) {
   }
   return [...matched].sort();
 }
+
+/** Aggregate-only publishers may inform public market context but never seed CRM records. */
+export function isAggregateOnlyPublicSourceUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return false;
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    return ADDITIONAL_YOUTH_SOURCE_CHANNELS.some((channel) =>
+      channel.access === "aggregate-only" &&
+      (host === channel.host || host.endsWith("." + channel.host))
+    );
+  } catch {
+    return false;
+  }
+}
