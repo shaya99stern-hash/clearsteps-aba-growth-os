@@ -3,6 +3,7 @@ import { ADDITIONAL_YOUTH_SOURCE_CHANNELS } from "../lib/intelligence/signals/ad
 import { PUBLIC_SOURCE_CHANNELS, choosePublicSourceChannels, matchedPublicSourceChannels, queryForPublicSource, isAggregateOnlyPublicSourceUrl } from "../lib/intelligence/signals/source-channel-catalog";
 import { SERVICE_DOCUMENT_PARSERS, SERVICE_DOCUMENT_CHECKS, runServiceDocumentChecks } from "../lib/intelligence/signals/service-document-checks";
 import { scanPublicSignals } from "../lib/intelligence/signals/public-signal-scan";
+import { publicPublisherId } from "../lib/intelligence/signals/publisher-evidence";
 
 assert.equal(ADDITIONAL_YOUTH_SOURCE_CHANNELS.length,20,"twenty NEW candidate public sources");
 assert.equal(PUBLIC_SOURCE_CHANNELS.length,294,"no accidental source drop / duplicate");
@@ -23,6 +24,8 @@ for(const state of ["MO","KS","CO"] as const){
   assert(queries.every((selected)=>selected.every((item)=>queryForPublicSource(item,"Sample County, "+state,"client").includes("Sample County"))));
 }
 assert.equal(ADDITIONAL_YOUTH_SOURCE_CHANNELS.filter((x)=>x.access==="aggregate-only").length,2);
+assert.equal(publicPublisherId("nschdata.org"), publicPublisherId("childhealthdata.org"), "CAHMI aliases share one independent publisher");
+assert.equal(publicPublisherId("kschildrenscabinet.gov"), publicPublisherId("koec.ks.gov"), "Kansas agency aliases share one publisher");
 assert.deepEqual(matchedPublicSourceChannels(["https://koec.ks.gov/about","https://www.1800childrenks.org/","https://unknown.invalid"]),["1800childrenks.org","koec.ks.gov"]);
 assert(isAggregateOnlyPublicSourceUrl("https://ks.childcareaware.org/data-research/"));
 assert(isAggregateOnlyPublicSourceUrl("https://web.mhanet.com/health-equity-dashboards/"));
