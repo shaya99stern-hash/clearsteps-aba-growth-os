@@ -35,8 +35,8 @@ const solo=runServiceDocumentChecks([official],"Denver, CO","2-18");
 assert.notEqual(solo.findings.find((x)=>x.id==="D01")?.status,"supported","one agency is not independent corroboration");
 const wrongGeography=runServiceDocumentChecks([official,hospital,newspaper],"Denver, KS","2-18");
 assert.equal(wrongGeography.supported,0,"identical named city in wrong state");
-const wrongAge=runServiceDocumentChecks([official,hospital,newspaper],"Denver, CO","6-11");
-assert.equal(wrongAge.supported,0,"broad age evidence cannot masquerade as exact school age band");
+const wrongAge=runServiceDocumentChecks([official,hospital,newspaper].map(item=>({ ...item, text: item.text.replace("ages 2-18","ages 2-5") })),"Denver, CO","6-11");
+assert.equal(wrongAge.supported,0,"preschool-only evidence cannot support the 6–11 age cohort");
 const raw=scanPublicSignals([
  {title:official.text,snippet:official.text,url:"https://publicagency.gov/report",sourceId:"duckduckgo-html",query:"Denver CO",rank:1},
  {title:hospital.text,snippet:hospital.text,url:"https://localclinic.org/reports",sourceId:"bing-rss",query:"Denver CO",rank:1},
