@@ -125,11 +125,12 @@ function elementQuery(tags: Record<string, string>): OsmQuery {
   return "clinic";
 }
 
-export function fixturePost(stateFips: string, overrides: { failKeyless?: boolean; failSchools?: boolean; remarkChildcare?: boolean; primaryDown?: boolean } = {}) {
+export function fixturePost(stateFips: string, overrides: { failKeyless?: boolean; failSchools?: boolean; remarkChildcare?: boolean; primaryDown?: boolean; overpassDown?: boolean } = {}) {
   return async (url: string, body: string) => {
     requested.push(url);
     if (overrides.failKeyless) throw new Error("HTTP 429");
     if (overrides.primaryDown && url.includes("overpass-api.de")) throw new Error("HTTP 504");
+    if (overrides.overpassDown) throw new Error("HTTP 504");
     const query = osmQueryKind(body);
     if (query === "school" && overrides.failSchools) throw new Error("HTTP 504");
     // Overpass reports a server-side timeout as HTTP 200 with a remark and no elements.

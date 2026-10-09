@@ -28,6 +28,14 @@ export const NPPES_COUNTY_QUERIES: ReadonlyArray<{ metric: MetricId; taxonomy: s
   { metric: "nppes.child_psych", taxonomy: "Clinical Child & Adolescent", enumeration: "NPI-1", label: "child & adolescent psychologists" },
 ];
 
+/**
+ * Last successful statewide OpenStreetMap counts per facility kind (per server instance, up to 7 days).
+ * Public Overpass servers are often overloaded; a failed refresh falls back to these, labeled with their age.
+ */
+const OSM_LAST_GOOD = new Map<string, { at: number; byCounty: Map<string, number> }>();
+const OSM_CACHE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+export function resetOsmCache() { OSM_LAST_GOOD.clear(); }
+
 export const OSM_COUNTY_METRICS: Readonly<Record<PlaceKind, MetricId>> = {
   daycare: "osm.childcare",
   school: "osm.schools",
@@ -239,7 +247,6 @@ export async function collectKeylessCountyCounts(input: {
     const succeeded = settled.flatMap((item, index) => item.status === "fulfilled" ? [{ kinds: osmSpecs[index].kinds, places: item.value }] : []);
     const failures = settled.flatMap((item, index) => item.status === "rejected"
       ? [`${osmSpecs[index].kinds.join("+")} (${errorText(item.reason).slice(0, 120)})`] : []);
-    if (!succeeded.length) throw new Error("all Overpass queries failed: " + failures.join("; "));
     let outside = 0, assigned = 0;
     const counts: Partial<Record<PlaceKind, number>> = {};
     const seen = new Set<string>();
@@ -258,6 +265,29 @@ export async function collectKeylessCountyCounts(input: {
       for (const kind of covered) entry[OSM_COUNTY_METRICS[kind]] ??= 0;
       metrics.set(shape.fips, entry);
     }
+    // Remember fresh counts; fill failed kinds from a recent successful pull, if one exists.
+    const now = Date.now();
+    for (const kind of covered) {
+      const byCounty = new Map<string, number>();
+      for (const shape of shapes) byCounty.set(shape.fips, metrics.get(shape.fips)?.[OSM_COUNTY_METRICS[kind]] ?? 0);
+      OSM_LAST_GOOD.set(`${input.state}:${kind}`, { at: now, byCounty });
+    }
+    const cachedNotes: string[] = [];
+    for (const spec of osmSpecs) {
+      if (spec.kinds.every((kind) => covered.has(kind))) continue;
+      const cached = spec.kinds.map((kind) => OSM_LAST_GOOD.get(`${input.state}:${kind}`));
+      if (cached.some((entry) => !entry || now - entry.at > OSM_CACHE_MAX_AGE)) continue;
+      spec.kinds.forEach((kind, index) => {
+        for (const [fips, value] of cached[index]!.byCounty) {
+          const entry = metrics.get(fips) ?? {};
+          entry[OSM_COUNTY_METRICS[kind]] = value;
+          metrics.set(fips, entry);
+        }
+        covered.add(kind);
+      });
+      cachedNotes.push(`${spec.kinds.join("+")} from last good pull ${new Date(Math.min(...cached.map((entry) => entry!.at))).toISOString().slice(0, 16).replace("T", " ")} UTC`);
+    }
+    if (!covered.size) throw new Error("all Overpass queries failed: " + failures.join("; "));
     // A kind whose query failed must not keep partial counts that would read as complete.
     for (const kind of Object.keys(OSM_COUNTY_METRICS) as PlaceKind[]) {
       if (covered.has(kind)) continue;
@@ -265,7 +295,8 @@ export async function collectKeylessCountyCounts(input: {
     }
     return `${assigned} named facilities assigned to counties (` + Object.entries(counts).map(([kind, n]) => `${n} ${kind}`).join(", ") + ")" +
       (outside ? `; ${outside} outside county outlines` : "") +
-      (failures.length ? `; ${failures.length} of ${settled.length} Overpass queries failed: ${failures.join("; ")}` : "");
+      (failures.length ? `; ${failures.length} of ${settled.length} Overpass queries failed: ${failures.join("; ")}` : "") +
+      (cachedNotes.length ? `; using ${cachedNotes.join(", ")}` : "");
   })();
 
   const [nppesR, osmR] = await Promise.allSettled([nppes, osm]);

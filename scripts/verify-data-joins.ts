@@ -8,7 +8,7 @@ import { rankStateCounties, selectCountyReport, LOW_SAMPLE_CHILDREN } from "../l
 import { CBP_NAICS } from "../lib/intelligence/joins/sources";
 import { INDICATOR_CATALOG, indicatorDefinition, scoreEngineFromObservations } from "../lib/intelligence/phase3/indicator-catalog";
 import { acsVars, byFips, COUNTIES, fixtureFetch, fixturePost, requested } from "./fixtures/county-joins";
-import { countyForPoint, parseCountyShapes, parseNppesStatewidePage } from "../lib/intelligence/joins/keyless-county";
+import { countyForPoint, parseCountyShapes, parseNppesStatewidePage, resetOsmCache } from "../lib/intelligence/joins/keyless-county";
 
 // ---------------------------------------------------------------------------
 // 1. Catalog contract: 90 joins, each crossing at least two independent data programs.
@@ -213,11 +213,23 @@ async function main() {
   assert.equal(keylessRanking.counties[0].fips, "29047", "The designed service-gap county still ranks first without a key");
   assert(keylessRanking.counties[0].observations.some((o) => o.indicatorId === "aba-supply.01"), "Keyless ABA supply fills the base indicator");
 
+  resetOsmCache();
   const noKeyless = rankStateCounties(await collectStateCountyBundle("MO", { fetchText: fixtureFetch("29", { failKeyless: true }), postText: fixturePost("29", { failKeyless: true }) }));
   assert.equal(noKeyless.programs.find((p) => p.program === "cms-nppes-county")!.status, "unavailable");
   assert.equal(noKeyless.programs.find((p) => p.program === "osm-county")!.status, "unavailable");
   for (const county of noKeyless.counties) for (const id of ["J41", "J61", "J64"]) assert.equal(county.joins.find((join) => join.id === id)!.status, "insufficient_data", "Failed registry/map never zero-fills");
 
+  // Last-good cache: an overloaded Overpass refresh reuses the previous successful pull, labeled with its age.
+  await collectStateCountyBundle("MO", { fetchText: fixtureFetch("29"), postText: fixturePost("29") }); // a good pull seeds the cache
+  const cachedRun = await collectStateCountyBundle("MO", { fetchText: fixtureFetch("29"), postText: fixturePost("29", { overpassDown: true }) });
+  assert.equal(cachedRun.frames.find((item) => item.fips === "29095")!.metrics["osm.childcare"], 130, "Failed refresh reuses the last good count");
+  assert.match(cachedRun.programs.find((p) => p.program === "osm-county")!.detail, /from last good pull/);
+  resetOsmCache();
+  const noCache = await collectStateCountyBundle("MO", { fetchText: fixtureFetch("29"), postText: fixturePost("29", { overpassDown: true }) });
+  assert.equal(noCache.programs.find((p) => p.program === "osm-county")!.status, "unavailable", "Without a cached pull, a total Overpass outage is unavailable");
+  assert.equal(noCache.frames.find((item) => item.fips === "29095")!.metrics["osm.childcare"], undefined);
+
+  resetOsmCache();
   const noSchools = await collectStateCountyBundle("MO", { fetchText: fixtureFetch("29"), postText: fixturePost("29", { failSchools: true }) });
   const ns = noSchools.frames.find((item) => item.fips === "29095")!;
   assert.equal(ns.metrics["osm.schools"], undefined, "A failed school query leaves school counts blank, not zero");
@@ -231,6 +243,7 @@ async function main() {
 
   // Production regression: Overpass returns HTTP 200 + "runtime error" remark on timeout. That must read as
   // failure (blank), never as "zero child care in every county".
+  resetOsmCache();
   const remark = await collectStateCountyBundle("MO", { fetchText: fixtureFetch("29"), postText: fixturePost("29", { remarkChildcare: true }) });
   const rf = remark.frames.find((item) => item.fips === "29095")!;
   assert.equal(rf.metrics["osm.childcare"], undefined, "Overpass timeout remark leaves child-care counts blank");
