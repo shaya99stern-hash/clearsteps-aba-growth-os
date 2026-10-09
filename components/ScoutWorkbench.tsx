@@ -446,8 +446,8 @@ export function ScoutWorkbench({
           {response?.publicSignals && (
             <details className="sourceDisclosure">
               <summary>
-                <span>180 public signal hypotheses + 60 cross-checks</span>
-                <span>{response.publicSignals.observations.length} supported · {response.publicSignals.supportedChecks}/60 linked</span>
+                <span>180 public signal hypotheses · 90 cross-checks</span>
+                <span>{response.publicSignals.observations.length} supported · {response.publicSignals.supportedChecks}/{response.publicSignals.crossChecks.length} linked</span>
               </summary>
               <div className="sourceRail">
                 <p>Every clue is screened against distinct public sources. Unconfirmed reports remain leads for additional research and do not add points to the market score. Personal residential details are excluded.</p>
