@@ -14,6 +14,11 @@ export function MobileDrawer({ title }: { title: string }) {
   const dialog = useRef<HTMLElement>(null);
 
   useEffect(() => {
+    // Client-side back/forward navigation should never leave an old drawer over a new page.
+    setOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
     if (!open) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
