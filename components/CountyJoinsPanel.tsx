@@ -14,7 +14,7 @@ function formatValue(value: number | null) {
   return abs < 1 ? value.toFixed(2) : abs < 100 ? value.toFixed(1) : Math.round(value).toLocaleString("en-US");
 }
 
-/** Scout result section for the 40 county data joins. Area-level statistics only. */
+/** Scout result section for the county data joins. Area-level statistics only. */
 export function CountyJoinsPanel({ dataJoins, onUseCounty }: { dataJoins: ScoutDataJoins; onUseCounty: (county: string) => void }) {
   const county = dataJoins.county;
   const summary = county
@@ -24,7 +24,7 @@ export function CountyJoinsPanel({ dataJoins, onUseCounty }: { dataJoins: ScoutD
   return (
     <details className="sourceDisclosure" open={dataJoins.status === "county_matched"}>
       <summary>
-        <span>40 county data joins</span>
+        <span>{dataJoins.totalJoins} county data joins</span>
         <span>{summary}</span>
       </summary>
       <div className="sourceRail">
@@ -34,7 +34,7 @@ export function CountyJoinsPanel({ dataJoins, onUseCounty }: { dataJoins: ScoutD
             <div className="sourceItem">
               <i className="sourceDot complete" />
               <div>
-                <b>Confidence {county.confidence}% · {county.computedJoins}/40 joins computed · source agreement {county.agreement ?? "—"}/100</b>
+                <b>Confidence {county.confidence}% · {county.computedJoins}/{dataJoins.totalJoins} joins computed · source agreement {county.agreement ?? "—"}/100</b>
                 <span>{county.familyScores.map((family) => `${family.title} ${family.score ?? "—"}`).join(" · ")}</span>
               </div>
             </div>
@@ -45,7 +45,7 @@ export function CountyJoinsPanel({ dataJoins, onUseCounty }: { dataJoins: ScoutD
               <div className="sourceItem" key={text}><i className="sourceDot unavailable" /><div><b>Watch</b><span>{text}</span></div></div>
             ))}
             <details className="ruleDisclosure">
-              <summary>All 40 joins (percentile within the state; validation joins show agreement)</summary>
+              <summary>All {dataJoins.totalJoins} joins (percentile within the state; validation joins show agreement)</summary>
               <div className="ruleList">
                 {county.joins.map((join) => {
                   const mark = badge(join.percentile, join.agreement);

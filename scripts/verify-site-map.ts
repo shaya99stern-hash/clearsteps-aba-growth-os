@@ -4,7 +4,7 @@ import { collectStateTracts, parseTigerTractPage, tractHotspots } from "../lib/i
 import { analyzeSite, assessDaycare, CDC_AUTISM_PREVALENCE, formatAgeRange, tractWeight } from "../lib/intelligence/geo/site-analysis";
 import { circlePolygon, haversineMiles, insideState } from "../lib/intelligence/geo/geo-math";
 import { FIXTURE_TRACTS, OVERPASS_ELEMENTS, SITE_CENTER, siteFixtureFetch, sitePostText } from "./fixtures/site-map";
-import { fixtureFetch } from "./fixtures/county-joins";
+import { fixtureFetch, fixturePost } from "./fixtures/county-joins";
 import { collectStateCountyBundle } from "../lib/intelligence/joins/collectors";
 import { rankStateCounties } from "../lib/intelligence/joins/rank";
 
@@ -138,8 +138,8 @@ async function main() {
   assert.equal(analysis.convergence.tests.find((test) => test.id === "C3")!.status, "insufficient", "County supply baseline missing → insufficient, not pass");
   assert.equal(analysis.rings.length, 3);
 
-  // --- With county context (40-join bundle for the same counties) ---------------
-  const bundle = await collectStateCountyBundle("MO", { fetchText: fixtureFetch("29") });
+  // --- With county context (county-join bundle for the same counties) ---------------
+  const bundle = await collectStateCountyBundle("MO", { fetchText: fixtureFetch("29"), postText: fixturePost("29") });
   const withCounty = analyzeSite(SITE_CENTER, { tracts: tracts.tracts, places, counties: bundle.frames, countyReports: rankStateCounties(bundle).counties });
   const ctxValue = (id: string) => withCounty.indicators.find((item) => item.id === id)?.value ?? null;
   assert.equal(withCounty.countyFips, "29095", "Point resolves to the county of its nearest tract");
@@ -148,6 +148,17 @@ async function main() {
   for (const id of ["C2", "C3", "C5"]) assert.notEqual(withCounty.convergence.tests.find((test) => test.id === id)!.status, "insufficient", `${id} evaluates with county context`);
   assert(withCounty.convergence.evaluated >= 7);
   assert.equal(withCounty.indicators.filter((item) => item.value !== null).length, 202, "All 202 indicators computed when every source responds");
+
+  // --- Keyless county context (no Census API key: SAIPE / SAHIE / CBP rejected) -----
+  const keylessBundle = await collectStateCountyBundle("MO", { fetchText: fixtureFetch("29", { keylessReporter: true }), postText: fixturePost("29") });
+  const keyless = analyzeSite(SITE_CENTER, { tracts: tracts.tracts, places, counties: keylessBundle.frames, countyReports: rankStateCounties(keylessBundle).counties });
+  const kv = (id: string) => keyless.indicators.find((item) => item.id === id);
+  assert(kv("county.county_opportunity")!.value !== null, "County score available without a key");
+  assert.deepEqual(kv("county.county_child_poverty")!.sources, ["census-acs5"], "Child poverty falls back to ACS and says so");
+  assert(Math.abs(kv("county.county_child_poverty")!.value! - 15) < 0.5, "ACS county child poverty ≈ fixture rate");
+  assert.match(kv("county.county_behavioral_practices")!.name, /NPPES/);
+  for (const id of ["C2", "C3"]) assert.notEqual(keyless.convergence.tests.find((test) => test.id === id)!.status, "insufficient", `${id} evaluates keylessly`);
+  assert.equal(keyless.convergence.tests.find((test) => test.id === "C5")!.status, "insufficient", "C5 needs an independent insurance model; ACS vs ACS is not corroboration");
 
   // --- Failure modes ----------------------------------------------------------
   const noNppes = await collectSitePlaces("MO", SITE_CENTER, { fetchText: siteFixtureFetch({ failNppes: true }), postText: sitePostText });

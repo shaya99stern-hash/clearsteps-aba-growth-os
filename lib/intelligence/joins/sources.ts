@@ -13,14 +13,16 @@ export type ProgramId =
   | "census-cbp"
   | "census-tiger"
   | "hrsa-hpsa-mh"
-  | "state-childcare-licensing";
+  | "state-childcare-licensing"
+  | "cms-nppes-county"
+  | "osm-county";
 
 export interface ProgramDefinition {
   id: ProgramId;
   label: string;
   publisher: string;
   /** How the numbers are produced. Two programs with different methods are independent measurements. */
-  method: "household survey" | "statistical model" | "business register" | "geographic boundary" | "federal designation" | "state licensing roster";
+  method: "household survey" | "statistical model" | "business register" | "geographic boundary" | "federal designation" | "state licensing roster" | "provider registry" | "community facility map";
   url: string;
 }
 
@@ -74,6 +76,20 @@ export const PROGRAMS: Record<ProgramId, ProgramDefinition> = {
     method: "state licensing roster",
     url: "https://gis.mo.gov/arcgis/rest/services/DHSS/Child_care/MapServer/0",
   },
+  "cms-nppes-county": {
+    id: "cms-nppes-county",
+    label: "CMS NPPES provider registry (statewide, by county)",
+    publisher: "Centers for Medicare & Medicaid Services",
+    method: "provider registry",
+    url: "https://npiregistry.cms.hhs.gov/",
+  },
+  "osm-county": {
+    id: "osm-county",
+    label: "OpenStreetMap facilities (statewide, by county)",
+    publisher: "OpenStreetMap contributors",
+    method: "community facility map",
+    url: "https://www.openstreetmap.org/",
+  },
 };
 
 export type MetricId =
@@ -102,7 +118,11 @@ export type MetricId =
   // HRSA designation
   | "hrsa.mh_hpsa_score"
   // State licensing roster
-  | "lic.childcare_sites" | "lic.childcare_capacity";
+  | "lic.childcare_sites" | "lic.childcare_capacity"
+  // CMS NPPES statewide registrations by practice county (keyless)
+  | "nppes.aba_orgs" | "nppes.ped_orgs" | "nppes.slp_orgs" | "nppes.ot_orgs" | "nppes.dev_peds" | "nppes.child_psych"
+  // OpenStreetMap facilities by county (keyless)
+  | "osm.childcare" | "osm.schools" | "osm.hospitals" | "osm.pediatrics" | "osm.therapy" | "osm.aba_named";
 
 export function metricProgram(metric: MetricId): ProgramId {
   const prefix = metric.slice(0, metric.indexOf("."));
@@ -114,6 +134,8 @@ export function metricProgram(metric: MetricId): ProgramId {
     case "tiger": return "census-tiger";
     case "hrsa": return "hrsa-hpsa-mh";
     case "lic": return "state-childcare-licensing";
+    case "nppes": return "cms-nppes-county";
+    case "osm": return "osm-county";
     default: throw new Error("Unknown metric program for " + metric);
   }
 }

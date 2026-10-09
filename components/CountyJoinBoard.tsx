@@ -69,14 +69,14 @@ export function CountyJoinBoard() {
     <section className={shared.queuePanel + " " + styles.board} aria-labelledby="county-joins-heading">
       <div className={shared.sectionHead}>
         <div>
-          <span className={shared.kicker}>40 cross-source data joins</span>
+          <span className={shared.kicker}>{data ? data.totals.joins : 90} cross-source data joins</span>
           <h3 id="county-joins-heading">Rank every county</h3>
         </div>
-        <span>Census ACS · SAIPE · SAHIE · County Business Patterns · TIGER · HRSA shortage areas · state child-care licensing</span>
+        <span>Census ACS · NPPES provider registry · OpenStreetMap · TIGER · HRSA shortage areas · state child-care licensing · SAIPE / SAHIE / CBP with a Census API key</span>
       </div>
       <p className={styles.lede}>
-        Each join combines at least two separate public statistical programs (for example, children per behavioral-health practice, or
-        employer-insured children per practice), ranked as a percentile among the state&apos;s counties. Use it to choose where to run Scout
+        Each join combines at least two separate public sources (for example, children with a disability per registered ABA organization, or
+        licensed child-care slots per ABA organization), ranked as a percentile among the state&apos;s counties. No API key is required. Use it to choose where to run Scout
         and build referral relationships. These are area-level proxies, not confirmed waitlists, diagnoses or eligibility.
       </p>
       <div className={shared.filterBar}>
@@ -126,7 +126,7 @@ export function CountyJoinBoard() {
                     <span className={styles.rank}>{county.rank ? "#" + county.rank : "—"}</span>
                     <span className={styles.name}>
                       <b>{short}</b>
-                      <small>{county.children !== null ? county.children.toLocaleString("en-US") + " children · " : ""}{county.computedJoins}/40 joins · confidence {county.confidence}%{county.lowSample ? " · small sample" : ""}</small>
+                      <small>{county.children !== null ? county.children.toLocaleString("en-US") + " children · " : ""}{county.computedJoins}/{data.totals.joins} joins · confidence {county.confidence}%{county.lowSample ? " · small sample" : ""}</small>
                     </span>
                     <span className={styles.score}><strong>{county.score ?? "—"}</strong><small>{county.score === null ? "unranked" : "/100"}</small></span>
                     <ChevronDown size={16} className={expanded ? styles.chevOpen : styles.chev} aria-hidden="true" />

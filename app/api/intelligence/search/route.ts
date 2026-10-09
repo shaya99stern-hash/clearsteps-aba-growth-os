@@ -386,10 +386,10 @@ export async function POST(request: Request) {
       observations.push(...joined.observations);
       const completePrograms = joined.dataJoins.programs.filter((program) => program.status === "complete").length;
       sourceStatus.push({
-        source: "County data joins (40 cross-program)",
+        source: `County data joins (${joined.dataJoins.totalJoins} cross-program)`,
         status: joined.dataJoins.status === "county_matched" ? "complete" : "unavailable",
         detail: joined.dataJoins.status === "county_matched" && joined.dataJoins.county
-          ? `${joined.dataJoins.county.name}: ${joined.dataJoins.county.computedJoins}/40 joins, rank ${joined.dataJoins.county.rank ?? "—"} of ${joined.dataJoins.county.rankedOf}; ${completePrograms}/${joined.dataJoins.programs.length} statistical programs`
+          ? `${joined.dataJoins.county.name}: ${joined.dataJoins.county.computedJoins}/${joined.dataJoins.totalJoins} joins, rank ${joined.dataJoins.county.rank ?? "—"} of ${joined.dataJoins.county.rankedOf}; ${completePrograms}/${joined.dataJoins.programs.length} statistical programs`
           : joined.dataJoins.note,
       });
     } catch (error) {

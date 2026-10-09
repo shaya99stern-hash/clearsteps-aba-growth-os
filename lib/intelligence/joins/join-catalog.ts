@@ -79,6 +79,35 @@ function statePercentile(frames: readonly CountyFrame[], fn: (m: Metrics) => num
 const behavioralPer10k = (m: Metrics) => per(m, ["cbp.mh_practices"], ["acs.kids"], 10_000);
 const disabledKids: MetricId[] = ["acs.dis_u5", "acs.dis_5to17"];
 const disabledUniverse: MetricId[] = ["acs.dis_u5_universe", "acs.dis_5to17_universe"];
+const ABA: MetricId = "nppes.aba_orgs";
+/** CDC ADDM 2022: 32.2 per 1,000 children aged 8 (about 1 in 31). Statistical expectation only. */
+const CDC_PREVALENCE = 32.2 / 1000;
+const abaPer10k = (m: Metrics) => per(m, [ABA], ["acs.kids"], 10_000);
+const perAba = (m: Metrics, people: MetricId[]) => perPractice(m, people, [ABA]);
+const product = (a: number | null, b: number | null) => a === null || b === null ? null : a * b;
+
+/** Agreement (0–100) between two independent per-child rates, compared as within-state percentiles. */
+function rankAgreement(m: Metrics, ctx: JoinContext, a: (x: Metrics) => number | null, b: (x: Metrics) => number | null) {
+  const va = a(m), vb = b(m);
+  if (va === null || vb === null) return null;
+  const pa = statePercentile(ctx.frames, a, va);
+  const pb = statePercentile(ctx.frames, b, vb);
+  return pa === null || pb === null ? null : Math.round(100 - Math.abs(pa - pb));
+}
+
+/** Distance from this county to the nearest county whose supply rate is at or above the state median (0 if this one is). */
+function nearestAdequate(m: Metrics, ctx: JoinContext, rate: (x: Metrics) => number | null) {
+  if (!has(m, "tiger.lat", "tiger.lon")) return null;
+  const own = rate(m);
+  const rates = ctx.frames.map((frame) => ({ frame, rate: rate(frame.metrics) }))
+    .filter((item): item is { frame: CountyFrame; rate: number } => item.rate !== null && item.rate > 0);
+  const threshold = median(rates.map((item) => item.rate));
+  if (own === null || threshold === null) return null;
+  if (own >= threshold) return 0;
+  const distances = rates.filter((item) => item.rate >= threshold && item.frame.fips !== ctx.self.fips && has(item.frame.metrics, "tiger.lat", "tiger.lon"))
+    .map((item) => haversineMiles(v(m, "tiger.lat"), v(m, "tiger.lon"), v(item.frame.metrics, "tiger.lat"), v(item.frame.metrics, "tiger.lon")));
+  return distances.length ? Math.min(...distances) : null;
+}
 
 export const DATA_JOINS: readonly JoinDefinition[] = [
   // --- Service gap -------------------------------------------------------------------------
@@ -161,19 +190,7 @@ export const DATA_JOINS: readonly JoinDefinition[] = [
     formula: "Centroid distance (TIGER) to the nearest county at or above the state median of CBP 621330 per ACS child; 0 if this county qualifies",
     unit: "miles", metrics: ["tiger.lat", "tiger.lon", "cbp.mh_practices", "acs.kids"], opportunity: "higher",
     indicator: { id: "aba-supply.08", value: "supply" },
-    compute: (m, ctx) => {
-      if (!has(m, "tiger.lat", "tiger.lon")) return null;
-      const own = behavioralPer10k(m);
-      const rates = ctx.frames.map((frame) => ({ frame, rate: behavioralPer10k(frame.metrics) }))
-        .filter((item): item is { frame: CountyFrame; rate: number } => item.rate !== null && item.rate > 0);
-      const threshold = median(rates.map((item) => item.rate));
-      if (own === null || threshold === null) return null;
-      if (own >= threshold) return 0;
-      const distances = rates.filter((item) => item.rate >= threshold && item.frame.fips !== ctx.self.fips &&
-        has(item.frame.metrics, "tiger.lat", "tiger.lon"))
-        .map((item) => haversineMiles(v(m, "tiger.lat"), v(m, "tiger.lon"), v(item.frame.metrics, "tiger.lat"), v(item.frame.metrics, "tiger.lon")));
-      return distances.length ? Math.min(...distances) : null;
-    },
+    compute: (m, ctx) => nearestAdequate(m, ctx, behavioralPer10k),
   },
 
   // --- Referral network --------------------------------------------------------------------
@@ -443,16 +460,381 @@ export const DATA_JOINS: readonly JoinDefinition[] = [
     rationale: "Employer child-care centers (CBP) and licensed sites (state) should rank counties similarly.",
     formula: "100 − |state percentile of CBP 624410 per young child − state percentile of licensed sites per young child|",
     unit: "agreement / 100", metrics: ["cbp.daycare", "lic.childcare_sites", "acs.kids_u6"], opportunity: "agreement",
-    compute: (m, ctx) => {
-      const cbpRate = (x: Metrics) => per(x, ["cbp.daycare"], ["acs.kids_u6"], 1_000);
-      const licRate = (x: Metrics) => per(x, ["lic.childcare_sites"], ["acs.kids_u6"], 1_000);
-      const a = cbpRate(m);
-      const b = licRate(m);
-      if (a === null || b === null) return null;
-      const pa = statePercentile(ctx.frames, cbpRate, a);
-      const pb = statePercentile(ctx.frames, licRate, b);
-      return pa === null || pb === null ? null : Math.round(100 - Math.abs(pa - pb));
+    compute: (m, ctx) => rankAgreement(m, ctx, (x) => per(x, ["cbp.daycare"], ["acs.kids_u6"], 1_000), (x) => per(x, ["lic.childcare_sites"], ["acs.kids_u6"], 1_000)),
+  },
+
+  // =========================================================================================
+  // J41–J90: keyless joins. NPPES (ABA-specific taxonomy), OpenStreetMap, ACS via Census Reporter,
+  // TIGER, HRSA and state licensing. These run without a Census API key.
+  // =========================================================================================
+
+  // --- Service gap: ABA-specific supply from the NPPES Behavior Analyst taxonomy ---------------
+  {
+    id: "J41", family: "service_gap", title: "ABA organizations per 10,000 children",
+    rationale: "Registered ABA organizations (NPPES Behavior Analyst taxonomy) per child is the most direct supply measure.",
+    formula: "NPPES Behavior Analyst organizations ÷ ACS children × 10,000", unit: "ABA orgs / 10k children",
+    metrics: [ABA, "acs.kids"], opportunity: "lower", indicator: { id: "aba-supply.01", value: "supply" },
+    compute: (m) => abaPer10k(m),
+  },
+  {
+    id: "J42", family: "service_gap", title: "ABA organizations per 10,000 children ages 0–5",
+    rationale: "Early-intervention-age demand against ABA-specific supply.",
+    formula: "NPPES ABA organizations ÷ ACS children under 6 × 10,000", unit: "ABA orgs / 10k young children",
+    metrics: [ABA, "acs.kids_u6"], opportunity: "lower",
+    compute: (m) => per(m, [ABA], ["acs.kids_u6"], 10_000),
+  },
+  {
+    id: "J43", family: "service_gap", title: "Children with a disability per ABA organization",
+    rationale: "Aggregate disability counts per ABA provider approximate the caseload each provider would face.",
+    formula: "ACS B18101 children with a disability ÷ (NPPES ABA organizations + 1)", unit: "children / ABA org",
+    metrics: [...disabledKids, ABA], opportunity: "higher",
+    compute: (m) => perAba(m, disabledKids),
+  },
+  {
+    id: "J44", family: "service_gap", title: "Children 5–17 with cognitive difficulty per ABA organization",
+    rationale: "Developmental need per ABA provider.",
+    formula: "ACS B18104 cognitive difficulty 5–17 ÷ (NPPES ABA organizations + 1)", unit: "children / ABA org",
+    metrics: ["acs.cog_5to17", ABA], opportunity: "higher",
+    compute: (m) => perAba(m, ["acs.cog_5to17"]),
+  },
+  {
+    id: "J45", family: "service_gap", title: "Medicaid-covered children per ABA organization",
+    rationale: "Medicaid ABA demand per provider; MO HealthNet, KanCare and Health First Colorado cover ABA.",
+    formula: "ACS under-19 Medicaid/means-tested only ÷ (NPPES ABA organizations + 1)", unit: "children / ABA org",
+    metrics: ["acs.u19_medicaid", ABA], opportunity: "higher",
+    compute: (m) => perAba(m, ["acs.u19_medicaid"]),
+  },
+  {
+    id: "J46", family: "service_gap", title: "Employer-insured children per ABA organization",
+    rationale: "Commercial (autism-mandate) demand per ABA provider.",
+    formula: "ACS under-19 employer-only ÷ (NPPES ABA organizations + 1)", unit: "children / ABA org",
+    metrics: ["acs.u19_employer", ABA], opportunity: "higher",
+    compute: (m) => perAba(m, ["acs.u19_employer"]),
+  },
+  {
+    id: "J47", family: "service_gap", title: "Children in poverty per ABA organization",
+    rationale: "Low-income children are likely Medicaid-eligible for ABA.",
+    formula: "ACS B17020 children below poverty ÷ (NPPES ABA organizations + 1)", unit: "children / ABA org",
+    metrics: ["acs.kids_pov", ABA], opportunity: "higher",
+    compute: (m) => perAba(m, ["acs.kids_pov"]),
+  },
+  {
+    id: "J48", family: "service_gap", title: "Child-population growth × children per ABA organization",
+    rationale: "A growing child population makes an ABA gap durable.",
+    formula: "(1 + ACS under-18 change since 2015–19) × ACS children ÷ (NPPES ABA organizations + 1)", unit: "growth-weighted children / ABA org",
+    metrics: ["acs.kids", "acs.kids_prior", ABA], opportunity: "higher",
+    compute: (m) => {
+      const gap = perAba(m, ["acs.kids"]);
+      if (gap === null || !has(m, "acs.kids_prior") || v(m, "acs.kids_prior") <= 0) return null;
+      return Math.max(0, 1 + (v(m, "acs.kids") - v(m, "acs.kids_prior")) / v(m, "acs.kids_prior")) * gap;
     },
+  },
+  {
+    id: "J49", family: "service_gap", title: "Federal mental-health shortage × children per ABA organization",
+    rationale: "HRSA's shortage designation independently corroborates the registry-based ABA gap.",
+    formula: "HRSA Mental Health HPSA score × ACS children ÷ (NPPES ABA organizations + 1)", unit: "score-weighted children / ABA org",
+    metrics: ["hrsa.mh_hpsa_score", "acs.kids", ABA], opportunity: "higher", indicator: { id: "aba-supply.06", value: "supply" },
+    compute: (m) => {
+      const gap = perAba(m, ["acs.kids"]);
+      return gap === null || !has(m, "hrsa.mh_hpsa_score") ? null : v(m, "hrsa.mh_hpsa_score") * gap;
+    },
+  },
+  {
+    id: "J50", family: "service_gap", title: "Miles to the nearest county with typical ABA supply",
+    rationale: "How far families travel to reach a county with at least the state-median ABA supply.",
+    formula: "TIGER centroid distance to nearest county at or above the state median of NPPES ABA orgs per ACS child; 0 if this county qualifies",
+    unit: "miles", metrics: ["tiger.lat", "tiger.lon", ABA, "acs.kids"], opportunity: "higher", indicator: { id: "aba-supply.08", value: "supply" },
+    compute: (m, ctx) => nearestAdequate(m, ctx, abaPer10k),
+  },
+  {
+    id: "J51", family: "service_gap", title: "Square miles per ABA organization",
+    rationale: "Large service areas per ABA provider mark rural families with few options.",
+    formula: "TIGER land area ÷ (NPPES ABA organizations + 1)", unit: "sq mi / ABA org",
+    metrics: ["tiger.land_sqmi", ABA], opportunity: "higher", indicator: { id: "access-geography.06", value: "opportunity" },
+    compute: (m) => perAba(m, ["tiger.land_sqmi"]),
+  },
+  {
+    id: "J52", family: "service_gap", title: "Car-free households × children per ABA organization",
+    rationale: "Families without cars depend on in-home ABA where providers are scarce.",
+    formula: "ACS no-vehicle household share × ACS children ÷ (NPPES ABA organizations + 1)", unit: "index",
+    metrics: ["acs.hh_no_vehicle", "acs.hh_vehicle_universe", "acs.kids", ABA], opportunity: "higher", indicator: { id: "access-geography.07", value: "opportunity" },
+    compute: (m) => product(share(m, "acs.hh_no_vehicle", "acs.hh_vehicle_universe"), perAba(m, ["acs.kids"])),
+  },
+  {
+    id: "J53", family: "service_gap", title: "Average commute × children per ABA organization",
+    rationale: "Long commutes leave little time for clinic visits, favoring in-home ABA.",
+    formula: "ACS mean travel time to work × ACS children ÷ (NPPES ABA organizations + 1) ÷ 100", unit: "index",
+    metrics: ["acs.commute_minutes", "acs.commuters", "acs.kids", ABA], opportunity: "higher",
+    compute: (m) => { const p = product(per(m, ["acs.commute_minutes"], ["acs.commuters"]), perAba(m, ["acs.kids"])); return p === null ? null : p / 100; },
+  },
+  {
+    id: "J54", family: "service_gap", title: "Limited-English households × children per ABA organization",
+    rationale: "Language-access gaps where ABA supply is thin favor bilingual intake.",
+    formula: "ACS limited-English household share × ACS children ÷ (NPPES ABA organizations + 1)", unit: "index",
+    metrics: ["acs.lep_hh", "acs.lep_universe", "acs.kids", ABA], opportunity: "higher",
+    compute: (m) => product(share(m, "acs.lep_hh", "acs.lep_universe"), perAba(m, ["acs.kids"])),
+  },
+  {
+    id: "J55", family: "service_gap", title: "Telehealth fit × square miles per ABA organization",
+    rationale: "Connected households in large, thinly served areas suit telehealth parent training.",
+    formula: "ACS internet share × TIGER sq mi ÷ (NPPES ABA organizations + 1)", unit: "index",
+    metrics: ["acs.hh_no_internet", "acs.hh_internet_universe", "tiger.land_sqmi", ABA], opportunity: "higher",
+    compute: (m) => { const offline = share(m, "acs.hh_no_internet", "acs.hh_internet_universe"); return offline === null ? null : product(1 - offline, perAba(m, ["tiger.land_sqmi"])); },
+  },
+  {
+    id: "J56", family: "service_gap", title: "Statistically expected autistic children (3–17) per ABA organization",
+    rationale: "CDC's 1-in-31 prevalence applied to the county's children, per ABA provider. An expectation, not identified children.",
+    formula: "ACS children 3–17 × CDC ADDM 32.2 / 1,000 ÷ (NPPES ABA organizations + 1)", unit: "expected children / ABA org",
+    metrics: ["acs.kids_3to5", "acs.kids_6to17", ABA], opportunity: "higher",
+    compute: (m) => { const p = perAba(m, ["acs.kids_3to5", "acs.kids_6to17"]); return p === null ? null : p * CDC_PREVALENCE; },
+  },
+  {
+    id: "J57", family: "service_gap", title: "Children per developmental-behavioral pediatrician",
+    rationale: "Diagnostic bottleneck: autism diagnoses that unlock ABA coverage often need this specialist.",
+    formula: "ACS children ÷ (NPPES Developmental-Behavioral Pediatrics clinicians + 1)", unit: "children / specialist",
+    metrics: ["acs.kids", "nppes.dev_peds"], opportunity: "higher",
+    compute: (m) => perPractice(m, ["acs.kids"], ["nppes.dev_peds"]),
+  },
+  {
+    id: "J58", family: "service_gap", title: "Children per child & adolescent psychologist",
+    rationale: "Psychologists provide many autism evaluations; scarcity delays diagnosis and ABA starts.",
+    formula: "ACS children ÷ (NPPES Clinical Child & Adolescent psychologists + 1)", unit: "children / psychologist",
+    metrics: ["acs.kids", "nppes.child_psych"], opportunity: "higher",
+    compute: (m) => perPractice(m, ["acs.kids"], ["nppes.child_psych"]),
+  },
+  {
+    id: "J59", family: "service_gap", title: "Children with a disability per speech-language organization",
+    rationale: "Speech-therapy bottlenecks push families toward other developmental services.",
+    formula: "ACS children with a disability ÷ (NPPES Speech-Language Pathologist organizations + 1)", unit: "children / org",
+    metrics: [...disabledKids, "nppes.slp_orgs"], opportunity: "higher",
+    compute: (m) => perPractice(m, disabledKids, ["nppes.slp_orgs"]),
+  },
+  {
+    id: "J60", family: "service_gap", title: "Children under 5 with a disability per occupational-therapy organization",
+    rationale: "Early-intervention-age need against the OT practices that often see these children first.",
+    formula: "ACS children under 5 with a disability ÷ (NPPES Occupational Therapist organizations + 1)", unit: "children / org",
+    metrics: ["acs.dis_u5", "nppes.ot_orgs"], opportunity: "higher",
+    compute: (m) => perPractice(m, ["acs.dis_u5"], ["nppes.ot_orgs"]),
+  },
+
+  // --- Referral network ---------------------------------------------------------------------
+  {
+    id: "J61", family: "referral_network", title: "Pediatric organizations per 10,000 children",
+    rationale: "Pediatric practices screen for autism and refer to ABA.",
+    formula: "NPPES Pediatrics organizations ÷ ACS children × 10,000", unit: "orgs / 10k children",
+    metrics: ["nppes.ped_orgs", "acs.kids"], opportunity: "higher", indicator: { id: "referral-ecosystem.01", value: "opportunity" },
+    compute: (m) => per(m, ["nppes.ped_orgs"], ["acs.kids"], 10_000),
+  },
+  {
+    id: "J62", family: "referral_network", title: "Pediatric organizations per ABA organization",
+    rationale: "More pediatric referrers per competing ABA provider means more referral flow per provider.",
+    formula: "NPPES Pediatrics organizations ÷ (NPPES ABA organizations + 1)", unit: "pediatric orgs / ABA org",
+    metrics: ["nppes.ped_orgs", ABA, "acs.kids"], opportunity: "higher",
+    compute: (m) => has(m, "acs.kids") ? perAba(m, ["nppes.ped_orgs"]) : null,
+  },
+  {
+    id: "J63", family: "referral_network", title: "Speech and OT organizations per ABA organization",
+    rationale: "Related-service practices refer children for behavioral evaluation.",
+    formula: "(NPPES SLP + OT organizations) ÷ (NPPES ABA organizations + 1), counties with ACS children only", unit: "orgs / ABA org",
+    metrics: ["nppes.slp_orgs", "nppes.ot_orgs", ABA, "acs.kids"], opportunity: "higher",
+    compute: (m) => has(m, "acs.kids") ? perAba(m, ["nppes.slp_orgs", "nppes.ot_orgs"]) : null,
+  },
+  {
+    id: "J64", family: "referral_network", title: "Mapped child-care facilities per 1,000 children 0–5",
+    rationale: "A second, independent view of the early-childhood network (works in Kansas too).",
+    formula: "OpenStreetMap child care + kindergartens ÷ ACS children under 6 × 1,000", unit: "facilities / 1k young children",
+    metrics: ["osm.childcare", "acs.kids_u6"], opportunity: "higher", indicator: { id: "referral-ecosystem.08", value: "opportunity" },
+    compute: (m) => per(m, ["osm.childcare"], ["acs.kids_u6"], 1_000),
+  },
+  {
+    id: "J65", family: "referral_network", title: "Schools per 10,000 school-age children",
+    rationale: "Schools and their special-education teams refer families for outside services.",
+    formula: "OpenStreetMap schools ÷ ACS children 6–17 × 10,000", unit: "schools / 10k school-age children",
+    metrics: ["osm.schools", "acs.kids_6to17"], opportunity: "higher",
+    compute: (m) => per(m, ["osm.schools"], ["acs.kids_6to17"], 10_000),
+  },
+  {
+    id: "J66", family: "referral_network", title: "Pediatric and children's clinics per 10,000 children",
+    rationale: "Named pediatric clinics on the community map, independent of the provider registry.",
+    formula: "OpenStreetMap pediatric / children's clinics ÷ ACS children × 10,000", unit: "clinics / 10k children",
+    metrics: ["osm.pediatrics", "acs.kids"], opportunity: "higher",
+    compute: (m) => per(m, ["osm.pediatrics"], ["acs.kids"], 10_000),
+  },
+  {
+    id: "J67", family: "referral_network", title: "Hospitals per 100,000 children",
+    rationale: "Hospital pediatric departments anchor diagnostic referral pathways.",
+    formula: "OpenStreetMap hospitals ÷ ACS children × 100,000", unit: "hospitals / 100k children",
+    metrics: ["osm.hospitals", "acs.kids"], opportunity: "higher", indicator: { id: "access-geography.08", value: "opportunity" },
+    compute: (m) => per(m, ["osm.hospitals"], ["acs.kids"], 100_000),
+  },
+  {
+    id: "J68", family: "referral_network", title: "Licensed child-care sites per ABA organization",
+    rationale: "Early-childhood referral partners available to each competing ABA provider.",
+    formula: "State licensed child-care sites ÷ (NPPES ABA organizations + 1)", unit: "sites / ABA org",
+    metrics: ["lic.childcare_sites", ABA], opportunity: "higher",
+    compute: (m) => perAba(m, ["lic.childcare_sites"]),
+  },
+  {
+    id: "J69", family: "referral_network", title: "Licensed child-care slots per ABA organization",
+    rationale: "Children in licensed care per ABA provider: the pool child-care partners can refer from.",
+    formula: "State licensed capacity ÷ (NPPES ABA organizations + 1)", unit: "slots / ABA org",
+    metrics: ["lic.childcare_capacity", ABA], opportunity: "higher",
+    compute: (m) => perAba(m, ["lic.childcare_capacity"]),
+  },
+  {
+    id: "J70", family: "referral_network", title: "All referral touchpoints per ABA organization",
+    rationale: "Pediatric, speech, OT and mapped child-care referrers combined, per competing ABA provider.",
+    formula: "(NPPES pediatric + SLP + OT organizations + OpenStreetMap child care) ÷ (NPPES ABA organizations + 1)", unit: "touchpoints / ABA org",
+    metrics: ["nppes.ped_orgs", "nppes.slp_orgs", "nppes.ot_orgs", "osm.childcare", ABA], opportunity: "higher",
+    compute: (m) => perAba(m, ["nppes.ped_orgs", "nppes.slp_orgs", "nppes.ot_orgs", "osm.childcare"]),
+  },
+  {
+    id: "J71", family: "referral_network", title: "Diagnostic clinicians per 10,000 children",
+    rationale: "Developmental pediatricians and child psychologists produce the diagnoses that start ABA referrals.",
+    formula: "(NPPES Developmental-Behavioral Pediatrics + Clinical Child & Adolescent) ÷ ACS children × 10,000", unit: "clinicians / 10k children",
+    metrics: ["nppes.dev_peds", "nppes.child_psych", "acs.kids"], opportunity: "higher", indicator: { id: "referral-ecosystem.04", value: "opportunity" },
+    compute: (m) => per(m, ["nppes.dev_peds", "nppes.child_psych"], ["acs.kids"], 10_000),
+  },
+  {
+    id: "J72", family: "referral_network", title: "Schools per ABA organization",
+    rationale: "School referral sources available to each competing ABA provider.",
+    formula: "OpenStreetMap schools ÷ (NPPES ABA organizations + 1)", unit: "schools / ABA org",
+    metrics: ["osm.schools", ABA], opportunity: "higher",
+    compute: (m) => perAba(m, ["osm.schools"]),
+  },
+
+  // --- Payer and family economics -------------------------------------------------------------
+  {
+    id: "J73", family: "payer_fit", title: "Insured children (employer + Medicaid) per ABA organization",
+    rationale: "Billable children per ABA provider across both major payer types.",
+    formula: "ACS under-19 employer-only + Medicaid-only ÷ (NPPES ABA organizations + 1)", unit: "children / ABA org",
+    metrics: ["acs.u19_employer", "acs.u19_medicaid", ABA], opportunity: "higher",
+    compute: (m) => perAba(m, ["acs.u19_employer", "acs.u19_medicaid"]),
+  },
+  {
+    id: "J74", family: "payer_fit", title: "Employer-insured children 0–5 per ABA organization",
+    rationale: "Young children on commercial plans are the highest-value early-intervention referrals.",
+    formula: "ACS children under 6 × employer-only share ÷ (NPPES ABA organizations + 1)", unit: "children / ABA org",
+    metrics: ["acs.kids_u6", "acs.u19_employer", "acs.u19", ABA], opportunity: "higher",
+    compute: (m) => product(share(m, "acs.u19_employer", "acs.u19"), perAba(m, ["acs.kids_u6"])),
+  },
+  {
+    id: "J75", family: "payer_fit", title: "Medicaid-covered children 0–5 per ABA organization",
+    rationale: "Young children on Medicaid, where EPSDT requires medically necessary ABA.",
+    formula: "ACS children under 6 × Medicaid-only share ÷ (NPPES ABA organizations + 1)", unit: "children / ABA org",
+    metrics: ["acs.kids_u6", "acs.u19_medicaid", "acs.u19", ABA], opportunity: "higher",
+    compute: (m) => product(share(m, "acs.u19_medicaid", "acs.u19"), perAba(m, ["acs.kids_u6"])),
+  },
+  {
+    id: "J76", family: "payer_fit", title: "Working-parent children 0–5 per ABA organization",
+    rationale: "Working families need center-based or scheduled ABA that fits their workday.",
+    formula: "ACS B23008 children under 6 with all parents working ÷ (NPPES ABA organizations + 1)", unit: "children / ABA org",
+    metrics: ["acs.u6_working_parents", ABA], opportunity: "higher",
+    compute: (m) => perAba(m, ["acs.u6_working_parents"]),
+  },
+  {
+    id: "J77", family: "payer_fit", title: "Income-adjusted families with children per ABA organization",
+    rationale: "Families with children, weighted by how their income compares with the county, per ABA provider.",
+    formula: "ACS households with children × (ACS family income with children ÷ ACS median household income) ÷ (NPPES ABA organizations + 1)", unit: "index",
+    metrics: ["acs.hh_kids", "acs.mfi_kids", "acs.mhi", ABA], opportunity: "higher",
+    compute: (m) => product(per(m, ["acs.mfi_kids"], ["acs.mhi"]), perAba(m, ["acs.hh_kids"])),
+  },
+
+  // --- Access -----------------------------------------------------------------------------------
+  {
+    id: "J78", family: "access", title: "Dense child population with thin ABA supply",
+    rationale: "Many children close together and few ABA providers: short drives, unmet demand.",
+    formula: "(ACS children ÷ TIGER sq mi) ÷ (NPPES ABA orgs per 10k children + 1)", unit: "index",
+    metrics: ["acs.kids", "tiger.land_sqmi", ABA], opportunity: "higher",
+    compute: (m) => { const density = per(m, ["acs.kids"], ["tiger.land_sqmi"]); const supply = abaPer10k(m); return density === null || supply === null ? null : density / (supply + 1); },
+  },
+  {
+    id: "J79", family: "access", title: "Rural shortage × square miles per ABA organization",
+    rationale: "A federal shortage designation over a large, ABA-thin area.",
+    formula: "HRSA Mental Health HPSA score × TIGER sq mi ÷ (NPPES ABA organizations + 1)", unit: "index",
+    metrics: ["hrsa.mh_hpsa_score", "tiger.land_sqmi", ABA], opportunity: "higher",
+    compute: (m) => has(m, "hrsa.mh_hpsa_score") ? product(v(m, "hrsa.mh_hpsa_score"), perAba(m, ["tiger.land_sqmi"])) : null,
+  },
+  {
+    id: "J80", family: "access", title: "Licensed child-care sites per square mile",
+    rationale: "Dense child-care networks make referral outreach routes efficient.",
+    formula: "State licensed child-care sites ÷ TIGER sq mi", unit: "sites / sq mi",
+    metrics: ["lic.childcare_sites", "tiger.land_sqmi"], opportunity: "higher",
+    compute: (m) => per(m, ["lic.childcare_sites"], ["tiger.land_sqmi"]),
+  },
+
+  // --- Need intensity ---------------------------------------------------------------------------
+  {
+    id: "J81", family: "need_intensity", title: "Children with a disability per diagnostic clinician",
+    rationale: "Developmental need against the clinicians who diagnose autism.",
+    formula: "ACS children with a disability ÷ (NPPES developmental pediatricians + child psychologists + 1)", unit: "children / clinician",
+    metrics: [...disabledKids, "nppes.dev_peds", "nppes.child_psych"], opportunity: "higher",
+    compute: (m) => perPractice(m, disabledKids, ["nppes.dev_peds", "nppes.child_psych"]),
+  },
+  {
+    id: "J82", family: "need_intensity", title: "Children under 5 with a disability per pediatric organization",
+    rationale: "Early need against the practices that run developmental screening.",
+    formula: "ACS children under 5 with a disability ÷ (NPPES Pediatrics organizations + 1)", unit: "children / org",
+    metrics: ["acs.dis_u5", "nppes.ped_orgs"], opportunity: "higher",
+    compute: (m) => perPractice(m, ["acs.dis_u5"], ["nppes.ped_orgs"]),
+  },
+  {
+    id: "J83", family: "need_intensity", title: "Children with cognitive difficulty per child psychologist",
+    rationale: "Cognitive need against evaluation capacity.",
+    formula: "ACS B18104 cognitive difficulty 5–17 ÷ (NPPES child & adolescent psychologists + 1)", unit: "children / psychologist",
+    metrics: ["acs.cog_5to17", "nppes.child_psych"], opportunity: "higher",
+    compute: (m) => perPractice(m, ["acs.cog_5to17"], ["nppes.child_psych"]),
+  },
+  {
+    id: "J84", family: "need_intensity", title: "Statistically expected autistic children per diagnostic clinician",
+    rationale: "CDC prevalence applied to the county's children, per diagnostic clinician. An expectation, not identified children.",
+    formula: "ACS children 3–17 × CDC ADDM 32.2 / 1,000 ÷ (NPPES developmental pediatricians + child psychologists + 1)", unit: "expected children / clinician",
+    metrics: ["acs.kids_3to5", "acs.kids_6to17", "nppes.dev_peds", "nppes.child_psych"], opportunity: "higher",
+    compute: (m) => { const p = perPractice(m, ["acs.kids_3to5", "acs.kids_6to17"], ["nppes.dev_peds", "nppes.child_psych"]); return p === null ? null : p * CDC_PREVALENCE; },
+  },
+
+  // --- Cross-source validation (rank agreement 0–100) -----------------------------------------
+  {
+    id: "J85", family: "validation", title: "Child care: OpenStreetMap vs state licensing",
+    rationale: "Community-mapped and state-licensed child care should rank counties similarly.",
+    formula: "100 − |state percentile of OSM child care per young child − state percentile of licensed sites per young child|",
+    unit: "agreement / 100", metrics: ["osm.childcare", "lic.childcare_sites", "acs.kids_u6"], opportunity: "agreement",
+    compute: (m, ctx) => rankAgreement(m, ctx, (x) => per(x, ["osm.childcare"], ["acs.kids_u6"], 1_000), (x) => per(x, ["lic.childcare_sites"], ["acs.kids_u6"], 1_000)),
+  },
+  {
+    id: "J86", family: "validation", title: "ABA supply: provider registry vs community map",
+    rationale: "NPPES ABA organizations and ABA-named mapped facilities should agree on where supply is.",
+    formula: "100 − |state percentile of NPPES ABA orgs per child − state percentile of OSM ABA-named facilities per child|",
+    unit: "agreement / 100", metrics: [ABA, "osm.aba_named", "acs.kids"], opportunity: "agreement",
+    compute: (m, ctx) => rankAgreement(m, ctx, abaPer10k, (x) => per(x, ["osm.aba_named"], ["acs.kids"], 10_000)),
+  },
+  {
+    id: "J87", family: "validation", title: "Pediatric supply: provider registry vs community map",
+    rationale: "NPPES pediatric organizations and mapped pediatric clinics should agree.",
+    formula: "100 − |state percentile of NPPES pediatric orgs per child − state percentile of OSM pediatric clinics per child|",
+    unit: "agreement / 100", metrics: ["nppes.ped_orgs", "osm.pediatrics", "acs.kids"], opportunity: "agreement",
+    compute: (m, ctx) => rankAgreement(m, ctx, (x) => per(x, ["nppes.ped_orgs"], ["acs.kids"], 10_000), (x) => per(x, ["osm.pediatrics"], ["acs.kids"], 10_000)),
+  },
+  {
+    id: "J88", family: "validation", title: "Behavioral supply: provider registry vs business register",
+    rationale: "NPPES ABA organizations vs CBP mental-health practices (runs when a Census API key is configured).",
+    formula: "100 − |state percentile of NPPES ABA orgs per child − state percentile of CBP 621330 per child|",
+    unit: "agreement / 100", metrics: [ABA, "cbp.mh_practices", "acs.kids"], opportunity: "agreement",
+    compute: (m, ctx) => rankAgreement(m, ctx, abaPer10k, behavioralPer10k),
+  },
+  {
+    id: "J89", family: "validation", title: "Hospitals: community map vs business register",
+    rationale: "Mapped hospitals vs CBP general hospitals (runs when a Census API key is configured).",
+    formula: "100 − |state percentile of OSM hospitals per child − state percentile of CBP 622110 per child|",
+    unit: "agreement / 100", metrics: ["osm.hospitals", "cbp.hospitals", "acs.kids"], opportunity: "agreement",
+    compute: (m, ctx) => rankAgreement(m, ctx, (x) => per(x, ["osm.hospitals"], ["acs.kids"], 100_000), (x) => per(x, ["cbp.hospitals"], ["acs.kids"], 100_000)),
+  },
+  {
+    id: "J90", family: "validation", title: "Speech/OT supply: provider registry vs community map",
+    rationale: "NPPES speech and OT organizations vs mapped therapy offices.",
+    formula: "100 − |state percentile of NPPES SLP + OT orgs per child − state percentile of OSM therapy offices per child|",
+    unit: "agreement / 100", metrics: ["nppes.slp_orgs", "nppes.ot_orgs", "osm.therapy", "acs.kids"], opportunity: "agreement",
+    compute: (m, ctx) => rankAgreement(m, ctx, (x) => per(x, ["nppes.slp_orgs", "nppes.ot_orgs"], ["acs.kids"], 10_000), (x) => per(x, ["osm.therapy"], ["acs.kids"], 10_000)),
   },
 ];
 

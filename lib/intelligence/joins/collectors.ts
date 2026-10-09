@@ -1,5 +1,9 @@
 import { MISSOURI_CHILD_CARE_LAYER_URL } from "../official/mo-child-care-gis";
 import { CBP_NAICS, STATE_FIPS, type JoinState, type MetricId, type ProgramId } from "./sources";
+import { errorText, isRecord, limitedSettled, upperKeys } from "./util";
+import { collectKeylessCountyCounts, parseCountyShapes, type CountyShape } from "./keyless-county";
+
+export { errorText, isRecord, limitedSettled, upperKeys };
 
 /**
  * Statewide, county-level collectors for the structured programs in ./sources.
@@ -446,6 +450,15 @@ export const defaultFetchText: FetchText = async (url, signal) => {
   return new TextDecoder().decode(Buffer.concat(chunks));
 };
 
+const defaultPostForm: PostForm = async (url, body, signal) => {
+  const response = await fetch(url, {
+    method: "POST", body, signal, cache: "no-store",
+    headers: { "content-type": "application/x-www-form-urlencoded", "user-agent": "ClearStepsResearch/1.0 (+public county data joins)" },
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.text();
+};
+
 export function censusUrl(path: string, params: Record<string, string> | URLSearchParams) {
   const search = new URLSearchParams(params);
   const key = process.env.CENSUS_API_KEY?.trim();
@@ -471,8 +484,11 @@ export async function firstWorking<T, R>(
   throw new Error(errors.join("; ") || "no attempts");
 }
 
+export type PostForm = (url: string, body: string, signal: AbortSignal) => Promise<string>;
 export interface CollectOptions {
   fetchText?: FetchText;
+  /** Form-encoded POST (Overpass). */
+  postText?: PostForm;
   /** Overall budget for the whole state; slower sources are reported unavailable. */
   timeoutMs?: number;
 }
@@ -480,7 +496,8 @@ export interface CollectOptions {
 export async function collectStateCountyBundle(state: JoinState, options: CollectOptions = {}): Promise<StateCountyBundle> {
   const fetchText = options.fetchText ?? defaultFetchText;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 22_000);
+  const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 45_000);
+  const postText = options.postText ?? defaultPostForm;
   const signal = controller.signal;
   const stateFips = STATE_FIPS[state];
   const geo = { for: "county:*", in: `state:${stateFips}` };
@@ -500,7 +517,9 @@ export async function collectStateCountyBundle(state: JoinState, options: Collec
 
   const acs = (async () => {
     const current = await fetchAcsRows({ get, signal, stateFips, level: "county", variables: ACS_BATCHES.flat() });
-    const prior = await fetchAcsRows({ get, signal, stateFips, level: "county", variables: ["B09001_001E"], prior: true }).catch(() => null);
+    let priorError = "";
+    const prior = await fetchAcsRows({ get, signal, stateFips, level: "county", variables: ["B09001_001E"], prior: true })
+      .catch((error) => { priorError = errorText(error).slice(0, 160); return null; });
     const patch: MetricPatch = new Map();
     for (const [fips, row] of current.rows) {
       const { metrics, issues } = acsMetricsFromRow(row);
@@ -512,7 +531,7 @@ export async function collectStateCountyBundle(state: JoinState, options: Collec
       if (kids !== undefined && patch.has(fips)) patch.get(fips)!.metrics["acs.kids_prior"] = kids;
     }
     apply(patch);
-    const partial = [...current.partial, prior ? null : `${ACS_PRIOR_YEAR} vintage failed`].filter(Boolean);
+    const partial = [...current.partial, prior ? null : `${ACS_PRIOR_YEAR} vintage failed (${priorError})`].filter(Boolean);
     return { vintage: current.vintage, detail: `${current.rows.size} counties via ${current.via}${partial.length ? "; " + partial.join("; ") : ""}` };
   })();
 
@@ -554,22 +573,34 @@ export async function collectStateCountyBundle(state: JoinState, options: Collec
     };
   })();
 
+  let resolveShapes: (shapes: CountyShape[]) => void = () => undefined;
+  const shapes = new Promise<CountyShape[]>((resolve) => { resolveShapes = resolve; });
   const tiger = (async () => {
-    let layer = 1;
     try {
-      layer = tigerCountyLayerId(JSON.parse(await get(`${TIGER_SERVICE}?f=json`))) ?? 1;
-    } catch { /* fall back to the documented Counties layer */ }
-    const params = new URLSearchParams({
-      where: `STATE='${stateFips}'`,
-      outFields: "GEOID,STATE,COUNTY,NAME,AREALAND,CENTLAT,CENTLON",
-      returnGeometry: "false",
-      f: "json",
-    });
-    const patch = parseTigerCounties(JSON.parse(await get(`${TIGER_SERVICE}/${layer}/query?${params.toString()}`)), stateFips);
-    if (!patch.size) throw new Error("no county features");
-    apply(patch);
-    return { vintage: "current", detail: `${patch.size} county boundaries (land area + centroid)` };
+      let layer = 1;
+      try {
+        layer = tigerCountyLayerId(JSON.parse(await get(`${TIGER_SERVICE}?f=json`))) ?? 1;
+      } catch { /* fall back to the documented Counties layer */ }
+      const params = new URLSearchParams({
+        where: `STATE='${stateFips}'`,
+        outFields: "GEOID,STATE,COUNTY,NAME,AREALAND,CENTLAT,CENTLON",
+        // Simplified boundaries (~0.5 km) assign NPPES ZIP areas and OpenStreetMap facilities to counties.
+        returnGeometry: "true", outSR: "4326", maxAllowableOffset: "0.005", geometryPrecision: "4",
+        f: "json",
+      });
+      const payload = JSON.parse(await get(`${TIGER_SERVICE}/${layer}/query?${params.toString()}`));
+      const patch = parseTigerCounties(payload, stateFips);
+      if (!patch.size) throw new Error("no county features");
+      apply(patch);
+      const parsedShapes = parseCountyShapes(payload, stateFips);
+      resolveShapes(parsedShapes);
+      return { vintage: "current", detail: `${patch.size} county boundaries (land area, centroid${parsedShapes.length ? ", outline" : ""})` };
+    } finally {
+      resolveShapes([]);
+    }
   })();
+
+  const keyless = collectKeylessCountyCounts({ state, stateFips, shapes, get, post: (url, body) => postText(url, body, signal), signal });
 
   const hpsa = (async () => {
     const scores = parseHpsaMentalHealthCsv(await get(HRSA_MH_HPSA_CSV), stateFips);
@@ -604,7 +635,7 @@ export async function collectStateCountyBundle(state: JoinState, options: Collec
     return null;
   })();
 
-  const [acsR, saipeR, sahieR, cbpR, tigerR, hpsaR, licR] = await Promise.allSettled([acs, saipe, sahie, cbp, tiger, hpsa, licensing]);
+  const [acsR, saipeR, sahieR, cbpR, tigerR, hpsaR, licR, keylessR] = await Promise.allSettled([acs, saipe, sahie, cbp, tiger, hpsa, licensing, keyless]);
   clearTimeout(timer);
 
   const record = (program: ProgramId, result: PromiseSettledResult<{ vintage: string; detail: string } | null>) => {
@@ -632,6 +663,19 @@ export async function collectStateCountyBundle(state: JoinState, options: Collec
   }
   record("census-cbp", cbpR);
   record("census-tiger", tigerR);
+
+  if (keylessR.status === "fulfilled") {
+    const patch: MetricPatch = new Map();
+    for (const [fips, metrics] of keylessR.value.metrics) patch.set(fips, { metrics });
+    // Only counties already known from other programs; never create a frame from counts alone.
+    for (const fips of [...patch.keys()]) if (!frames.has(fips)) patch.delete(fips);
+    apply(patch);
+    programs.push({ program: "cms-nppes-county", status: keylessR.value.nppes.status, vintage: keylessR.value.nppes.status === "complete" ? "current" : null, detail: keylessR.value.nppes.detail });
+    programs.push({ program: "osm-county", status: keylessR.value.osm.status, vintage: keylessR.value.osm.status === "complete" ? "current" : null, detail: keylessR.value.osm.detail });
+  } else {
+    programs.push({ program: "cms-nppes-county", status: "unavailable", vintage: null, detail: errorText(keylessR.reason) });
+    programs.push({ program: "osm-county", status: "unavailable", vintage: null, detail: errorText(keylessR.reason) });
+  }
 
   // HPSA: counties absent from a successfully parsed state file have no active designation (score 0).
   if (hpsaR.status === "fulfilled") {
@@ -707,18 +751,6 @@ export function parseCensusReporterRows(payload: unknown): { rows: Map<string, R
   return { rows, years: typeof release.years === "string" ? release.years : null };
 }
 
-export async function limitedSettled<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<PromiseSettledResult<R>[]> {
-  const results: PromiseSettledResult<R>[] = new Array(items.length);
-  let next = 0;
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (next < items.length) {
-      const index = next++;
-      try { results[index] = { status: "fulfilled", value: await fn(items[index]) }; }
-      catch (reason) { results[index] = { status: "rejected", reason }; }
-    }
-  }));
-  return results;
-}
 
 export interface AcsFetch {
   get: (url: string) => Promise<string>;
@@ -770,19 +802,21 @@ export async function fetchAcsRows(input: AcsFetch): Promise<{ rows: Map<string,
       years ??= parsed.years;
       for (const [geoid, row] of parsed.rows) rows.set(geoid, { ...(rows.get(geoid) ?? {}), ...row });
     };
-    for (const chunk of chunks) {
+    // Table groups run in parallel (bounded) so one slow group cannot starve the rest of the time budget.
+    await limitedSettled(chunks, 3, async (chunk) => {
       try {
         merge(await request(chunk, `04000US${input.stateFips}`));
       } catch (error) {
-        if (input.level !== "tract" || !input.counties) { partial.push(`${chunk.join("/")}: ${errorText(error)}`); continue; }
+        if (input.level !== "tract" || !input.counties) { partial.push(`${chunk.join("/")}: ${errorText(error)}`); return; }
         // Statewide tract request refused (size limit): fall back to one request per county.
         const counties = await input.counties();
-        const results = await limitedSettled(counties, 6, (fips) => request(chunk, `05000US${fips}`));
+        const results = await limitedSettled(counties, 5, (fips) => request(chunk, `05000US${fips}`));
         let ok = 0;
         for (const result of results) if (result.status === "fulfilled") { merge(result.value); ok++; }
-        if (ok < counties.length) partial.push(`${chunk.join("/")}: ${counties.length - ok}/${counties.length} counties failed`);
+        const firstError = results.find((result) => result.status === "rejected") as PromiseRejectedResult | undefined;
+        if (ok < counties.length) partial.push(`${chunk.join("/")}: ${counties.length - ok}/${counties.length} counties failed${firstError ? ` (${errorText(firstError.reason)})` : ""}`);
       }
-    }
+    });
     if (!rows.size) throw new Error("Census Reporter returned no rows" + (partial.length ? ": " + partial[0] : ""));
     return { rows, vintage: (years ?? "latest").replace("-", "–"), via: "Census Reporter (keyless ACS mirror)", partial };
   };
@@ -812,15 +846,5 @@ export function getStateCountyBundle(state: JoinState, options: CollectOptions &
   return entry.bundle;
 }
 
-export function upperKeys(record: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(record).map(([key, value]) => [key.toUpperCase(), value]));
-}
 
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
-export function errorText(error: unknown) {
-  if (error instanceof Error) return error.name === "AbortError" ? "timed out" : error.message;
-  return String(error);
-}

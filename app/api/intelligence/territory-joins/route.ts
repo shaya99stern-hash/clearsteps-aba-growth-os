@@ -7,7 +7,7 @@ import { PROGRAMS } from "@/lib/intelligence/joins/sources";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 45;
+export const maxDuration = 60;
 
 const QUERY = z.object({
   state: z.enum(["MO", "KS", "CO"]),
@@ -15,7 +15,7 @@ const QUERY = z.object({
 });
 
 /**
- * Ranks every county in a state with 40 cross-program data joins.
+ * Ranks every county in a state with 90 cross-program data joins (52 run without a Census API key).
  * Area-level public statistics only: no family, child or household records exist in this pipeline.
  */
 export async function GET(request: NextRequest) {

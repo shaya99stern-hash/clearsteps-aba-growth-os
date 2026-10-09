@@ -7,6 +7,7 @@ import { PROGRAMS } from "./sources";
 export interface ScoutDataJoins {
   status: "county_matched" | "county_required" | "unavailable";
   note: string;
+  totalJoins: number;
   county: {
     name: string; fips: string; rank: number | null; rankedOf: number; score: number | null;
     confidence: number; coverage: number; computedJoins: number; agreement: number | null;
@@ -29,7 +30,7 @@ export function scoutDataJoins(bundle: StateCountyBundle, location: string): { d
 
   if (!ranking.totals.counties) {
     return {
-      dataJoins: { status: "unavailable", note: "Public statistical programs did not respond; no county joins were computed.", county: null, suggestions: [], topCounties: [], programs },
+      dataJoins: { status: "unavailable", totalJoins: DATA_JOINS.length, note: "Public statistical programs did not respond; no county joins were computed.", county: null, suggestions: [], topCounties: [], programs },
       observations: [],
     };
   }
@@ -37,6 +38,7 @@ export function scoutDataJoins(bundle: StateCountyBundle, location: string): { d
     return {
       dataJoins: {
         status: "county_required",
+        totalJoins: DATA_JOINS.length,
         note: "County data joins use county statistics. Enter a county (for example \"Clay County\") to score this area; a city never borrows its county's numbers.",
         county: null, suggestions, topCounties, programs,
       },
@@ -47,6 +49,7 @@ export function scoutDataJoins(bundle: StateCountyBundle, location: string): { d
   return {
     dataJoins: {
       status: "county_matched",
+      totalJoins: DATA_JOINS.length,
       note: "Within-state percentiles across " + ranking.totals.counties + " counties. Proxies for unmet demand and referral leverage, not confirmed waitlists or eligibility.",
       county: {
         name: report.name, fips: report.fips, rank: report.rank, rankedOf: report.rankedOf, score: report.score,

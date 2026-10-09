@@ -158,6 +158,11 @@ export interface SiteContext {
   countyReports?: readonly CountyJoinReport[];
 }
 
+const cbpPer10k = (frame: CountyFrame) => div(frame.metrics["cbp.mh_practices"], frame.metrics["acs.kids"], 10_000);
+const nppesAbaPer10k = (frame: CountyFrame) => div(frame.metrics["nppes.aba_orgs"], frame.metrics["acs.kids"], 10_000);
+const osmAbaPer10k = (frame: CountyFrame) => div(frame.metrics["osm.aba_named"], frame.metrics["acs.kids"], 10_000);
+const acsCountyRate = (frame: CountyFrame | undefined, part: MetricId, whole: MetricId) => frame ? div(frame.metrics[part], frame.metrics[whole], 100) : null;
+
 function stateBaselines(ctx: SiteContext) {
   const totals: Sums = {};
   const densities: number[] = [];
@@ -171,7 +176,10 @@ function stateBaselines(ctx: SiteContext) {
   }
   densities.sort((a, b) => a - b);
   const sahie = (ctx.counties ?? []).map((county) => county.metrics["sahie.u19_uninsured_rate"]).filter((v): v is number => v !== undefined).sort((a, b) => a - b);
-  const cbpRates = (ctx.counties ?? []).map((county) => div(county.metrics["cbp.mh_practices"], county.metrics["acs.kids"], 10_000)).filter((v): v is number => v !== null).sort((a, b) => a - b);
+  const rates = (fn: (frame: CountyFrame) => number | null) => (ctx.counties ?? []).map(fn).filter((v): v is number => v !== null).sort((a, b) => a - b);
+  const cbpRates = rates(cbpPer10k);
+  const nppesRates = rates(nppesAbaPer10k);
+  const osmRates = rates(osmAbaPer10k);
   const median = (values: number[]) => values.length ? values[Math.floor(values.length / 2)] : null;
   return {
     youngDensity: div(totals["acs.kids_u6"], totals.land),
@@ -180,6 +188,8 @@ function stateBaselines(ctx: SiteContext) {
     insuredShare: div(add(totals["acs.u19_employer"], totals["acs.u19_medicaid"]), totals["acs.u19"]),
     medianSahieUninsured: median(sahie),
     medianCbpPer10k: median(cbpRates),
+    medianNppesAbaPer10k: median(nppesRates),
+    medianOsmAbaPer10k: median(osmRates),
   };
 }
 
@@ -331,14 +341,25 @@ export function analyzeSite(center: LatLon, ctx: SiteContext): SiteAnalysis {
   nearest("hospital", "hospital", (p) => p.kind === "hospital", osmAvailable, ["osm"]);
   nearest("school", "school", (p) => p.kind === "school", osmAvailable, ["osm"]);
 
-  const cbpRate = county ? div(county.metrics["cbp.mh_practices"], county.metrics["acs.kids"], 10_000) : null;
+  const cbpRate = county ? cbpPer10k(county) : null;
+  const nppesRate = county ? nppesAbaPer10k(county) : null;
+  // County supply context: the business register when a Census API key is configured, else the ABA provider registry.
+  const countySupply = cbpRate !== null
+    ? { value: cbpRate, median: baseline.medianCbpPer10k, label: "behavioral-health practices (CBP)", sources: ["census-cbp", "census-acs5"] }
+    : { value: nppesRate, median: baseline.medianNppesAbaPer10k, label: "ABA organizations (NPPES)", sources: ["cms-nppes-county", "census-acs5"] };
+  const childPoverty = county?.metrics["saipe.child_pov_rate"] !== undefined
+    ? { value: county.metrics["saipe.child_pov_rate"], sources: ["census-saipe"] }
+    : { value: acsCountyRate(county, "acs.kids_pov", "acs.kids_pov_universe"), sources: ["census-acs5"] };
+  const uninsuredChildren = county?.metrics["sahie.u19_uninsured_rate"] !== undefined
+    ? { value: county.metrics["sahie.u19_uninsured_rate"], sources: ["census-sahie"] }
+    : { value: acsCountyRate(county, "acs.u19_uninsured", "acs.u19"), sources: ["census-acs5"] };
   const contextRows: Array<[string, string, number | null, string, string[]]> = [
-    ["county_opportunity", "County opportunity score (40 data joins)", countyReport?.score ?? null, "/100", ["county-data-joins"]],
+    ["county_opportunity", "County opportunity score (county data joins)", countyReport?.score ?? null, "/100", ["county-data-joins"]],
     ["county_rank_percentile", "County rank percentile within the state", countyReport?.rank && countyReport.rankedOf ? (1 - (countyReport.rank - 1) / countyReport.rankedOf) * 100 : null, "percentile", ["county-data-joins"]],
-    ["county_child_poverty", "County child poverty rate (SAIPE model)", county?.metrics["saipe.child_pov_rate"] ?? null, "%", ["census-saipe"]],
-    ["county_uninsured_children", "County uninsured children rate (SAHIE model)", county?.metrics["sahie.u19_uninsured_rate"] ?? null, "%", ["census-sahie"]],
+    ["county_child_poverty", "County child poverty rate", childPoverty.value ?? null, "%", childPoverty.sources],
+    ["county_uninsured_children", "County uninsured children rate", uninsuredChildren.value ?? null, "%", uninsuredChildren.sources],
     ["county_mh_shortage", "County mental-health shortage score (HRSA HPSA)", county?.metrics["hrsa.mh_hpsa_score"] ?? null, "score 0–25", ["hrsa-hpsa"]],
-    ["county_behavioral_practices", "County behavioral-health practices per 10k children (CBP)", cbpRate, "per 10k", ["census-cbp", "census-acs5"]],
+    ["county_behavioral_practices", `County ${countySupply.label} per 10k children`, countySupply.value, "per 10k", countySupply.sources],
   ];
   for (const [id, name, value, unit, sources] of contextRows) push("county_context", `county.${id}`, name, null, value, unit, sources, "County-level statistic for the county containing the point");
 
@@ -359,15 +380,20 @@ export function analyzeSite(center: LatLon, ctx: SiteContext): SiteAnalysis {
 
   const disRate5 = div(add(s5["acs.dis_u5"], s5["acs.dis_5to17"]), add(s5["acs.dis_u5_universe"], s5["acs.dis_5to17_universe"]));
   const hpsa = county?.metrics["hrsa.mh_hpsa_score"] ?? null;
-  test("C2", "Developmental need with a recognised shortage", ["Census ACS tracts", "HRSA shortage designation / CBP county supply"], [disRate5, baseline.disabilityRate, hpsa ?? cbpRate],
-    () => disRate5! >= baseline.disabilityRate! && ((hpsa ?? 0) > 0 || (cbpRate !== null && baseline.medianCbpPer10k !== null && cbpRate < baseline.medianCbpPer10k)),
-    `Child disability rate within 5 mi ${show(disRate5, 100)}% vs state ${show(baseline.disabilityRate, 100)}%; HPSA score ${show(hpsa)}; county practices/10k children ${show(cbpRate)} vs state median ${show(baseline.medianCbpPer10k)}`);
+  test("C2", "Developmental need with a recognised shortage", ["Census ACS tracts", "HRSA shortage designation / county provider supply"], [disRate5, baseline.disabilityRate, hpsa ?? countySupply.value],
+    () => disRate5! >= baseline.disabilityRate! && ((hpsa ?? 0) > 0 || (countySupply.value !== null && countySupply.median !== null && countySupply.value < countySupply.median)),
+    `Child disability rate within 5 mi ${show(disRate5, 100)}% vs state ${show(baseline.disabilityRate, 100)}%; HPSA score ${show(hpsa)}; county ${countySupply.label}/10k children ${show(countySupply.value)} vs state median ${show(countySupply.median)}`);
 
   const aba5 = supplyKnown ? within(5).filter((p) => p.kind === "aba_provider").length : null;
   const abaPer10k5 = aba5 !== null ? div(aba5, s5["acs.kids"], 10_000) : null;
-  test("C3", "ABA supply is thin by two independent measures", ["NPPES / OpenStreetMap near the point", "County Business Patterns (county)"], [abaPer10k5, cbpRate, baseline.medianCbpPer10k],
-    () => abaPer10k5! < baseline.medianCbpPer10k! && cbpRate! <= baseline.medianCbpPer10k! * 1.1,
-    `ABA organizations within 5 mi per 10k children: ${show(abaPer10k5)}; county behavioral practices per 10k: ${show(cbpRate)}; state median ${show(baseline.medianCbpPer10k)}`);
+  // Measure A: ABA organizations near the point vs the statewide county median of the same registry measure.
+  // Measure B (independent of NPPES): the business register when keyed, else ABA-named facilities on the community map.
+  const second = cbpRate !== null
+    ? { value: cbpRate, median: baseline.medianCbpPer10k, label: "County Business Patterns behavioral practices" }
+    : { value: county ? osmAbaPer10k(county) : null, median: baseline.medianOsmAbaPer10k, label: "OpenStreetMap ABA-named facilities" };
+  test("C3", "ABA supply is thin by two independent measures", ["NPPES / OpenStreetMap near the point", second.label + " (county)"], [abaPer10k5, baseline.medianNppesAbaPer10k, second.value, second.median],
+    () => abaPer10k5! < baseline.medianNppesAbaPer10k! && second.value! <= second.median!,
+    `ABA organizations within 5 mi per 10k children ${show(abaPer10k5)} vs state county median ${show(baseline.medianNppesAbaPer10k)}; county ${second.label} per 10k ${show(second.value)} vs median ${show(second.median)}`);
 
   const ped5 = nppesAvailable ? zipsWithin(5).reduce((sum, zip) => sum + zip.pediatricClinicians, 0) + within(5).filter((p) => p.kind === "pediatrics").length : null;
   const licensed5 = rosterAvailable ? within(5).filter((p) => p.kind === "daycare" && p.licensed).length : null;

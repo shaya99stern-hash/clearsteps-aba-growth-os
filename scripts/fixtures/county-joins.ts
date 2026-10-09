@@ -76,7 +76,65 @@ export function reporterPayload(geos: Array<{ geoid: string; name: string; value
   return JSON.stringify({ release: { id: "acs2023_5yr", years: "2019-2023" }, geography, data });
 }
 
-export function fixtureFetch(stateFips: string, overrides: { failHpsa?: boolean; hangAll?: boolean; keylessReporter?: boolean } = {}): FetchText {
+/** Fixture county outline: a square ±0.09° around the centroid. */
+export function square(lat: number, lon: number, h = 0.09) {
+  return [[lon - h, lat - h], [lon + h, lat - h], [lon + h, lat + h], [lon - h, lat + h], [lon - h, lat - h]];
+}
+export const countyZips = (fips: string) => ["6" + fips.slice(2) + "0", "6" + fips.slice(2) + "1"];
+
+/** Statewide NPPES counts per county used by the fixture (organizations, or clinicians for NPI-1 taxonomies). */
+export const NPPES_FIXTURE_COUNTS: Record<string, Record<string, number>> = {
+  "Behavior Analyst": { "095": 30, "189": 50, "510": 20, "019": 8, "077": 9, "047": 1, "037": 2 },
+  "Pediatrics": { "095": 300, "189": 450, "510": 130, "019": 70, "077": 100, "047": 105, "213": 10, "111": 1, "037": 30 },
+  "Speech-Language Pathologist": { "095": 25, "189": 40, "510": 10, "019": 8, "077": 10, "047": 4, "037": 3 },
+  "Occupational Therapist": { "095": 20, "189": 30, "510": 8, "019": 6, "077": 8, "047": 3, "037": 2 },
+  "Developmental - Behavioral Pediatrics": { "095": 6, "189": 10, "510": 4, "019": 3, "077": 2 },
+  "Clinical Child & Adolescent": { "095": 15, "189": 25, "510": 8, "019": 6, "077": 5, "047": 2 },
+};
+
+function nppesRecords(counties: County[], taxonomy: string, enumeration: string) {
+  const counts = NPPES_FIXTURE_COUNTS[taxonomy] ?? {};
+  const records: unknown[] = [];
+  for (const c of counties) {
+    const n = counts[c.fips.slice(2)] ?? 0;
+    for (let i = 0; i < n; i++) records.push({
+      number: `${taxonomy.length}${c.fips}${String(i).padStart(4, "0")}`, enumeration_type: enumeration, basic: { status: "A" },
+      addresses: [{ address_purpose: "LOCATION", postal_code: countyZips(c.fips)[i % 2] + "1234" }],
+    });
+  }
+  // A registration whose ZIP is not a mapped ZIP area (e.g. a PO box ZIP) is reported, not guessed.
+  records.push({ number: "9" + taxonomy.length, enumeration_type: enumeration, basic: { status: "A" }, addresses: [{ address_purpose: "LOCATION", postal_code: "99999" }] });
+  // Deactivated registrations are ignored.
+  records.push({ number: "8" + taxonomy.length, enumeration_type: enumeration, basic: { status: "D" }, addresses: [{ address_purpose: "LOCATION", postal_code: countyZips(counties[0].fips)[0] }] });
+  return records;
+}
+
+/** Statewide Overpass fixture: facilities placed inside each county square. */
+export function fixturePost(stateFips: string, overrides: { failKeyless?: boolean } = {}) {
+  return async (url: string, body: string) => {
+    requested.push(url);
+    if (overrides.failKeyless) throw new Error("HTTP 429");
+    assert(url.includes("overpass") && body.includes(encodeURIComponent('area["ISO3166-2"="US-')), "Statewide Overpass area query");
+    const elements: unknown[] = [];
+    let id = 1;
+    for (const county of COUNTIES) {
+      const c = { ...county, fips: stateFips + county.fips.slice(2) };
+      const add = (n: number, tags: Record<string, string>) => {
+        for (let i = 0; i < n; i++) elements.push({ type: "node", id: id++, lat: c.lat + ((i % 5) - 2) * 0.01, lon: c.lon + ((i % 3) - 1) * 0.01, tags: { ...tags, name: `${tags.name} ${i}` } });
+      };
+      add(Math.round(c.cbp["624410"] / 2), { amenity: "childcare", name: "Kids Care" });
+      add(c.cbp["611110"] * 3, { amenity: "school", name: "Elementary" });
+      add(c.cbp["622110"], { amenity: "hospital", name: "General Hospital" });
+      add(c.cbp["621111"] > 100 ? 2 : 0, { amenity: "clinic", name: "Children's Clinic" });
+      add(Math.round(c.cbp["621340"] / 10), { healthcare: "speech_therapist", name: "Speech Therapy" });
+      add(Math.round(c.cbp["621330"] / 20), { amenity: "clinic", name: "Autism Center" });
+    }
+    elements.push({ type: "node", id: id++, lat: 45, lon: -100, tags: { amenity: "school", name: "Outside every county" } });
+    return JSON.stringify({ elements });
+  };
+}
+
+export function fixtureFetch(stateFips: string, overrides: { failHpsa?: boolean; hangAll?: boolean; keylessReporter?: boolean; failKeyless?: boolean } = {}): FetchText {
   return async (url, signal) => {
     requested.push(url);
     if (overrides.hangAll) {
@@ -130,12 +188,30 @@ export function fixtureFetch(stateFips: string, overrides: { failHpsa?: boolean;
         return table(["NAME", "ESTAB", "NAICS2017", "state", "county"], rows);
       }
     }
+    if (u.hostname === "tigerweb.geo.census.gov" && u.pathname.includes("ZCTA")) {
+      if (overrides.failKeyless) throw new Error("HTTP 503");
+      if (u.pathname.endsWith("/MapServer")) return JSON.stringify({ layers: [{ id: 2, name: "2020 Census ZIP Code Tabulation Areas" }] });
+      const offset = Number(u.searchParams.get("resultOffset") ?? 0);
+      return JSON.stringify({ features: counties.flatMap((c) => countyZips(c.fips).map((zip, i) => ({ attributes: {
+        ZCTA5: zip, CENTLAT: String(c.lat + (i ? 0.03 : -0.03)), CENTLON: String(c.lon),
+      } }))).slice(offset, offset + 1000) });
+    }
     if (u.hostname === "tigerweb.geo.census.gov") {
       if (u.pathname.endsWith("/MapServer")) return JSON.stringify({ layers: [{ id: 0, name: "States" }, { id: 11, name: "Counties" }] });
       assert(u.pathname.endsWith("/MapServer/11/query"), "TIGER layer is discovered by name");
-      return JSON.stringify({ features: counties.map((c) => ({ attributes: {
-        GEOID: c.fips, NAME: c.name.split(",")[0], AREALAND: c.sqmi * 2_589_988.11, CENTLAT: "+" + c.lat, CENTLON: String(c.lon),
-      } })) });
+      return JSON.stringify({ features: counties.map((c) => ({
+        attributes: { GEOID: c.fips, NAME: c.name.split(",")[0], AREALAND: c.sqmi * 2_589_988.11, CENTLAT: "+" + c.lat, CENTLON: String(c.lon) },
+        geometry: u.searchParams.get("returnGeometry") === "true" ? { rings: [square(c.lat, c.lon)] } : undefined,
+      })) });
+    }
+    if (u.hostname === "npiregistry.cms.hhs.gov") {
+      if (overrides.failKeyless) throw new Error("HTTP 503");
+      assert.equal(u.searchParams.get("address_purpose"), "LOCATION");
+      const taxonomy = u.searchParams.get("taxonomy_description")!;
+      const all = nppesRecords(counties, taxonomy, u.searchParams.get("enumeration_type")!);
+      const skip = Number(u.searchParams.get("skip") ?? 0), limit = Number(u.searchParams.get("limit"));
+      const results = all.slice(skip, skip + limit);
+      return JSON.stringify({ result_count: results.length, results });
     }
     if (u.hostname === "data.hrsa.gov") {
       if (overrides.failHpsa) throw new Error("HTTP 503");

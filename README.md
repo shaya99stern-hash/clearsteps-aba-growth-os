@@ -8,7 +8,7 @@ The main experience is **Scout**. Choose a lead engine (Clients, RBTs or BCBAs),
 
 - **Scout** (`/`): bounded official/public research, public-source enrichment and dossiers, with a summary saved to this device after successful runs.
 - **Map** (`/map`): county scores and census-tract hotspots statewide; click a point or enter an address to see licensed child care (priority / confirmed / unconfirmed), ABA providers, pediatric practices, schools and hospitals, with 202 indicators at 2, 5 and 10 miles and eight two-source convergence tests.
-- **Territories** (`/territories`): rank every county with 40 cross-program data joins, then compare latest research summaries per market, state and engine; spot thin or aging evidence; re-run a scan with its original scope.
+- **Territories** (`/territories`): rank every county with 90 cross-source data joins (52 need no API key), then compare latest research summaries per market, state and engine; spot thin or aging evidence; re-run a scan with its original scope.
 - **Intelligence** (`/intelligence`): prioritize overdue tasks, high-evidence CRM items and markets needing verification. Create linked verification tasks; no messages are sent.
 - **Referral CRM** (`/pipeline`): review referral organizations by lifecycle stage.
 - **Talent CRM** (`/talent`): manage recruiting opportunities with separate verification boundaries.

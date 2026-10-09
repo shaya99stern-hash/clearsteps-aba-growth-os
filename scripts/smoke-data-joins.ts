@@ -42,11 +42,11 @@ async function checkState(state: JoinState) {
   for (const program of ranking.programs) console.log(`  ${program.status.padEnd(14)} ${program.program} ${program.vintage ?? ""} — ${program.detail}`);
   if (ranking.integrityIssues.length) console.log(`  integrity drops: ${ranking.integrityIssues.length} (first: ${ranking.integrityIssues[0]})`);
   for (const county of ranking.counties.slice(0, 5)) {
-    console.log(`  #${county.rank} ${county.name} ${county.score}/100 conf ${county.confidence} joins ${county.computedJoins}/40`);
+    console.log(`  #${county.rank} ${county.name} ${county.score}/100 conf ${county.confidence} joins ${county.computedJoins}/${ranking.totals.joins}`);
     for (const driver of county.drivers) console.log(`      ${driver}`);
   }
   const perJoin = ranking.counties.length
-    ? Array.from({ length: 40 }, (_, i) => ranking.counties.filter((county) => county.joins[i].status === "computed").length)
+    ? Array.from({ length: ranking.totals.joins }, (_, i) => ranking.counties.filter((county) => county.joins[i].status === "computed").length)
     : [];
   const empty = perJoin.map((n, i) => (n === 0 ? `J${String(i + 1).padStart(2, "0")}` : null)).filter(Boolean);
   if (empty.length) console.log(`  joins with no county computed: ${empty.join(", ")}`);

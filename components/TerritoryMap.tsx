@@ -299,7 +299,7 @@ export function TerritoryMap({ initialState = "MO" }: { initialState?: MapState 
           {!site && (
             <div className={styles.empty}>
               <h3>Narrow down to a 2-mile area</h3>
-              <p>1. Load a state to see county scores (40 data joins) and census-tract hotspots, where young children, developmental need and insured families concentrate.</p>
+              <p>1. Load a state to see county scores (90 data joins) and census-tract hotspots, where young children, developmental need and insured families concentrate.</p>
               <p>2. Click a hotspot or any address area. Clear Steps pulls licensed child care, ABA providers, pediatric practices, schools and hospitals within 10 miles, and scores 202 indicators at 2, 5 and 10 miles.</p>
               {layers && <p className={styles.muted}>{layers.counties.length} counties · {layers.hotspots.length.toLocaleString("en-US")} tract hotspots · {layers.sources.filter((s) => s.status === "complete").length}/{layers.sources.length} sources responding</p>}
             </div>

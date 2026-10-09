@@ -7,13 +7,14 @@ import { DATA_JOINS, joinPrograms } from "../lib/intelligence/joins/join-catalog
 import { rankStateCounties, selectCountyReport, LOW_SAMPLE_CHILDREN } from "../lib/intelligence/joins/rank";
 import { CBP_NAICS } from "../lib/intelligence/joins/sources";
 import { INDICATOR_CATALOG, indicatorDefinition, scoreEngineFromObservations } from "../lib/intelligence/phase3/indicator-catalog";
-import { acsVars, byFips, COUNTIES, fixtureFetch, requested } from "./fixtures/county-joins";
+import { acsVars, byFips, COUNTIES, fixtureFetch, fixturePost, requested } from "./fixtures/county-joins";
+import { countyForPoint, parseCountyShapes, parseNppesStatewidePage } from "../lib/intelligence/joins/keyless-county";
 
 // ---------------------------------------------------------------------------
-// 1. Catalog contract: 40 joins, each crossing at least two independent data programs.
+// 1. Catalog contract: 90 joins, each crossing at least two independent data programs.
 // ---------------------------------------------------------------------------
-assert.equal(DATA_JOINS.length, 40, "Exactly 40 data joins");
-assert.deepEqual(DATA_JOINS.map((join) => join.id), Array.from({ length: 40 }, (_, i) => "J" + String(i + 1).padStart(2, "0")));
+assert.equal(DATA_JOINS.length, 90, "90 data joins (40 original + 50 keyless)");
+assert.deepEqual(DATA_JOINS.map((join) => join.id), Array.from({ length: 90 }, (_, i) => "J" + String(i + 1).padStart(2, "0")));
 for (const join of DATA_JOINS) {
   assert(joinPrograms(join).length >= 2, `${join.id} must combine at least two separate data programs`);
   assert(join.title && join.rationale && join.formula && join.unit, `${join.id} must explain itself`);
@@ -24,7 +25,11 @@ for (const join of DATA_JOINS) {
       `${join.id}: supply-scaled values only for lower_opportunity (ABA supply) indicators`);
   }
 }
-assert.equal(DATA_JOINS.filter((join) => join.opportunity === "agreement").length, 4, "Four cross-source validation joins");
+assert.equal(DATA_JOINS.filter((join) => join.opportunity === "agreement").length, 10, "Ten cross-source validation joins");
+const KEY_ONLY = ["census-saipe", "census-sahie", "census-cbp"];
+const keylessJoins = DATA_JOINS.filter((join) => joinPrograms(join).every((program) => !KEY_ONLY.includes(program)));
+assert(keylessJoins.filter((join) => join.opportunity !== "agreement").length >= 48, "At least 48 opportunity joins run without a Census API key");
+assert(DATA_JOINS.slice(40).every((join) => joinPrograms(join).length >= 2), "Every new join crosses two or more programs");
 const crossAgency = DATA_JOINS.filter((join) => joinPrograms(join).some((program) => !program.startsWith("census-")));
 assert(crossAgency.length >= 6, "Joins must also cross agencies (HRSA / state licensing), not only Census programs");
 
@@ -77,9 +82,9 @@ async function main() {
   assert.deepEqual(parseColoradoChildCareStats([{ county: "Denver", sites: "250", capacity: "18000" }, { county: "Mesa", sites: "40" }]).get("mesa"), { sites: 40, capacity: null });
 
   // Full statewide collection with year fallbacks.
-  const bundle = await collectStateCountyBundle("MO", { fetchText: fixtureFetch("29") });
+  const bundle = await collectStateCountyBundle("MO", { fetchText: fixtureFetch("29"), postText: fixturePost("29") });
   const status = Object.fromEntries(bundle.programs.map((program) => [program.program, program]));
-  for (const program of ["census-acs5", "census-saipe", "census-sahie", "census-cbp", "census-tiger", "hrsa-hpsa-mh", "state-childcare-licensing"]) {
+  for (const program of ["census-acs5", "census-saipe", "census-sahie", "census-cbp", "census-tiger", "hrsa-hpsa-mh", "state-childcare-licensing", "cms-nppes-county", "osm-county"]) {
     assert.equal(status[program]?.status, "complete", `${program} should complete: ${status[program]?.detail}`);
   }
   assert.equal(status["census-acs5"].vintage, "2019–2023", "ACS falls back from 2024 to 2023 when the newer release is unavailable");
@@ -98,10 +103,31 @@ async function main() {
   assert.equal(frame("29037").metrics["acs.u19"], undefined, "Integrity failure keeps bad ACS insurance data out");
   assert(bundle.integrityIssues.some((issue) => issue.startsWith("Cass County")));
 
+  // Keyless statewide counts: NPPES by practice ZIP, OpenStreetMap by county outline.
+  assert.equal(frame("29095").metrics["nppes.aba_orgs"], 30);
+  assert.equal(frame("29095").metrics["nppes.ped_orgs"], 300, "Paginated registry (1,198 pediatric records over 6 pages) counted fully");
+  assert.equal(frame("29213").metrics["nppes.aba_orgs"], 0, "A county with no registrations is zero once the statewide query succeeded");
+  assert.equal(frame("29095").metrics["nppes.dev_peds"], 6);
+  assert.equal(frame("29095").metrics["osm.childcare"], 130);
+  assert.equal(frame("29095").metrics["osm.schools"], 84);
+  assert.equal(frame("29047").metrics["osm.aba_named"], 1);
+  assert.match(status["cms-nppes-county"].detail, /registrations outside mapped ZIP areas/, "Unmapped ZIPs are reported, not guessed");
+  assert.deepEqual(parseNppesStatewidePage({ result_count: 2, results: [
+    { number: "1", basic: { status: "A" }, addresses: [{ address_purpose: "MAILING", postal_code: "11111" }, { address_purpose: "LOCATION", postal_code: "640951234" }] },
+    { number: "2", basic: { status: "D" }, addresses: [{ address_purpose: "LOCATION", postal_code: "64095" }] },
+  ] }), [{ npi: "1", zip: "64095" }]);
+  const shapes = parseCountyShapes({ features: [
+    { attributes: { GEOID: "29189" }, geometry: { rings: [[[-91, 38], [-90, 38], [-90, 39], [-91, 39], [-91, 38]], [[-90.6, 38.4], [-90.4, 38.4], [-90.4, 38.6], [-90.6, 38.6], [-90.6, 38.4]]] } },
+    { attributes: { GEOID: "29510" }, geometry: { rings: [[[-90.6, 38.4], [-90.4, 38.4], [-90.4, 38.6], [-90.6, 38.6], [-90.6, 38.4]]] } },
+  ] }, "29");
+  assert.equal(countyForPoint(shapes, 38.5, -90.5), "29510", "A point in a county's hole belongs to the enclaved county");
+  assert.equal(countyForPoint(shapes, 38.2, -90.8), "29189");
+  assert.equal(countyForPoint(shapes, 45, -100), null);
+
   // Ranking
   const ranking = rankStateCounties(bundle);
-  assert.equal(ranking.totals.joins, 40);
-  assert.equal(ranking.totals.crossProgramJoins, 40);
+  assert.equal(ranking.totals.joins, 90);
+  assert.equal(ranking.totals.crossProgramJoins, 90);
   const top = ranking.counties[0];
   assert.equal(top.name, "Clay County, Missouri", `Designed service-gap county should rank first, got ${top.name}`);
   assert.equal(top.rank, 1);
@@ -109,7 +135,7 @@ async function main() {
   for (const county of ranking.counties) {
     if (county.score !== null) assert(county.score >= 0 && county.score <= 100);
     assert(county.confidence >= 0 && county.confidence <= 100);
-    assert.equal(county.joins.length, 40);
+    assert.equal(county.joins.length, DATA_JOINS.length);
     for (const result of county.joins) {
       if (result.percentile !== null) assert(result.percentile >= 0 && result.percentile <= 100);
       if (result.status === "insufficient_data") assert.equal(result.percentile ?? result.agreement, null);
@@ -167,7 +193,7 @@ async function main() {
   // Keyless path: Census Reporter serves ACS when the Census Data API rejects keyless requests.
   assert.equal(reporterVariableKey("B09001001"), "B09001_001E");
   assert.equal(reporterVariableKey("C16002013"), "C16002_013E");
-  const keyless = await collectStateCountyBundle("MO", { fetchText: fixtureFetch("29", { keylessReporter: true }) });
+  const keyless = await collectStateCountyBundle("MO", { fetchText: fixtureFetch("29", { keylessReporter: true }), postText: fixturePost("29") });
   const keylessAcs = keyless.programs.find((program) => program.program === "census-acs5")!;
   assert.equal(keylessAcs.status, "complete", keylessAcs.detail);
   assert(keylessAcs.detail.includes("Census Reporter") && keylessAcs.vintage === "2019–2023");
@@ -177,21 +203,36 @@ async function main() {
   assert.equal(kf.metrics["acs.u19_medicaid"], frame("29095").metrics["acs.u19_medicaid"], "Same metrics as the Census Data API path");
   assert.match(keyless.programs.find((program) => program.program === "census-saipe")!.detail, /non-JSON response: "Invalid Key"/, "API rejections name the cause");
 
+  // Fully keyless operation: no Census API key, so SAIPE / SAHIE / CBP are rejected; the 50 keyless joins still rank every county.
+  const keylessRanking = rankStateCounties(keyless);
+  for (const program of ["census-saipe", "census-sahie", "census-cbp"]) assert.equal(keyless.programs.find((p) => p.program === program)!.status, "unavailable");
+  assert.equal(keylessRanking.totals.ranked, COUNTIES.length, "Every county ranks without a Census API key");
+  const keylessJackson = keylessRanking.counties.find((county) => county.fips === "29095")!;
+  assert(keylessJackson.joins.filter((join) => join.percentile !== null).length >= 46, "Most opportunity joins compute keylessly");
+  assert(keylessJackson.joins.find((join) => join.id === "J01")!.status === "insufficient_data", "CBP-based joins wait for a key rather than guessing");
+  assert.equal(keylessRanking.counties[0].fips, "29047", "The designed service-gap county still ranks first without a key");
+  assert(keylessRanking.counties[0].observations.some((o) => o.indicatorId === "aba-supply.01"), "Keyless ABA supply fills the base indicator");
+
+  const noKeyless = rankStateCounties(await collectStateCountyBundle("MO", { fetchText: fixtureFetch("29", { failKeyless: true }), postText: fixturePost("29", { failKeyless: true }) }));
+  assert.equal(noKeyless.programs.find((p) => p.program === "cms-nppes-county")!.status, "unavailable");
+  assert.equal(noKeyless.programs.find((p) => p.program === "osm-county")!.status, "unavailable");
+  for (const county of noKeyless.counties) for (const id of ["J41", "J61", "J64"]) assert.equal(county.joins.find((join) => join.id === id)!.status, "insufficient_data", "Failed registry/map never zero-fills");
+
   // Failure modes: an unavailable program degrades joins to insufficient_data, never to invented values.
-  const noHpsa = rankStateCounties(await collectStateCountyBundle("MO", { fetchText: fixtureFetch("29", { failHpsa: true }) }));
+  const noHpsa = rankStateCounties(await collectStateCountyBundle("MO", { fetchText: fixtureFetch("29", { failHpsa: true }), postText: fixturePost("29") }));
   assert.equal(noHpsa.programs.find((program) => program.program === "hrsa-hpsa-mh")!.status, "unavailable");
   for (const county of noHpsa.counties) for (const id of ["J08", "J33"]) {
     assert.equal(county.joins.find((join) => join.id === id)!.status, "insufficient_data");
   }
   assert(noHpsa.counties[0].rank === 1, "Ranking still works on the remaining 34+ joins");
 
-  const timedOut = await collectStateCountyBundle("MO", { fetchText: fixtureFetch("29", { hangAll: true }), timeoutMs: 50 });
+  const timedOut = await collectStateCountyBundle("MO", { fetchText: fixtureFetch("29", { hangAll: true }), postText: fixturePost("29"), timeoutMs: 50 });
   assert(timedOut.programs.filter((program) => program.status === "unavailable").length >= 6);
   assert.equal(timedOut.frames.length, 0);
   assert.equal(rankStateCounties(timedOut).totals.ranked, 0);
 
   // Kansas: no statewide licensing roster integrated → explicit not_applicable, CBP child-care join still runs.
-  const kansas = await collectStateCountyBundle("KS", { fetchText: fixtureFetch("20") });
+  const kansas = await collectStateCountyBundle("KS", { fetchText: fixtureFetch("20"), postText: fixturePost("20") });
   assert.equal(kansas.programs.find((program) => program.program === "state-childcare-licensing")!.status, "not_applicable");
   const ksRanking = rankStateCounties(kansas);
   assert(ksRanking.counties.every((county) => county.joins.find((join) => join.id === "J13")!.status === "insufficient_data"));
@@ -209,7 +250,7 @@ async function main() {
     "Join output fields are area-level aggregates only");
   assert.equal(CBP_NAICS.length, 10);
 
-  console.log(`Data joins verified: 40 cross-program joins, ${ranking.totals.ranked}/${ranking.totals.counties} fixture counties ranked, ` +
+  console.log(`Data joins verified: ${DATA_JOINS.length} cross-program joins (${keylessJoins.length} keyless), keyless ranking ${keylessRanking.totals.ranked}/${keylessRanking.totals.counties}, ${ranking.totals.ranked}/${ranking.totals.counties} fixture counties ranked, ` +
     `top = ${top.name} (${top.score}/100, confidence ${top.confidence}), client coverage ${before.coverage}% → ${after.coverage}% from joins alone.`);
 }
 

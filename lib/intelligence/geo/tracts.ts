@@ -58,7 +58,7 @@ export function parseTigerTractPage(payload: unknown, stateFips: string): { rows
 export async function collectStateTracts(state: JoinState, options: { fetchText?: FetchText; timeoutMs?: number } = {}): Promise<StateTracts> {
   const fetchText = options.fetchText ?? defaultFetchText;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 25_000);
+  const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 45_000);
   const signal = controller.signal;
   const get = (url: string) => fetchText(url, signal);
   const stateFips = STATE_FIPS[state];
@@ -109,12 +109,15 @@ export async function collectStateTracts(state: JoinState, options: { fetchText?
   return { state, capturedAt: new Date().toISOString(), tracts, programs, integrityIssues };
 }
 
-const CACHE = new Map<JoinState, { at: number; value: Promise<StateTracts> }>();
+const CACHE = new Map<JoinState, { at: number; ttl: number; value: Promise<StateTracts> }>();
 export function getStateTracts(state: JoinState, options: { fetchText?: FetchText; force?: boolean } = {}): Promise<StateTracts> {
   const cached = CACHE.get(state);
-  if (!options.force && cached && Date.now() - cached.at < 12 * 60 * 60 * 1000) return cached.value;
+  if (!options.force && cached && Date.now() - cached.at < cached.ttl) return cached.value;
   const value = collectStateTracts(state, options);
-  CACHE.set(state, { at: Date.now(), value });
+  const entry = { at: Date.now(), ttl: 30 * 60 * 1000, value };
+  CACHE.set(state, entry);
+  // Complete tract data is cached for 12 hours; partial data is retried after 30 minutes.
+  value.then((result) => { if (result.programs.every((program) => program.status === "complete" && !program.detail.includes("failed"))) entry.ttl = 12 * 60 * 60 * 1000; }, () => undefined);
   value.then((result) => { if (!result.tracts.some((tract) => tract.metrics["acs.kids"] !== undefined)) CACHE.delete(state); }, () => CACHE.delete(state));
   return value;
 }

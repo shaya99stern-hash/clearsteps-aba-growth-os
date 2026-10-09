@@ -1,5 +1,11 @@
 import { MISSOURI_CHILD_CARE_LAYER_URL } from "../official/mo-child-care-gis";
 import { defaultFetchText, errorText, isRecord, parseCsv, upperKeys, type FetchText } from "../joins/collectors";
+import { inclusionSignals, parseOverpassPlaces, type MapPlace, type PlaceKind } from "./osm";
+import { parseZctaCentroids, zctaLayerId } from "../joins/keyless-county";
+
+export { parseZctaCentroids, zctaLayerId } from "../joins/keyless-county";
+
+export { INCLUSION_PATTERN, inclusionSignals, parseOverpassPlaces, type MapPlace, type PlaceKind } from "./osm";
 import type { JoinState } from "../joins/sources";
 import type { EnrichedWebsite } from "../source-types";
 import { boundsAround, haversineMiles, isValidPoint, MAX_SITE_RADIUS, type LatLon } from "./geo-math";
@@ -14,31 +20,6 @@ import { boundsAround, haversineMiles, isValidPoint, MAX_SITE_RADIUS, type LatLo
  *  - OpenStreetMap features are limited to facility tags (childcare, school, hospital, clinic, therapist offices).
  *  - Nothing here locates, infers or represents a child, family or household.
  */
-export type PlaceKind = "aba_provider" | "daycare" | "pediatrics" | "therapy" | "school" | "hospital";
-
-export interface MapPlace {
-  id: string;
-  kind: PlaceKind;
-  name: string;
-  lat: number;
-  lon: number;
-  /** Placed at a ZIP centroid because the address could not be geocoded. */
-  approximate: boolean;
-  address?: string;
-  city?: string;
-  zip?: string;
-  phone?: string;
-  website?: string;
-  sources: string[];
-  licensed?: boolean;
-  capacity?: number;
-  minAgeYears?: number | null;
-  maxAgeYears?: number | null;
-  schoolDistrictOperated?: boolean;
-  inclusionSignals: string[];
-  distanceMiles?: number;
-}
-
 export interface ZipProviderCount {
   zip: string; lat: number; lon: number;
   behaviorAnalysts: number; pediatricClinicians: number;
@@ -71,33 +52,12 @@ const OVERPASS = "https://overpass-api.de/api/interpreter";
 const COLORADO_CHILDCARE_API = "https://data.colorado.gov/resource/a9rr-k8mu.json";
 const MAX_ZIPS = 30;
 
-export const INCLUSION_PATTERN = /\b(inclusi(?:ve|on)|special needs|special education|early intervention|developmental(?:ly)?|autism|autistic|therapeutic|IEP|IFSP|ECSE|early childhood special|sensory|speech therapy|occupational therapy|behavior(?:al)? support|ABA)\b/gi;
-const ABA_NAME = /\b(aba|autism|autistic|applied behavior|behavior(?:al)? (?:analysis|therapy|analyst))\b/i;
 
 // ---------------------------------------------------------------------------
 // Pure parsers
 // ---------------------------------------------------------------------------
 
-export function zctaLayerId(serviceJson: unknown): number | null {
-  if (!isRecord(serviceJson) || !Array.isArray(serviceJson.layers)) return null;
-  const layers = serviceJson.layers.filter((layer): layer is { id: number; name: string } =>
-    isRecord(layer) && typeof layer.id === "number" && typeof layer.name === "string" && /zip code tabulation areas$/i.test(layer.name.trim()));
-  // Prefer the most recent vintage (e.g. "2020 Census ZIP Code Tabulation Areas").
-  layers.sort((a, b) => b.name.localeCompare(a.name));
-  return layers[0]?.id ?? null;
-}
 
-export function parseZctaCentroids(payload: unknown): Array<{ zip: string; lat: number; lon: number }> {
-  if (!isRecord(payload) || !Array.isArray(payload.features)) throw new Error("ZCTA query returned no features");
-  return payload.features.flatMap((feature) => {
-    if (!isRecord(feature) || !isRecord(feature.attributes)) return [];
-    const a = upperKeys(feature.attributes);
-    const zip = String(a.ZCTA5 ?? a.GEOID ?? a.BASENAME ?? "");
-    const lat = Number(a.CENTLAT ?? a.INTPTLAT);
-    const lon = Number(a.CENTLON ?? a.INTPTLON);
-    return /^\d{5}$/.test(zip) && Number.isFinite(lat) && Number.isFinite(lon) ? [{ zip, lat, lon }] : [];
-  });
-}
 
 /** Parses Missouri DHSS licensed-care age text such as "6 WKS", "2 YRS 6 MOS", "12". */
 export function parseAgeYears(text: unknown): number | null {
@@ -116,12 +76,6 @@ export function parseAgeYears(text: unknown): number | null {
   if (matched) return Math.round(years * 100) / 100;
   const plain = Number(value.trim());
   return Number.isFinite(plain) && plain >= 0 && plain <= 21 ? plain : null;
-}
-
-export function inclusionSignals(text: string): string[] {
-  const found = new Set<string>();
-  for (const match of text.matchAll(INCLUSION_PATTERN)) found.add(match[0].toLowerCase());
-  return [...found].slice(0, 6);
 }
 
 export function parseMissouriChildCarePlaces(payload: unknown): MapPlace[] {
@@ -183,44 +137,6 @@ export function parseColoradoChildCarePlaces(rows: unknown, zipCentroids: Readon
         ...inclusionSignals(name + " " + serviceType),
         ...(district ? ["school-district operated"] : []),
       ],
-    });
-  }
-  return out;
-}
-
-export function parseOverpassPlaces(payload: unknown): MapPlace[] {
-  if (!isRecord(payload) || !Array.isArray(payload.elements)) throw new Error("Overpass returned no elements");
-  const out: MapPlace[] = [];
-  for (const element of payload.elements) {
-    if (!isRecord(element) || !isRecord(element.tags)) continue;
-    const tags = element.tags as Record<string, string>;
-    const name = tags.name?.trim();
-    if (!name) continue;
-    // Facility tags only; anything mapped as a dwelling is never used.
-    if (/^(house|residential|apartments|detached|semidetached_house)$/.test(tags.building ?? "")) continue;
-    const center = isRecord(element.center) ? element.center : element;
-    const lat = Number(center.lat);
-    const lon = Number(center.lon);
-    if (!isValidPoint({ lat, lon })) continue;
-    const amenity = tags.amenity ?? "";
-    const healthcare = tags.healthcare ?? "";
-    const speciality = (tags["healthcare:speciality"] ?? "") + " " + (tags.description ?? "");
-    let kind: PlaceKind | null = null;
-    if (ABA_NAME.test(name) || /autism|behavio/i.test(speciality)) kind = "aba_provider";
-    else if (amenity === "childcare" || amenity === "kindergarten") kind = "daycare";
-    else if (/paediatric|pediatric/i.test(speciality) || /pediatric|paediatric|children'?s clinic/i.test(name)) kind = "pediatrics";
-    else if (/speech_therapist|occupational_therapist|physiotherapist/.test(healthcare)) kind = "therapy";
-    else if (amenity === "school") kind = "school";
-    else if (amenity === "hospital") kind = "hospital";
-    if (!kind) continue;
-    out.push({
-      id: `osm-${element.type}-${element.id}`, kind, name, lat, lon, approximate: false,
-      address: [tags["addr:housenumber"], tags["addr:street"]].filter(Boolean).join(" ") || undefined,
-      city: tags["addr:city"], zip: tags["addr:postcode"]?.slice(0, 5), phone: tags.phone ?? tags["contact:phone"],
-      website: tags.website ?? tags["contact:website"], sources: ["openstreetmap"], licensed: false,
-      capacity: Number(tags.capacity) > 0 ? Number(tags.capacity) : undefined,
-      minAgeYears: tags.min_age ? Number(tags.min_age) : null, maxAgeYears: tags.max_age ? Number(tags.max_age) : null,
-      inclusionSignals: kind === "daycare" ? inclusionSignals(name + " " + (tags.description ?? "")) : [],
     });
   }
   return out;
