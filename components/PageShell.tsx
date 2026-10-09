@@ -63,7 +63,7 @@ export function PageShell({
         {!compact && (
           <div className="pageIntroWrap">
             <div className="pageIntro">
-              <span className="eyebrow">Missouri + Kansas ABA intelligence</span>
+              <span className="eyebrow">Missouri · Kansas · Colorado ABA intelligence</span>
               <h1>{title}</h1>
               <p>{description}</p>
             </div>
