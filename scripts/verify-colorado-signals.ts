@@ -48,9 +48,9 @@ const corroborated=scanPublicSignals([
 assert(corroborated.observations.some(x=>x.indicatorId==="service-capacity.01"));
 assert(corroborated.observations.some(x=>x.indicatorId==="institutional-demand.10"));
 assert.equal(corroborated.crossChecks.find(x=>x.id==="X01")?.status,"supported");
-assert.equal(corroborated.crossChecks.length,60);
+assert.equal(corroborated.crossChecks.length,90);
 const privateClue=scanPublicSignals([
  hit("forum.org","My autistic son lives at our house on 123 Main Street; ABA waitlist"),
 ]);
 assert.equal(privateClue.clues.length,0,"Household-level signals must not be included");
-console.log("Colorado institutional collector, 180 public hypotheses, 60 cross-checks and privacy checks passed.");
+console.log("Colorado institutional collector, 180 public hypotheses, 90 cross-checks and privacy checks passed.");
