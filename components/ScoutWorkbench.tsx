@@ -254,10 +254,10 @@ export function ScoutWorkbench({
   return (
     <div className="scoutShellV3">
       <section className="scoutHeroV3">
-        <span className="eyebrow">ABA Engine · Missouri + Kansas + Colorado</span>
+        <span className="eyebrow">CLIENT RESEARCH · MO / KS / CO</span>
         <div className="scoutHeadlineRow">
           <h1>Scout</h1>
-          <p>Find where families may need your ABA services, improve local visibility and plan RBT coverage. Public research never identifies individual children.</p>
+          <p>Identify local ABA demand and RBT coverage using verified public evidence. No child profiles.</p>
         </div>
 
         <div className="scoutControlDeck" aria-label="Scout research mode">
