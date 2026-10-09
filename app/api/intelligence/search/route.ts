@@ -32,7 +32,7 @@ import { buildProviderReviewDossier, providerReviewQuery, providerReviewQueries,
 import { summarizeCompanyReviewEvidence } from "@/lib/intelligence/signals/competitor-reviews";
 import { assessOpportunityReliability } from "@/lib/intelligence/score-reliability";
 import { buildClientGrowthPlan } from "@/lib/intelligence/client-growth";
-import { PUBLIC_SOURCE_CHANNELS, matchedPublicSourceChannels } from "@/lib/intelligence/signals/source-channel-catalog";
+import { PUBLIC_SOURCE_CHANNELS, matchedPublicSourceChannels, isAggregateOnlyPublicSourceUrl } from "@/lib/intelligence/signals/source-channel-catalog";
 import { getStateCountyBundle } from "@/lib/intelligence/joins/collectors";
 import { scoutDataJoins, type ScoutDataJoins } from "@/lib/intelligence/joins/scout";
 
@@ -242,7 +242,7 @@ export async function POST(request: Request) {
   // Public discussion is aggregate context; a forum poster must never become a family-level CRM lead.
   const researchOnlyCommunity = (url: string) => /(^|\.)(reddit\.com|facebook\.com|nextdoor\.com|threads\.net|instagram\.com|tiktok\.com|x\.com)$/i.test(safeDomain(url) ?? "");
   const resolvedPublic = resolveSearchHits(
-    rows.filter((row) => !researchOnlyCommunity(row.hit.url) && !isRestrictedReviewSite(row.hit.url)).map((row) => ({
+    rows.filter((row) => !researchOnlyCommunity(row.hit.url) && !isRestrictedReviewSite(row.hit.url) && !isAggregateOnlyPublicSourceUrl(row.hit.url)).map((row) => ({
       ...row,
       enrichment: row.enrichment ?? enrichmentByDomain.get(safeDomain(row.hit.url)) ?? null,
     })),
