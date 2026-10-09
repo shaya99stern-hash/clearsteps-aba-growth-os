@@ -152,11 +152,11 @@ export const ADDITIONAL_YOUTH_SOURCE_CHANNELS: readonly PublicSourceChannel[] = 
     "access": "public-index"
   },
   {
-    "host": "familyvoices.org",
-    "scope": "national",
-    "kind": "program",
+    "host": "ecclacolorado.org",
+    "scope": "CO",
+    "kind": "referral",
     "method": "site-search",
-    "focus": "family-to-family resource organizations for youth special health needs",
+    "focus": "Colorado county early childhood council directory and referral support resources",
     "access": "public-index"
   },
   {
