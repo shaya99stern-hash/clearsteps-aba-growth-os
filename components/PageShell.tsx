@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Plus, Search } from "lucide-react";
 import { AppNav } from "./AppNav";
-import { MobileTabBar } from "./MobileTabBar";
+import { MobileDrawer } from "./MobileDrawer";
 
 export function PageShell({
   title,
@@ -24,6 +24,8 @@ export function PageShell({
       >
         Skip to main content
       </a>
+
+      <MobileDrawer title={title} />
 
       <aside className="workspaceRail">
         <div className="railHeader">
@@ -71,7 +73,6 @@ export function PageShell({
         <main id="page-content" tabIndex={-1} className={compact ? "pageContent compact" : "pageContent"}>{children}</main>
       </section>
 
-      <MobileTabBar />
     </div>
   );
 }

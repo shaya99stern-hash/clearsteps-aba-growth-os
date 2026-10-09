@@ -154,7 +154,7 @@ async function verifyMobilePwa(baseUrl: string) {
   try {
     await page.goto(`${baseUrl}/outreach`, { waitUntil: "domcontentloaded" });
     await assertNoBodyOverflow(page, "Outreach");
-    await assertNativeMobileChrome(page, "More");
+    await assertNativeMobileChrome(page, "Outreach");
 
     await page.keyboard.press("Tab");
     const firstFocusText = await page.evaluate(() => document.activeElement?.textContent?.trim() ?? "");
@@ -176,6 +176,17 @@ async function verifyMobilePwa(baseUrl: string) {
     await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
     await assertNoBodyOverflow(page, "Scout");
     await assertNativeMobileChrome(page, "Scout");
+
+    // Accessible hamburger drawer replaces the previous five-tab footer.
+    const openNavigation = page.getByRole("button", { name: "Open navigation" });
+    await openNavigation.click();
+    const drawer = page.getByRole("dialog", { name: "Workspace navigation" });
+    await drawer.waitFor({ state: "visible" });
+    assert.equal(await drawer.getByRole("link", { name: "Scout", exact: true }).getAttribute("aria-current"), "page");
+    assert.equal(await drawer.getByRole("link").count(), 11, "all ten workspaces plus source status should remain reachable");
+    await page.keyboard.press("Escape");
+    await drawer.waitFor({ state: "detached" });
+    assert.equal(await openNavigation.evaluate((button) => document.activeElement === button), true, "closing drawer returns focus to hamburger");
 
     const bodyText = await page.locator("body").innerText();
     assert.equal(/Lakewood|New Jersey|\bNJ\b/.test(bodyText), false, "Scout mobile should not expose the retired New Jersey default");
@@ -225,7 +236,7 @@ async function verifyMobilePwa(baseUrl: string) {
 
     await page.goto(baseUrl + "/intelligence", { waitUntil: "domcontentloaded" });
     await assertNoBodyOverflow(page, "Intelligence");
-    await assertNativeMobileChrome(page, "More");
+    await assertNativeMobileChrome(page, "Intelligence");
     await page.getByRole("heading", { name: "Decision queue" }).waitFor({ state: "visible" });
     await page.getByText("Kansas City, Missouri · CLIENT", { exact: true }).waitFor({ state: "visible" });
 
@@ -348,12 +359,12 @@ async function assertNativeMobileChrome(page: Page, expected: string) {
   assert.equal(await page.locator(".workspaceRail").isVisible(), false, "mobile should not render the desktop workspace rail");
   assert.equal(await page.locator(".workspaceTopbar").isVisible(), false, "mobile should not render the desktop workspace topbar");
 
-  const mobileNav = page.locator('nav[aria-label="ABA Engine primary navigation"]');
-  await mobileNav.waitFor({ state: "visible" });
-  assert.equal(await mobileNav.getByRole("link").count(), 5, "mobile should expose exactly five primary destinations");
-  const active = mobileNav.locator('a[aria-current="page"]');
-  assert.equal(await active.count(), 1, "mobile should expose one active primary destination");
-  assert.equal((await active.innerText()).trim(), expected);
+  const mobileHeader = page.locator(".csMobileHeader");
+  await mobileHeader.waitFor({ state: "visible" });
+  assert.equal(await page.getByRole("button", { name: "Open navigation" }).isVisible(), true, "mobile should expose an accessible hamburger");
+  assert.equal((await mobileHeader.locator(".csMobileIdentityText small").innerText()).trim(), expected, "mobile header should name the active workspace");
+  assert.equal(await page.locator(".mobileTabBar").count(), 0, "mobile must not render a second bottom navigation");
+  assert.equal(await page.getByRole("dialog", { name: "Workspace navigation" }).count(), 0, "drawer stays closed until requested");
 }
 
 async function assertNoBodyOverflow(page: Page, label: string) {

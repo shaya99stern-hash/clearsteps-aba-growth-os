@@ -15,7 +15,7 @@ type WorkspaceNavGroup = {
   items: WorkspaceNavItem[];
 };
 
-const navGroups: WorkspaceNavGroup[] = [
+export const navGroups: WorkspaceNavGroup[] = [
   {
     label: "Discover",
     items: [
