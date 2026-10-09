@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Activity, ChevronRight, Database, Mail, Settings, Users } from "lucide-react";
+import { Activity, ChevronRight, Database, Mail, MapPinned, Settings, Users } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 
 const items = [
+  { label: "Map", description: "County scores, hotspots, child care and providers by radius", href: "/map", icon: MapPinned },
   { label: "Talent CRM", description: "RBT and BCBA recruiting pipeline", href: "/talent", icon: Users },
   { label: "Intelligence", description: "Market and evidence views", href: "/intelligence", icon: Activity },
   { label: "Outreach", description: "Reviewed referral outreach workspace", href: "/outreach", icon: Mail },

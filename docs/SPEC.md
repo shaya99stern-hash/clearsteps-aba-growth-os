@@ -108,3 +108,21 @@ Green code tests do not prove public hosts return live results, cross-device dat
 - Registering 274 candidate sites is not 274 working API collectors. Source status must reveal the number actually searched, returned and independently corroborated; keyless-only and public pages.
 - The current ACS data groups ages 0–2 and 3–17. Ages 2 and 18 cannot be separated from those tables, so Clear Steps currently only displays observed ages 3–17; exact age-2–18 census population remains **unknown**, never estimated without single-year age data.
 - The 60 crosschecks test relationship hypotheses; they do not claim confirmed relationships without corroborating sources.
+
+## County data joins and the 2 / 5 / 10-mile map (October 2026)
+
+**County data joins (Territories).** 90 joins, each crossing at least two public sources. Every county in MO/KS/CO is ranked by within-state percentile across five families (service gap, referral network, payer fit, access, need intensity). Ten validation joins compare independent sources that measure the same thing; their agreement adjusts confidence. Unavailable sources leave joins blank, never estimated. ACS tables whose child universe does not match B09001 are dropped as likely variable drift.
+
+- **Keyless (51 joins: J41–J90 except J48, plus J13, J26, J27, J33):** ACS via the Census Reporter mirror, CMS NPPES statewide registrations by practice county (ABA, pediatric, speech and OT organizations; developmental pediatricians and child psychologists counted, never listed), OpenStreetMap facilities by county outline, TIGER, HRSA Mental Health HPSA and state child-care licensing (MO DHSS, CO CDEC).
+- **With a free Census API key (`CENSUS_API_KEY`):** SAIPE, SAHIE and County Business Patterns add the remaining joins and three validation checks. Without a key these joins show "insufficient data"; the ranking still covers every county. The growth joins (J09, J48) also need the 2015–19 ACS vintage, which the keyless mirror does not serve.
+- NPPES and OpenStreetMap points are assigned to counties with TIGER county outlines (holes respected); NPPES ZIPs map through ZIP-area centroids, and registrations in unmapped ZIPs are reported rather than guessed.
+
+**Map (`/map`).** MapLibre with an OpenFreeMap basemap (blank fallback if tiles are unreachable). Layers:
+- County opportunity bubbles (90 joins) and census-tract hotspots (young-child density, child disability rate, insured share, working parents, county service gap).
+- Organization pins within 10 miles of a chosen point: ABA provider organizations (NPPES NPI-2 + ABA-named OpenStreetMap facilities), licensed child care (state roster) and unconfirmed child-care listings (OpenStreetMap), pediatric practices, speech/OT/PT offices, schools and hospitals.
+- 2, 5 and 10-mile rings with 202 indicators: area-weighted tract counts and rates, organization counts, cross-source ratios, concentration, nearest distances, statistical expectations and county context.
+- Eight convergence tests, each requiring two independent sources to agree, roll up to a strong / moderate / weak / insufficient strength label.
+
+**Child-care tiers.** *Priority*: state-licensed, ages compatible with 2–5, and public inclusion/special-needs language (name, CO district-operated flag, or the facility's own website checked with robots.txt respected). *Confirmed*: state-licensed, so children are definitely enrolled. *Likely*: listed on OpenStreetMap only. Expected autistic children at licensed capacity uses CDC ADDM 2022 prevalence (1 in 31) and is labeled a statistical expectation, never identified children.
+
+**Boundaries kept.** Only organizations and area aggregates are mapped. Individual NPPES clinicians are counted by ZIP and never pinned (practice addresses can be homes). OpenStreetMap features mapped as houses are excluded. The map never locates, infers or targets a child, family or household. That rules out residential "autistic child" signs, posts in parent groups, or any other household-level disability signal.

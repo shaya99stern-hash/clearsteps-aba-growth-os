@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Database, KanbanSquare, Mail, Map, Search, Settings, SquareCheckBig, Users, type LucideIcon } from "lucide-react";
+import { Activity, Database, KanbanSquare, Mail, Map, Search, Settings, SquareCheckBig, Users, type LucideIcon, MapPinned } from "lucide-react";
 
 type WorkspaceNavItem = {
   label: string;
@@ -21,6 +21,7 @@ const navGroups: WorkspaceNavGroup[] = [
     items: [
       { label: "Scout", href: "/", icon: Search },
       { label: "Territories", href: "/territories", icon: Map },
+      { label: "Map", href: "/map", icon: MapPinned },
       { label: "Intelligence", href: "/intelligence", icon: Activity },
     ],
   },

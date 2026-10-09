@@ -93,6 +93,16 @@ jobs:
       - name: Verify youth age groups and organizational referral qualification
         run: npm run verify:youth-qualification
 
+      - name: Verify 40 county data joins across public statistical programs
+        run: npm run verify:data-joins
+
+      - name: Verify 2/5/10-mile site map, 202 indicators and child-care tiers
+        run: npm run verify:site-map
+
+      - name: Smoke live county data joins and ACS variable labels (non-gating)
+        continue-on-error: true
+        run: npm run smoke:data-joins
+
       - name: Smoke real keyless upstream data feeds (non-gating)
         continue-on-error: true
         run: npm run smoke:live-acquisition
