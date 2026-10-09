@@ -67,7 +67,8 @@ const uncorroborated=scanPublicSignals([
   getHits("Teen autism community program expansion", "localpaper.com"),
 ],"2026-10-08","Denver, CO","2-18");
 assert.equal(uncorroborated.observations.length,0,"One public source is research only");
-assert.equal(uncorroborated.crossChecks.length,60);
+assert.equal(uncorroborated.crossChecks.length,90);
+assert.equal(uncorroborated.parsedDocumentCategories,0);
 
 for(const state of ["MO","KS","CO"] as const) {
   const client=choosePublicSourceChannels(state,"client","school-age resource",8);
