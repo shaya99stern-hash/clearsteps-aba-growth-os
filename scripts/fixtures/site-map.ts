@@ -1,6 +1,6 @@
 import type { FetchText } from "../../lib/intelligence/joins/collectors";
 import type { PostText } from "../../lib/intelligence/geo/places";
-import { acsVars, COUNTIES, type County } from "./county-joins";
+import { acsVars, COUNTIES, reporterPayload, type County } from "./county-joins";
 
 // ---------------------------------------------------------------------------
 // Recorded-response fixture for a Kansas City-area site (shared by verify-site-map and local render checks).
@@ -63,10 +63,21 @@ export const OVERPASS_ELEMENTS = [
 export const sitePosts: string[] = [];
 export const siteGets: string[] = [];
 
-export function siteFixtureFetch(options: { failNppes?: boolean } = {}): FetchText {
+export function siteFixtureFetch(options: { failNppes?: boolean; keylessReporter?: boolean } = {}): FetchText {
   return async (url) => {
     siteGets.push(url);
     const u = new URL(url);
+    if (u.hostname === "api.censusreporter.org") {
+      if (!options.keylessReporter) throw new Error("HTTP 503");
+      const parent = (u.searchParams.get("geo_ids") ?? "").split("|")[1];
+      // Statewide tract requests are refused, forcing the per-county fallback.
+      if (parent.startsWith("04000US")) return JSON.stringify({ error: "Too many geographies requested" });
+      const countyFips = parent.replace("05000US", "");
+      return reporterPayload(FIXTURE_TRACTS.filter((tract) => tract.geoid.startsWith(countyFips)).map((tract) => ({
+        geoid: "14000US" + tract.geoid, name: `Census Tract ${tract.geoid.slice(5)}`, values: acsVars(tract.county),
+      })), (u.searchParams.get("table_ids") ?? "").split(","));
+    }
+    if (options.keylessReporter && u.hostname === "api.census.gov") return "<html>Invalid Key</html>";
     if (u.hostname === "api.census.gov" && u.searchParams.get("for") === "tract:*") {
       if (u.pathname.includes("/2024/")) throw new Error("HTTP 404");
       const vars = (u.searchParams.get("get") ?? "").split(",");

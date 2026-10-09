@@ -105,7 +105,10 @@ export const ACS_EXPECTED_LABELS: Readonly<Record<string, readonly string[]>> = 
 /** Census Data API JSON: a header row followed by value rows. */
 export function parseCensusTable(raw: string): Row[] {
   const text = raw.trim();
-  if (!text.startsWith("[")) throw new Error("Census API returned a non-JSON response");
+  if (!text.startsWith("[")) {
+    const snippet = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 140);
+    throw new Error(`Census API returned a non-JSON response${snippet ? `: "${snippet}"` : ""}${process.env.CENSUS_API_KEY?.trim() ? "" : " (no CENSUS_API_KEY set)"}`);
+  }
   const payload = JSON.parse(text) as unknown;
   if (!Array.isArray(payload) || payload.length < 1 || !Array.isArray(payload[0])) {
     throw new Error("Census API returned an unexpected table shape");
@@ -496,32 +499,21 @@ export async function collectStateCountyBundle(state: JoinState, options: Collec
   };
 
   const acs = (async () => {
-    const { option: year, result: first } = await firstWorking(ACS_YEARS, async (year) =>
-      parseCensusTable(await get(censusUrl(`${year}/acs/acs5`, { get: ["NAME", ...ACS_BATCHES[0]].join(","), ...geo }))), signal);
-    const [second, prior] = await Promise.allSettled([
-      get(censusUrl(`${year}/acs/acs5`, { get: ["NAME", ...ACS_BATCHES[1]].join(","), ...geo })).then(parseCensusTable),
-      get(censusUrl(`${ACS_PRIOR_YEAR}/acs/acs5`, { get: "NAME,B09001_001E", ...geo })).then(parseCensusTable),
-    ]);
-    const merged = new Map<string, Row>();
-    for (const row of first) { const fips = rowFips(row); if (fips) merged.set(fips, { ...row }); }
-    if (second.status === "fulfilled") for (const row of second.value) {
-      const fips = rowFips(row);
-      if (fips && merged.has(fips)) Object.assign(merged.get(fips)!, row);
-    }
+    const current = await fetchAcsRows({ get, signal, stateFips, level: "county", variables: ACS_BATCHES.flat() });
+    const prior = await fetchAcsRows({ get, signal, stateFips, level: "county", variables: ["B09001_001E"], prior: true }).catch(() => null);
     const patch: MetricPatch = new Map();
-    for (const [fips, row] of merged) {
+    for (const [fips, row] of current.rows) {
       const { metrics, issues } = acsMetricsFromRow(row);
       if (issues.length) integrityIssues.push(...issues.map((issue) => `${row.NAME || fips}: ${issue}`));
       patch.set(fips, { name: row.NAME, metrics });
     }
-    if (prior.status === "fulfilled") for (const row of prior.value) {
-      const fips = rowFips(row);
+    if (prior) for (const [fips, row] of prior.rows) {
       const kids = count(row, "B09001_001E");
-      if (fips && kids !== undefined && patch.has(fips)) patch.get(fips)!.metrics["acs.kids_prior"] = kids;
+      if (kids !== undefined && patch.has(fips)) patch.get(fips)!.metrics["acs.kids_prior"] = kids;
     }
     apply(patch);
-    const partial = [second.status === "rejected" ? "second variable batch failed" : null, prior.status === "rejected" ? `${ACS_PRIOR_YEAR} vintage failed` : null].filter(Boolean);
-    return { vintage: `${year - 4}–${year}`, detail: `${merged.size} counties${partial.length ? "; " + partial.join("; ") : ""}` };
+    const partial = [...current.partial, prior ? null : `${ACS_PRIOR_YEAR} vintage failed`].filter(Boolean);
+    return { vintage: current.vintage, detail: `${current.rows.size} counties via ${current.via}${partial.length ? "; " + partial.join("; ") : ""}` };
   })();
 
   const saipe = (async () => {
@@ -675,6 +667,133 @@ export async function collectStateCountyBundle(state: JoinState, options: Collec
     programs,
     integrityIssues,
   };
+}
+
+// ---------------------------------------------------------------------------
+// ACS rows: Census Data API (with CENSUS_API_KEY) or the keyless Census Reporter mirror.
+// ---------------------------------------------------------------------------
+
+const CENSUS_REPORTER = "https://api.censusreporter.org/1.0/data/show";
+
+/** "B09001001" (Census Reporter) -> "B09001_001E" (Census Data API). */
+export function reporterVariableKey(id: string): string | null {
+  const match = id.match(/^([BC]\d{5}[A-Z]?)(\d{3})$/);
+  return match ? `${match[1]}_${match[2]}E` : null;
+}
+
+/** Census Reporter /data/show payload -> Census-API-shaped rows keyed by county or tract GEOID. */
+export function parseCensusReporterRows(payload: unknown): { rows: Map<string, Row>; years: string | null } {
+  if (!isRecord(payload) || !isRecord(payload.data)) {
+    const message = isRecord(payload) && typeof payload.error === "string" ? payload.error : "no data";
+    throw new Error("Census Reporter: " + message);
+  }
+  const geography = isRecord(payload.geography) ? payload.geography : {};
+  const rows = new Map<string, Row>();
+  for (const [geoid, tables] of Object.entries(payload.data)) {
+    const match = geoid.match(/^(?:050|140)00US(\d{2})(\d{3})(\d{6})?$/);
+    if (!match || !isRecord(tables)) continue;
+    const geo = geography[geoid];
+    const row: Row = { NAME: isRecord(geo) && typeof geo.name === "string" ? geo.name : geoid, state: match[1], county: match[2], ...(match[3] ? { tract: match[3] } : {}) };
+    for (const table of Object.values(tables)) {
+      if (!isRecord(table) || !isRecord(table.estimate)) continue;
+      for (const [id, value] of Object.entries(table.estimate)) {
+        const key = reporterVariableKey(id);
+        if (key) row[key] = typeof value === "number" && Number.isFinite(value) ? String(value) : "";
+      }
+    }
+    rows.set(match[1] + match[2] + (match[3] ?? ""), row);
+  }
+  const release = isRecord(payload.release) ? payload.release : {};
+  return { rows, years: typeof release.years === "string" ? release.years : null };
+}
+
+export async function limitedSettled<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<PromiseSettledResult<R>[]> {
+  const results: PromiseSettledResult<R>[] = new Array(items.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const index = next++;
+      try { results[index] = { status: "fulfilled", value: await fn(items[index]) }; }
+      catch (reason) { results[index] = { status: "rejected", reason }; }
+    }
+  }));
+  return results;
+}
+
+export interface AcsFetch {
+  get: (url: string) => Promise<string>;
+  signal: AbortSignal;
+  stateFips: string;
+  level: "county" | "tract";
+  variables: readonly string[];
+  /** Use the ACS_PRIOR_YEAR vintage instead of the latest release. */
+  prior?: boolean;
+  /** Counties for per-county tract requests when a statewide tract request is refused. */
+  counties?: () => Promise<string[]>;
+}
+
+export async function fetchAcsRows(input: AcsFetch): Promise<{ rows: Map<string, Row>; vintage: string; via: string; partial: string[] }> {
+  const viaApi = async () => {
+    const batches: string[][] = [];
+    for (let i = 0; i < input.variables.length; i += 48) batches.push(input.variables.slice(i, i + 48) as string[]);
+    const params = (batch: string[]) => {
+      const search = new URLSearchParams({ get: ["NAME", ...batch].join(","), for: input.level === "county" ? "county:*" : "tract:*" });
+      search.append("in", `state:${input.stateFips}`);
+      if (input.level === "tract") search.append("in", "county:*");
+      return search;
+    };
+    const years = input.prior ? [ACS_PRIOR_YEAR] : ACS_YEARS;
+    const { option: year, result: first } = await firstWorking(years, async (year) =>
+      parseCensusTable(await input.get(censusUrl(`${year}/acs/acs5`, params(batches[0])))), input.signal);
+    const rest = await Promise.allSettled(batches.slice(1).map((batch) => input.get(censusUrl(`${year}/acs/acs5`, params(batch))).then(parseCensusTable)));
+    const rows = new Map<string, Row>();
+    const key = (row: Row) => (row.state ?? "") + (row.county ?? "") + (row.tract ?? "");
+    for (const row of first) rows.set(key(row), { ...row });
+    for (const result of rest) if (result.status === "fulfilled") for (const row of result.value) if (rows.has(key(row))) Object.assign(rows.get(key(row))!, row);
+    const failed = rest.filter((result) => result.status === "rejected").length;
+    return { rows, vintage: `${year - 4}–${year}`, via: "Census Data API", partial: failed ? [`${failed} variable batch(es) failed`] : [] };
+  };
+
+  const viaReporter = async () => {
+    const tables = [...new Set(input.variables.map((variable) => variable.split("_")[0]))];
+    const perRequest = input.level === "county" ? 8 : 3;
+    const chunks: string[][] = [];
+    for (let i = 0; i < tables.length; i += perRequest) chunks.push(tables.slice(i, i + perRequest));
+    const release = input.prior ? `acs${ACS_PRIOR_YEAR}_5yr` : "latest";
+    const sumlevel = input.level === "county" ? "050" : "140";
+    const request = (chunk: string[], parent: string) => input.get(`${CENSUS_REPORTER}/${release}?${new URLSearchParams({ table_ids: chunk.join(","), geo_ids: `${sumlevel}|${parent}` }).toString()}`)
+      .then((text) => parseCensusReporterRows(JSON.parse(text)));
+    const rows = new Map<string, Row>();
+    let years: string | null = null;
+    const partial: string[] = [];
+    const merge = (parsed: { rows: Map<string, Row>; years: string | null }) => {
+      years ??= parsed.years;
+      for (const [geoid, row] of parsed.rows) rows.set(geoid, { ...(rows.get(geoid) ?? {}), ...row });
+    };
+    for (const chunk of chunks) {
+      try {
+        merge(await request(chunk, `04000US${input.stateFips}`));
+      } catch (error) {
+        if (input.level !== "tract" || !input.counties) { partial.push(`${chunk.join("/")}: ${errorText(error)}`); continue; }
+        // Statewide tract request refused (size limit): fall back to one request per county.
+        const counties = await input.counties();
+        const results = await limitedSettled(counties, 6, (fips) => request(chunk, `05000US${fips}`));
+        let ok = 0;
+        for (const result of results) if (result.status === "fulfilled") { merge(result.value); ok++; }
+        if (ok < counties.length) partial.push(`${chunk.join("/")}: ${counties.length - ok}/${counties.length} counties failed`);
+      }
+    }
+    if (!rows.size) throw new Error("Census Reporter returned no rows" + (partial.length ? ": " + partial[0] : ""));
+    return { rows, vintage: (years ?? "latest").replace("-", "–"), via: "Census Reporter (keyless ACS mirror)", partial };
+  };
+
+  const order = process.env.CENSUS_API_KEY?.trim() ? [viaApi, viaReporter] : [viaReporter, viaApi];
+  const errors: string[] = [];
+  for (const attempt of order) {
+    if (input.signal.aborted) break;
+    try { return await attempt(); } catch (error) { errors.push(errorText(error)); }
+  }
+  throw new Error(errors.join(" | ") || "timed out");
 }
 
 const CACHE = new Map<JoinState, { at: number; ttl: number; bundle: Promise<StateCountyBundle> }>();

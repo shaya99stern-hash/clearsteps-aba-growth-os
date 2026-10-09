@@ -60,7 +60,23 @@ export function acsVars(c: County): Record<string, number> {
 const table = (header: string[], rows: Array<Array<string | number>>) => JSON.stringify([header, ...rows.map((row) => row.map(String))]);
 export const requested: string[] = [];
 
-export function fixtureFetch(stateFips: string, overrides: { failHpsa?: boolean; hangAll?: boolean } = {}): FetchText {
+/** Census Reporter /data/show payload built from Census-API-style variable values. */
+export function reporterPayload(geos: Array<{ geoid: string; name: string; values: Record<string, number> }>, tables: string[]) {
+  const data: Record<string, Record<string, { estimate: Record<string, number> }>> = {};
+  const geography: Record<string, { name: string }> = {};
+  for (const geo of geos) {
+    geography[geo.geoid] = { name: geo.name };
+    data[geo.geoid] = {};
+    for (const [variable, value] of Object.entries(geo.values)) {
+      const table = variable.split("_")[0];
+      if (!tables.includes(table)) continue;
+      (data[geo.geoid][table] ??= { estimate: {} }).estimate[table + variable.split("_")[1].replace("E", "")] = value;
+    }
+  }
+  return JSON.stringify({ release: { id: "acs2023_5yr", years: "2019-2023" }, geography, data });
+}
+
+export function fixtureFetch(stateFips: string, overrides: { failHpsa?: boolean; hangAll?: boolean; keylessReporter?: boolean } = {}): FetchText {
   return async (url, signal) => {
     requested.push(url);
     if (overrides.hangAll) {
@@ -69,6 +85,17 @@ export function fixtureFetch(stateFips: string, overrides: { failHpsa?: boolean;
     }
     const u = new URL(url);
     const counties = COUNTIES.map((county) => ({ ...county, fips: stateFips + county.fips.slice(2) }));
+    if (u.hostname === "api.censusreporter.org") {
+      if (!overrides.keylessReporter) throw new Error("HTTP 503");
+      const prior = u.pathname.endsWith("/acs2019_5yr");
+      assert.equal(u.searchParams.get("geo_ids"), `050|04000US${stateFips}`);
+      return reporterPayload(counties.map((c) => {
+        const values = acsVars(byFips.get("29" + c.fips.slice(2))!);
+        if (prior) values.B09001_001E = Math.round(c.kids / (1 + c.growth));
+        return { geoid: "05000US" + c.fips, name: c.name.replace(", Missouri", ", MO"), values };
+      }), (u.searchParams.get("table_ids") ?? "").split(","));
+    }
+    if (overrides.keylessReporter && u.hostname === "api.census.gov") return "<html><body>Invalid Key</body></html>";
     if (u.hostname === "api.census.gov") {
       assert.equal(u.searchParams.get("in"), `state:${stateFips}`);
       const vars = (u.searchParams.get("get") ?? "").split(",");

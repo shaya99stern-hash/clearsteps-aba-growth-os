@@ -4,7 +4,7 @@ import { getStateCountyBundle } from "@/lib/intelligence/joins/collectors";
 import { rankStateCounties } from "@/lib/intelligence/joins/rank";
 import { getStateTracts } from "@/lib/intelligence/geo/tracts";
 import { collectSitePlaces } from "@/lib/intelligence/geo/places";
-import { analyzeSite, INDICATOR_FAMILY_TITLES, CDC_PREVALENCE_SOURCE } from "@/lib/intelligence/geo/site-analysis";
+import { analyzeSite, formatAgeRange, INDICATOR_FAMILY_TITLES, CDC_PREVALENCE_SOURCE } from "@/lib/intelligence/geo/site-analysis";
 import { insideState } from "@/lib/intelligence/geo/geo-math";
 import { enrichPublicWebsite } from "@/lib/intelligence/free-search";
 
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
     daycares: analysis.daycares.map((item) => ({
       id: item.place.id, name: item.place.name, tier: item.tier, distanceMiles: item.place.distanceMiles ?? null,
       capacity: item.place.capacity ?? null, phone: item.place.phone ?? null, address: item.place.address ?? null, city: item.place.city ?? null,
-      website: item.place.website ?? null, ages: item.place.minAgeYears != null && item.place.maxAgeYears != null ? `${item.place.minAgeYears}–${item.place.maxAgeYears}` : null,
+      website: item.place.website ?? null, ages: item.place.minAgeYears != null && item.place.maxAgeYears != null ? formatAgeRange(item.place.minAgeYears, item.place.maxAgeYears) : null,
       confirmedBy: item.confirmedBy, servesTargetAges: item.servesTargetAges, reasons: item.reasons,
       expectedAutisticAtCapacity: item.expectedAutisticAtCapacity, expectedWithDisabilityAtCapacity: item.expectedWithDisabilityAtCapacity,
     })),

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { collectSitePlaces, mergePlaces, parseAgeYears, parseColoradoChildCarePlaces, parseGeocoderBatch, parseNppesZip, parseOverpassPlaces, samePlace, zctaLayerId, type MapPlace } from "../lib/intelligence/geo/places";
 import { collectStateTracts, parseTigerTractPage, tractHotspots } from "../lib/intelligence/geo/tracts";
-import { analyzeSite, assessDaycare, CDC_AUTISM_PREVALENCE, tractWeight } from "../lib/intelligence/geo/site-analysis";
+import { analyzeSite, assessDaycare, CDC_AUTISM_PREVALENCE, formatAgeRange, tractWeight } from "../lib/intelligence/geo/site-analysis";
 import { circlePolygon, haversineMiles, insideState } from "../lib/intelligence/geo/geo-math";
 import { FIXTURE_TRACTS, OVERPASS_ELEMENTS, SITE_CENTER, siteFixtureFetch, sitePostText } from "./fixtures/site-map";
 import { fixtureFetch } from "./fixtures/county-joins";
@@ -25,6 +25,8 @@ async function main() {
   assert.equal(parseAgeYears("2 YRS 6 MOS"), 2.5);
   assert.equal(parseAgeYears("12"), 12);
   assert.equal(parseAgeYears("unknown"), null);
+  assert.equal(formatAgeRange(0.12, 12), "6 wks–12 yrs");
+  assert.equal(formatAgeRange(2.5, 5), "2.5 yrs–5 yrs");
   assert.equal(zctaLayerId({ layers: [{ id: 1, name: "2010 Census ZIP Code Tabulation Areas" }, { id: 2, name: "2020 Census ZIP Code Tabulation Areas" }] }), 2);
   const osm = parseOverpassPlaces({ elements: OVERPASS_ELEMENTS });
   assert(!osm.some((place) => place.name.includes("Grandma")), "Facilities mapped as houses are never used");
@@ -66,6 +68,16 @@ async function main() {
   const hotspots = tractHotspots(tracts.tracts, new Map([["29095", 80], ["29047", 20]]));
   assert.equal(hotspots.length, FIXTURE_TRACTS.length);
   assert(hotspots.every((spot) => spot.score >= 0 && spot.score <= 100));
+
+  const keylessTracts = await collectStateTracts("MO", { fetchText: siteFixtureFetch({ keylessReporter: true }) });
+  const keylessAcs = keylessTracts.programs.find((p) => p.program === "census-acs5")!;
+  assert.equal(keylessAcs.status, "complete", keylessAcs.detail);
+  assert(keylessAcs.detail.includes("Census Reporter"));
+  assert.equal(keylessTracts.tracts.filter((t) => t.metrics["acs.kids"] !== undefined).length, FIXTURE_TRACTS.length, "Per-county fallback fills every tract");
+  const geoOnly = await collectStateTracts("MO", { fetchText: async (url, signal) => /censusreporter|api\.census\.gov/.test(url) ? "<html>down</html>" : siteFixtureFetch()(url, signal) });
+  assert.equal(geoOnly.tracts.length, FIXTURE_TRACTS.length, "Tract geography is kept when ACS is unavailable");
+  assert(geoOnly.tracts.every((t) => t.metrics["acs.kids"] === undefined));
+  assert.equal(analyzeSite(SITE_CENTER, { tracts: geoOnly.tracts, places: { center: SITE_CENTER, radiusMiles: 10, places: [], zipCounts: [], sources: [] } }).countyFips, "29095", "County still resolves without ACS");
 
   // --- Site places ------------------------------------------------------------
   let enriched = 0;

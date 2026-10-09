@@ -1,5 +1,5 @@
 import {
-  ACS_BATCHES, acsMetricsFromRow, censusUrl, defaultFetchText, errorText, firstWorking, isRecord, parseCensusTable, upperKeys,
+  ACS_BATCHES, acsMetricsFromRow, defaultFetchText, errorText, fetchAcsRows, isRecord, upperKeys,
   type FetchText, type ProgramStatus,
 } from "../joins/collectors";
 import { STATE_FIPS, type JoinState, type MetricId } from "../joins/sources";
@@ -27,17 +27,9 @@ export interface StateTracts {
   integrityIssues: string[];
 }
 
-const ACS_YEARS = [2024, 2023] as const;
 const TIGER_TRACTS = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer";
 const SQ_METERS_PER_SQ_MILE = 2_589_988.110336;
 const PAGE = 1000;
-
-function tractParams(variables: readonly string[], stateFips: string) {
-  const params = new URLSearchParams({ get: ["NAME", ...variables].join(","), for: "tract:*" });
-  params.append("in", `state:${stateFips}`);
-  params.append("in", "county:*");
-  return params;
-}
 
 export function tractLayerId(serviceJson: unknown): number | null {
   if (!isRecord(serviceJson) || !Array.isArray(serviceJson.layers)) return null;
@@ -73,22 +65,6 @@ export async function collectStateTracts(state: JoinState, options: { fetchText?
   const programs: ProgramStatus[] = [];
   const integrityIssues: string[] = [];
 
-  const acs = (async () => {
-    const { option: year, result: first } = await firstWorking(ACS_YEARS, async (year) =>
-      parseCensusTable(await get(censusUrl(`${year}/acs/acs5`, tractParams(ACS_BATCHES[0], stateFips)))), signal);
-    const second = await get(censusUrl(`${year}/acs/acs5`, tractParams(ACS_BATCHES[1], stateFips))).then(parseCensusTable).catch(() => null);
-    const rows = new Map<string, Record<string, string>>();
-    for (const row of first) {
-      const geoid = (row.state ?? "") + (row.county ?? "") + (row.tract ?? "");
-      if (/^\d{11}$/.test(geoid)) rows.set(geoid, { ...row });
-    }
-    if (second) for (const row of second) {
-      const geoid = (row.state ?? "") + (row.county ?? "") + (row.tract ?? "");
-      if (rows.has(geoid)) Object.assign(rows.get(geoid)!, row);
-    }
-    return { year, rows, partial: !second };
-  })();
-
   const tiger = (async () => {
     let layer = 0;
     try { layer = tractLayerId(JSON.parse(await get(`${TIGER_TRACTS}?f=json`))) ?? 0; } catch { /* documented default */ }
@@ -106,21 +82,26 @@ export async function collectStateTracts(state: JoinState, options: { fetchText?
     return out;
   })();
 
+  const acs = fetchAcsRows({
+    get, signal, stateFips, level: "tract", variables: ACS_BATCHES.flat(),
+    counties: async () => [...new Set((await tiger).map((row) => row.geoid.slice(0, 5)))],
+  });
+
   const [acsR, tigerR] = await Promise.allSettled([acs, tiger]);
   clearTimeout(timer);
   const tracts: TractFrame[] = [];
-  if (acsR.status === "fulfilled" && tigerR.status === "fulfilled") {
-    const geo = new Map(tigerR.value.map((row) => [row.geoid, row]));
-    for (const [geoid, row] of acsR.value.rows) {
-      const place = geo.get(geoid);
-      if (!place) continue;
-      const { metrics, issues } = acsMetricsFromRow(row);
-      if (issues.length) integrityIssues.push(`${row.NAME || geoid}: ${issues[0]}`);
-      tracts.push({ geoid, countyFips: geoid.slice(0, 5), name: row.NAME || geoid, lat: place.lat, lon: place.lon, landSqmi: place.landSqmi, metrics });
+  if (tigerR.status === "fulfilled") {
+    // Geography is kept even without ACS so a point still resolves to its county; demand stays blank, not zero.
+    const acsRows = acsR.status === "fulfilled" ? acsR.value.rows : new Map<string, Record<string, string>>();
+    for (const place of tigerR.value) {
+      const row = acsRows.get(place.geoid);
+      const parsed = row ? acsMetricsFromRow(row) : { metrics: {}, issues: [] as string[] };
+      if (parsed.issues.length) integrityIssues.push(`${row?.NAME || place.geoid}: ${parsed.issues[0]}`);
+      tracts.push({ geoid: place.geoid, countyFips: place.geoid.slice(0, 5), name: row?.NAME || place.geoid, lat: place.lat, lon: place.lon, landSqmi: place.landSqmi, metrics: parsed.metrics });
     }
   }
   programs.push(acsR.status === "fulfilled"
-    ? { program: "census-acs5", status: "complete", vintage: `${acsR.value.year - 4}–${acsR.value.year}`, detail: `${acsR.value.rows.size} tracts${acsR.value.partial ? "; second variable batch failed" : ""}` }
+    ? { program: "census-acs5", status: "complete", vintage: acsR.value.vintage, detail: `${acsR.value.rows.size} tracts via ${acsR.value.via}${acsR.value.partial.length ? "; " + acsR.value.partial.join("; ") : ""}` }
     : { program: "census-acs5", status: "unavailable", vintage: null, detail: errorText(acsR.reason) });
   programs.push(tigerR.status === "fulfilled"
     ? { program: "census-tiger", status: "complete", vintage: "current", detail: `${tigerR.value.length} tract centroids` }
@@ -134,7 +115,7 @@ export function getStateTracts(state: JoinState, options: { fetchText?: FetchTex
   if (!options.force && cached && Date.now() - cached.at < 12 * 60 * 60 * 1000) return cached.value;
   const value = collectStateTracts(state, options);
   CACHE.set(state, { at: Date.now(), value });
-  value.then((result) => { if (!result.tracts.length) CACHE.delete(state); }, () => CACHE.delete(state));
+  value.then((result) => { if (!result.tracts.some((tract) => tract.metrics["acs.kids"] !== undefined)) CACHE.delete(state); }, () => CACHE.delete(state));
   return value;
 }
 

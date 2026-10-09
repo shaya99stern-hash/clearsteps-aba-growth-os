@@ -118,6 +118,13 @@ const add = (...values: Array<number | undefined>) => values.some((value) => val
 const show = (value: number | null | undefined, scale = 1) => value === null || value === undefined ? "—" : String(round(value * scale));
 const round = (value: number | null) => value === null ? null : Math.abs(value) >= 100 ? Math.round(value) : Math.round(value * 100) / 100;
 
+/** 0.12 -> "6 wks", 2 -> "2 yrs", 2.5 -> "2.5 yrs". */
+export function formatAgeYears(value: number): string {
+  if (value < 1) return `${Math.max(1, Math.round(value * 52))} wks`;
+  return `${Number.isInteger(value) ? value : value.toFixed(1)} yrs`;
+}
+export const formatAgeRange = (min: number, max: number) => `${formatAgeYears(min)}–${formatAgeYears(max)}`;
+
 export function servesAges(place: MapPlace, min: number, max: number): boolean | null {
   if (place.minAgeYears == null || place.maxAgeYears == null || !Number.isFinite(place.minAgeYears) || !Number.isFinite(place.maxAgeYears)) return null;
   return place.minAgeYears <= max && place.maxAgeYears >= min;
@@ -130,8 +137,8 @@ export function assessDaycare(place: MapPlace, underFiveDisabilityRate: number |
   if (place.licensed) reasons.push("State-licensed child-care facility: children are enrolled by definition" + (place.capacity ? ` (licensed for ${place.capacity})` : ""));
   else reasons.push("Listed as child care on OpenStreetMap only; licensing not confirmed");
   if (confirmedBy >= 2) reasons.push(`Confirmed by ${confirmedBy} independent sources (${place.sources.filter((s) => s !== "organization-website").join(", ")})`);
-  if (servesTargetAges === true) reasons.push(`Licensed ages ${place.minAgeYears}–${place.maxAgeYears} overlap the 2–5 early-intervention window`);
-  if (servesTargetAges === false) reasons.push(`Licensed ages ${place.minAgeYears}–${place.maxAgeYears} do not include ages 2–5`);
+  if (servesTargetAges === true) reasons.push(`Licensed ages ${formatAgeRange(place.minAgeYears!, place.maxAgeYears!)} overlap the 2–5 early-intervention window`);
+  if (servesTargetAges === false) reasons.push(`Licensed ages ${formatAgeRange(place.minAgeYears!, place.maxAgeYears!)} do not include ages 2–5`);
   if (place.schoolDistrictOperated) reasons.push("School-district operated program: districts serve preschoolers with IEPs");
   if (place.inclusionSignals.length) reasons.push("Inclusion / special-needs language: " + place.inclusionSignals.join(", "));
   const tier: DaycareTier = !place.licensed ? "likely"

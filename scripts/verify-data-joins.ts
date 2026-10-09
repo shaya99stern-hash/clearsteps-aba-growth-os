@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import {
   ACS_BATCHES, acsMetricsFromRow, collectStateCountyBundle, countyKey, parseCbpRows, parseCensusTable, parseCsv,
-  parseHpsaMentalHealthCsv, parseMissouriChildCareStats, parseColoradoChildCareStats, tigerCountyLayerId,
+  parseHpsaMentalHealthCsv, parseMissouriChildCareStats, parseColoradoChildCareStats, reporterVariableKey, tigerCountyLayerId,
 } from "../lib/intelligence/joins/collectors";
 import { DATA_JOINS, joinPrograms } from "../lib/intelligence/joins/join-catalog";
 import { rankStateCounties, selectCountyReport, LOW_SAMPLE_CHILDREN } from "../lib/intelligence/joins/rank";
@@ -163,6 +163,19 @@ async function main() {
   const suggestion = selectCountyReport(ranking, "Boone, MO");
   assert.equal(suggestion.report, null);
   assert.deepEqual(suggestion.suggestions, ["Boone County"]);
+
+  // Keyless path: Census Reporter serves ACS when the Census Data API rejects keyless requests.
+  assert.equal(reporterVariableKey("B09001001"), "B09001_001E");
+  assert.equal(reporterVariableKey("C16002013"), "C16002_013E");
+  const keyless = await collectStateCountyBundle("MO", { fetchText: fixtureFetch("29", { keylessReporter: true }) });
+  const keylessAcs = keyless.programs.find((program) => program.program === "census-acs5")!;
+  assert.equal(keylessAcs.status, "complete", keylessAcs.detail);
+  assert(keylessAcs.detail.includes("Census Reporter") && keylessAcs.vintage === "2019–2023");
+  const kf = keyless.frames.find((item) => item.fips === "29095")!;
+  assert.equal(kf.metrics["acs.kids"], 160000);
+  assert.equal(kf.metrics["acs.kids_prior"], frame("29095").metrics["acs.kids_prior"], "Prior vintage also served keylessly");
+  assert.equal(kf.metrics["acs.u19_medicaid"], frame("29095").metrics["acs.u19_medicaid"], "Same metrics as the Census Data API path");
+  assert.match(keyless.programs.find((program) => program.program === "census-saipe")!.detail, /non-JSON response: "Invalid Key"/, "API rejections name the cause");
 
   // Failure modes: an unavailable program degrades joins to insufficient_data, never to invented values.
   const noHpsa = rankStateCounties(await collectStateCountyBundle("MO", { fetchText: fixtureFetch("29", { failHpsa: true }) }));
