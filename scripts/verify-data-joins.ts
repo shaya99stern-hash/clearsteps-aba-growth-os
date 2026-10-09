@@ -224,6 +224,11 @@ async function main() {
   assert.equal(ns.metrics["osm.childcare"], 130, "Other facility kinds still count");
   assert.match(noSchools.programs.find((p) => p.program === "osm-county")!.detail, /1 of 4 Overpass queries failed/);
 
+  const mirrored = await collectStateCountyBundle("MO", { fetchText: fixtureFetch("29"), postText: fixturePost("29", { primaryDown: true }) });
+  assert.equal(mirrored.frames.find((item) => item.fips === "29095")!.metrics["osm.childcare"], 130, "Mirror answers when the main Overpass server is down");
+  assert.doesNotMatch(mirrored.programs.find((p) => p.program === "osm-county")!.detail, /failed/);
+  assert(requested.some((url) => url.includes("overpass.private.coffee")));
+
   // Production regression: Overpass returns HTTP 200 + "runtime error" remark on timeout. That must read as
   // failure (blank), never as "zero child care in every county".
   const remark = await collectStateCountyBundle("MO", { fetchText: fixtureFetch("29"), postText: fixturePost("29", { remarkChildcare: true }) });
