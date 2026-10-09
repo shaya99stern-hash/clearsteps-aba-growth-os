@@ -78,7 +78,7 @@ export const PROGRAMS: Record<ProgramId, ProgramDefinition> = {
 
 export type MetricId =
   // ACS household survey
-  | "acs.pop" | "acs.kids" | "acs.kids_u3" | "acs.kids_3to5" | "acs.kids_u6" | "acs.kids_6to17" | "acs.kids_prior"
+  | "acs.pop" | "acs.kids" | "acs.kids_u3" | "acs.kids_3to5" | "acs.kids_u6" | "acs.kids_6to17" | "acs.kids_6to11" | "acs.kids_12to17" | "acs.kids_prior"
   | "acs.hh" | "acs.hh_kids"
   | "acs.u19" | "acs.u19_employer" | "acs.u19_medicaid" | "acs.u19_uninsured"
   | "acs.kids_pov" | "acs.kids_pov_universe"

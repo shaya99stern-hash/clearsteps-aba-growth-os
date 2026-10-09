@@ -9,7 +9,7 @@
     "lint": "eslint",
     "verify:intelligence": "tsx scripts/verify-intelligence.ts",
     "verify:aba-engine": "tsx scripts/verify-aba-engine.ts",
-    "postinstall": "prisma generate",
+    "postinstall": "prisma generate && node scripts/copy-maplibre-worker.mjs",
     "browser:install": "playwright install --with-deps --only-shell chromium",
     "verify:browser": "tsx scripts/verify-browser.ts",
     "verify:command-center": "tsx scripts/verify-command-center.ts",
@@ -26,13 +26,15 @@
     "verify:adaptive-followup": "tsx scripts/verify-adaptive-followup.ts",
     "verify:colorado-networks": "tsx scripts/verify-colorado-networks.ts",
     "verify:data-joins": "tsx scripts/verify-data-joins.ts",
-    "smoke:data-joins": "tsx scripts/smoke-data-joins.ts"
+    "smoke:data-joins": "tsx scripts/smoke-data-joins.ts",
+    "verify:site-map": "tsx scripts/verify-site-map.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
     "clsx": "^2.1.1",
     "lucide-react": "^1.14.0",
+    "maplibre-gl": "6.11.2",
     "next": "16.3.3",
     "pg": "^8.23.0",
     "playwright": "^1.62.1",

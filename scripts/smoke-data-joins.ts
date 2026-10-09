@@ -6,6 +6,9 @@
 import { ACS_EXPECTED_LABELS, collectStateCountyBundle } from "../lib/intelligence/joins/collectors";
 import { rankStateCounties } from "../lib/intelligence/joins/rank";
 import type { JoinState } from "../lib/intelligence/joins/sources";
+import { collectStateTracts } from "../lib/intelligence/geo/tracts";
+import { collectSitePlaces } from "../lib/intelligence/geo/places";
+import { analyzeSite } from "../lib/intelligence/geo/site-analysis";
 
 const ACS_YEAR = 2023;
 let failures = 0;
@@ -60,6 +63,22 @@ async function main() {
       console.error(`${state} failed: ${error instanceof Error ? error.message : error}`);
     }
   }
+  // Live 2/5/10-mile site analysis around downtown Kansas City, MO.
+  try {
+    const center = { lat: 39.0997, lon: -94.5786 };
+    const [tracts, places] = await Promise.all([collectStateTracts("MO", { timeoutMs: 40_000 }), collectSitePlaces("MO", center, { timeoutMs: 40_000 })]);
+    console.log(`\nSite: ${tracts.tracts.length} MO tracts; ${places.places.length} organization pins within 10 mi`);
+    for (const program of tracts.programs) console.log(`  ${program.status.padEnd(14)} ${program.program} (tracts) — ${program.detail}`);
+    for (const source of places.sources) console.log(`  ${source.status.padEnd(14)} ${source.source} — ${source.detail}`);
+    const analysis = analyzeSite(center, { tracts: tracts.tracts, places });
+    console.log(`  ${analysis.indicators.filter((item) => item.value !== null).length}/${analysis.indicators.length} indicators; ${analysis.daycares.length} child-care facilities (${analysis.daycares.filter((d) => d.tier === "priority").length} priority); convergence ${analysis.convergence.passed}/${analysis.convergence.evaluated}`);
+    for (const ring of analysis.rings) console.log(`  ${ring.radiusMiles} mi: ${ring.children} children, ${ring.childrenUnder6} under 6, ${ring.licensedDaycares} licensed child care, ${ring.abaProviders} ABA orgs`);
+    if (!tracts.tracts.length || !places.places.length) failures++;
+  } catch (error) {
+    failures++;
+    console.error(`site analysis failed: ${error instanceof Error ? error.message : error}`);
+  }
+
   if (failures) {
     console.error(`\n${failures} live data-join check(s) failed`);
     process.exit(1);

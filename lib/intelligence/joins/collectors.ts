@@ -138,6 +138,8 @@ const PART_OF_WHOLE: ReadonlyArray<[MetricId, MetricId]> = [
   ["acs.kids", "acs.pop"],
   ["acs.kids_u6", "acs.kids"],
   ["acs.kids_6to17", "acs.kids"],
+  ["acs.kids_6to11", "acs.kids_6to17"],
+  ["acs.kids_12to17", "acs.kids_6to17"],
   ["acs.hh_kids", "acs.hh"],
   ["acs.u19_employer", "acs.u19"],
   ["acs.u19_medicaid", "acs.u19"],
@@ -173,6 +175,8 @@ export function acsMetricsFromRow(row: Row): { metrics: Partial<Record<MetricId,
     "acs.kids_3to5": total(v("B09001_004E"), v("B09001_005E")),
     "acs.kids_u6": total(v("B09001_003E"), v("B09001_004E"), v("B09001_005E")),
     "acs.kids_6to17": total(v("B09001_006E"), v("B09001_007E"), v("B09001_008E"), v("B09001_009E")),
+    "acs.kids_6to11": total(v("B09001_006E"), v("B09001_007E")),
+    "acs.kids_12to17": total(v("B09001_008E"), v("B09001_009E")),
     "acs.hh": v("B11005_001E"),
     "acs.hh_kids": v("B11005_002E"),
     "acs.u19": v("B27010_002E"),
@@ -416,7 +420,7 @@ export function parseColoradoChildCareStats(payload: unknown): Map<string, { sit
 // Network collection
 // ---------------------------------------------------------------------------
 
-const defaultFetchText: FetchText = async (url, signal) => {
+export const defaultFetchText: FetchText = async (url, signal) => {
   const response = await fetch(url, {
     signal,
     cache: "no-store",
@@ -439,14 +443,14 @@ const defaultFetchText: FetchText = async (url, signal) => {
   return new TextDecoder().decode(Buffer.concat(chunks));
 };
 
-function censusUrl(path: string, params: Record<string, string>) {
+export function censusUrl(path: string, params: Record<string, string> | URLSearchParams) {
   const search = new URLSearchParams(params);
   const key = process.env.CENSUS_API_KEY?.trim();
   if (key) search.set("key", key);
   return `${CENSUS_API}/${path}?${search.toString()}`;
 }
 
-async function firstWorking<T, R>(
+export async function firstWorking<T, R>(
   options: readonly T[],
   attempt: (option: T) => Promise<R>,
   signal?: AbortSignal,
@@ -689,15 +693,15 @@ export function getStateCountyBundle(state: JoinState, options: CollectOptions &
   return entry.bundle;
 }
 
-function upperKeys(record: Record<string, unknown>): Record<string, unknown> {
+export function upperKeys(record: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(record).map(([key, value]) => [key.toUpperCase(), value]));
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function errorText(error: unknown) {
+export function errorText(error: unknown) {
   if (error instanceof Error) return error.name === "AbortError" ? "timed out" : error.message;
   return String(error);
 }
