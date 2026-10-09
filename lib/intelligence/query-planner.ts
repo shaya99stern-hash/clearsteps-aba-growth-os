@@ -1,5 +1,6 @@
 import { choosePublicSourceChannels, queryForPublicSource } from "./signals/source-channel-catalog";
 import type { LeadEngine } from "./phase3/indicator-catalog";
+import { understandAbaRequest, type AbaLanguageReading } from "./aba-language";
 
 export type SearchLane = "referral" | "talent" | "community" | "market";
 
@@ -10,6 +11,7 @@ export interface SearchPlan {
   lanes: SearchLane[];
   queries: Array<{ lane: SearchLane; query: string }>;
   safeguards: string[];
+  interpretation: AbaLanguageReading;
 }
 
 const LANE_TERMS: Record<SearchLane, string[]> = {
@@ -20,27 +22,40 @@ const LANE_TERMS: Record<SearchLane, string[]> = {
 };
 
 export function buildSearchPlan(input: string, location: string, engine?: LeadEngine, state?: "MO" | "KS" | "CO"): SearchPlan {
-  const normalized = input.toLowerCase();
+  const interpretation = understandAbaRequest(input, engine);
+  const normalized = interpretation.corrected;
+  const padded = " " + normalized + " ";
   const inferred = (Object.keys(LANE_TERMS) as SearchLane[]).filter((lane) =>
-    LANE_TERMS[lane].some((term) => normalized.includes(term)),
+    LANE_TERMS[lane].some((term) => padded.includes(" " + term + " ")),
   );
+  const kinds = new Set(interpretation.recognized.map((term) => term.kind));
+  if (kinds.has("referral") || kinds.has("client")) inferred.push("referral");
+  if (kinds.has("community")) inferred.push("community");
+  if (kinds.has("market")) inferred.push("market");
+  if (kinds.has("staffing")) inferred.push("talent");
   const selected = engine
     ? lanesForEngine(engine)
     : inferred.length
-      ? inferred
+      ? Array.from(new Set(inferred))
       : (["referral", "community", "market"] as SearchLane[]);
   const place = location.trim();
   const queries: Array<{ lane: SearchLane; query: string }> = [];
-  for (const lane of selected) queries.push(...laneQueries(lane, input, place, engine));
+  for (const lane of selected) queries.push(...laneQueries(lane, normalized, place, engine));
 
   const targeted = state && engine
-    ? choosePublicSourceChannels(state, engine, place + " " + input, 6, Math.floor(Date.now() / 86_400_000)).map((channel) => ({
+    ? choosePublicSourceChannels(state, engine, place + " " + normalized, 6, Math.floor(Date.now() / 86_400_000)).map((channel) => ({
         lane: (channel.kind === "workforce" ? "talent" : channel.kind === "press" || channel.kind === "community" ? "community" : "referral") as SearchLane,
         query: queryForPublicSource(channel, place, engine),
       }))
     : [];
+  const expanded = interpretation.suggestedQueries.map((phrase) => ({
+    lane: (interpretation.interpretedGoal === "rbt_recruiting" || interpretation.interpretedGoal === "bcba_recruiting"
+      ? "talent" : "referral") as SearchLane,
+    query: (phrase + " " + place).trim(),
+  }));
   return {
     input,
+    interpretation,
     location: place,
     engine,
     lanes: selected,
@@ -51,6 +66,7 @@ export function buildSearchPlan(input: string, location: string, engine?: LeadEn
       ...queries.filter((row)=>row.lane==="talent").slice(0,4),
       ...queries.filter((row)=>row.lane==="market").slice(0,4),
       ...queries.filter((row)=>row.lane==="community").slice(0,2),
+      ...expanded,
       ...targeted,
       ...queries,
     ].map((row)=>[`${row.lane}:${row.query}`, row])).values()).slice(0, 20),
