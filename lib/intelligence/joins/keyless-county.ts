@@ -222,17 +222,23 @@ export async function collectKeylessCountyCounts(input: {
   // Overpass starts immediately (it does not need county outlines until assignment) and is split so the
   // numerous schools do not hold up child care, clinics and hospitals. Each query zero-fills only its own kinds.
   const area = `[out:json][timeout:40];area["ISO3166-2"="US-${input.state}"]["admin_level"="4"]->.s;`;
-  const osmQueries: Array<{ kinds: PlaceKind[]; text: Promise<string> }> = [
-    {
-      kinds: ["daycare", "hospital", "pediatrics", "therapy", "aba_provider"],
-      text: input.post(OVERPASS, "data=" + encodeURIComponent(area + "(" +
-        `nwr(area.s)["amenity"~"^(childcare|kindergarten|hospital)$"];` +
-        `nwr(area.s)["amenity"~"^(doctors|clinic)$"]["name"~"pediatric|paediatric|children|kids|autism|ABA|behavio",i];` +
-        `nwr(area.s)["healthcare"~"^(speech_therapist|occupational_therapist|psychotherapist)$"];` +
-        ");out center tags;")),
-    },
-    { kinds: ["school"], text: input.post(OVERPASS, "data=" + encodeURIComponent(area + `nwr(area.s)["amenity"="school"];out center tags;`)) },
+  // Four light queries instead of one heavy one: a statewide case-insensitive name match on clinics is the
+  // expensive part, so it runs alone. At most two run at once (Overpass allows ~2 slots per client).
+  const osmSpecs: Array<{ kinds: PlaceKind[]; body: string }> = [
+    { kinds: ["daycare"], body: `nwr(area.s)["amenity"~"^(childcare|kindergarten)$"];` },
+    { kinds: ["school"], body: `nwr(area.s)["amenity"="school"];` },
+    { kinds: ["hospital", "therapy"], body: `(nwr(area.s)["amenity"="hospital"];nwr(area.s)["healthcare"~"^(speech_therapist|occupational_therapist|psychotherapist)$"];);` },
+    { kinds: ["pediatrics", "aba_provider"], body: `nwr(area.s)["amenity"~"^(doctors|clinic)$"]["name"~"pediatric|paediatric|children|kids|autism|ABA|behavio",i];` },
   ];
+  const osmTexts = limitedSettled(osmSpecs, 2, (spec) => input.post(OVERPASS, "data=" + encodeURIComponent(area + spec.body + "out center tags;")));
+  const osmQueries = osmSpecs.map((spec, index) => ({
+    kinds: spec.kinds,
+    text: osmTexts.then((results) => {
+      const result = results[index];
+      if (result.status === "rejected") throw result.reason;
+      return result.value;
+    }),
+  }));
   for (const query of osmQueries) query.text.catch(() => undefined);
   const osm = (async () => {
     const shapes = await input.shapes;

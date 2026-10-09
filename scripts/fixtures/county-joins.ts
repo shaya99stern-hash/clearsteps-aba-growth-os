@@ -110,12 +110,31 @@ function nppesRecords(counties: County[], taxonomy: string, enumeration: string)
 }
 
 /** Statewide Overpass fixture: facilities placed inside each county square. */
-export function fixturePost(stateFips: string, overrides: { failKeyless?: boolean; failSchools?: boolean } = {}) {
+type OsmQuery = "school" | "childcare" | "hospital_therapy" | "clinic";
+function osmQueryKind(body: string): OsmQuery {
+  const text = decodeURIComponent(body);
+  if (text.includes('["amenity"="school"]')) return "school";
+  if (text.includes("childcare|kindergarten")) return "childcare";
+  if (text.includes('["amenity"="hospital"]')) return "hospital_therapy";
+  return "clinic";
+}
+function elementQuery(tags: Record<string, string>): OsmQuery {
+  if (tags.amenity === "school") return "school";
+  if (tags.amenity === "childcare" || tags.amenity === "kindergarten") return "childcare";
+  if (tags.amenity === "hospital" || tags.healthcare) return "hospital_therapy";
+  return "clinic";
+}
+
+export function fixturePost(stateFips: string, overrides: { failKeyless?: boolean; failSchools?: boolean; remarkChildcare?: boolean } = {}) {
   return async (url: string, body: string) => {
     requested.push(url);
     if (overrides.failKeyless) throw new Error("HTTP 429");
-    const schoolsOnly = decodeURIComponent(body).includes('nwr(area.s)["amenity"="school"];out');
-    if (schoolsOnly && overrides.failSchools) throw new Error("HTTP 504");
+    const query = osmQueryKind(body);
+    if (query === "school" && overrides.failSchools) throw new Error("HTTP 504");
+    // Overpass reports a server-side timeout as HTTP 200 with a remark and no elements.
+    if (query === "childcare" && overrides.remarkChildcare) {
+      return JSON.stringify({ elements: [], remark: 'runtime error: Query timed out in "query" at line 1 after 41 seconds.' });
+    }
     assert(url.includes("overpass") && body.includes(encodeURIComponent('area["ISO3166-2"="US-')), "Statewide Overpass area query");
     const elements: unknown[] = [];
     let id = 1;
@@ -132,8 +151,7 @@ export function fixturePost(stateFips: string, overrides: { failKeyless?: boolea
       add(Math.round(c.cbp["621330"] / 20), { amenity: "clinic", name: "Autism Center" });
     }
     elements.push({ type: "node", id: id++, lat: 45, lon: -100, tags: { amenity: "school", name: "Outside every county" } });
-    const isSchool = (element: unknown) => (element as { tags: Record<string, string> }).tags.amenity === "school";
-    return JSON.stringify({ elements: elements.filter((element) => schoolsOnly === isSchool(element)) });
+    return JSON.stringify({ elements: elements.filter((element) => elementQuery((element as { tags: Record<string, string> }).tags) === query) });
   };
 }
 

@@ -41,6 +41,11 @@ export function inclusionSignals(text: string): string[] {
 
 export function parseOverpassPlaces(payload: unknown): MapPlace[] {
   if (!isRecord(payload) || !Array.isArray(payload.elements)) throw new Error("Overpass returned no elements");
+  // Overpass reports timeouts and memory limits as HTTP 200 with a "remark" and empty or partial elements.
+  // That is a failure, never "no facilities".
+  if (typeof payload.remark === "string" && /runtime error|timed out|out of memory/i.test(payload.remark)) {
+    throw new Error("Overpass: " + payload.remark.replace(/\s+/g, " ").slice(0, 160));
+  }
   const out: MapPlace[] = [];
   for (const element of payload.elements) {
     if (!isRecord(element) || !isRecord(element.tags)) continue;
