@@ -1,6 +1,6 @@
 import { MISSOURI_CHILD_CARE_LAYER_URL } from "../official/mo-child-care-gis";
 import { defaultFetchText, errorText, isRecord, parseCsv, upperKeys, type FetchText } from "../joins/collectors";
-import { inclusionSignals, parseOverpassPlaces, type MapPlace, type PlaceKind } from "./osm";
+import { inclusionSignals, overpassPlaces, type MapPlace, type PlaceKind } from "./osm";
 import { parseZctaCentroids, zctaLayerId } from "../joins/keyless-county";
 
 export { parseZctaCentroids, zctaLayerId } from "../joins/keyless-county";
@@ -48,7 +48,6 @@ export interface PlaceDeps {
 const ZCTA_SERVICE = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/PUMA_TAD_TAZ_UGA_ZCTA/MapServer";
 const NPPES_API = "https://npiregistry.cms.hhs.gov/api/";
 const GEOCODER_BATCH = "https://geocoding.geo.census.gov/geocoder/locations/addressbatch";
-const OVERPASS = "https://overpass-api.de/api/interpreter";
 const COLORADO_CHILDCARE_API = "https://data.colorado.gov/resource/a9rr-k8mu.json";
 const MAX_ZIPS = 30;
 
@@ -289,7 +288,7 @@ export async function collectSitePlaces(state: JoinState, center: LatLon, deps: 
       `nwr${around}["amenity"~"^(childcare|kindergarten|school|hospital|doctors|clinic)$"];` +
       `nwr${around}["healthcare"~"^(speech_therapist|occupational_therapist|psychotherapist|counselling|physiotherapist)$"];` +
       `);out center tags 1500;`;
-    return parseOverpassPlaces(JSON.parse(await postText(OVERPASS, "data=" + encodeURIComponent(query), signal, "application/x-www-form-urlencoded")));
+    return overpassPlaces((url, body) => postText(url, body, signal, "application/x-www-form-urlencoded"), query);
   })();
 
   // 4. NPPES by ZIP: behavior-analyst and pediatric ORGANIZATIONS become pins; individuals are only counted.

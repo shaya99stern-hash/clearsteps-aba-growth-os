@@ -39,8 +39,35 @@ export function inclusionSignals(text: string): string[] {
   return [...found].slice(0, 6);
 }
 
+/** Public Overpass endpoints: the main instance, then a community mirror used when the first fails or times out. */
+export const OVERPASS_ENDPOINTS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
+] as const;
+
+/**
+ * Runs one Overpass query, retrying once on the mirror. A response is accepted only if it parses into places,
+ * so HTTP-200 "runtime error" remarks also fall through to the mirror.
+ */
+export async function overpassPlaces(post: (url: string, body: string) => Promise<string>, query: string): Promise<MapPlace[]> {
+  const errors: string[] = [];
+  for (const endpoint of OVERPASS_ENDPOINTS) {
+    try {
+      return parseOverpassPlaces(JSON.parse(await post(endpoint, "data=" + encodeURIComponent(query))));
+    } catch (error) {
+      errors.push(`${new URL(endpoint).hostname}: ${error instanceof Error ? error.message : String(error)}`.slice(0, 140));
+    }
+  }
+  throw new Error(errors.join(" | "));
+}
+
 export function parseOverpassPlaces(payload: unknown): MapPlace[] {
   if (!isRecord(payload) || !Array.isArray(payload.elements)) throw new Error("Overpass returned no elements");
+  // Overpass reports timeouts and memory limits as HTTP 200 with a "remark" and empty or partial elements.
+  // That is a failure, never "no facilities".
+  if (typeof payload.remark === "string" && /runtime error|timed out|out of memory/i.test(payload.remark)) {
+    throw new Error("Overpass: " + payload.remark.replace(/\s+/g, " ").slice(0, 160));
+  }
   const out: MapPlace[] = [];
   for (const element of payload.elements) {
     if (!isRecord(element) || !isRecord(element.tags)) continue;

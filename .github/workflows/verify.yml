@@ -99,7 +99,7 @@ jobs:
       - name: Verify youth age groups and organizational referral qualification
         run: npm run verify:youth-qualification
 
-      - name: Verify 40 county data joins across public statistical programs
+      - name: Verify 90 county data joins (51 keyless) across public sources
         run: npm run verify:data-joins
 
       - name: Verify 2/5/10-mile site map, 202 indicators and child-care tiers
