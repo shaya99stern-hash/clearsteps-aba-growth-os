@@ -6,8 +6,8 @@ import { scanPublicSignals } from "../lib/intelligence/signals/public-signal-sca
 import { publicPublisherId } from "../lib/intelligence/signals/publisher-evidence";
 
 assert.equal(ADDITIONAL_YOUTH_SOURCE_CHANNELS.length,20,"twenty NEW candidate public sources");
-assert.equal(PUBLIC_SOURCE_CHANNELS.length,294,"no accidental source drop / duplicate");
-assert.equal(new Set(PUBLIC_SOURCE_CHANNELS.map((item)=>item.host)).size,294,"every candidate host is unique");
+assert.equal(PUBLIC_SOURCE_CHANNELS.length,444,"294 prior + 150 v6 candidates; no accidental source drop / duplicate");
+assert.equal(new Set(PUBLIC_SOURCE_CHANNELS.map((item)=>item.host)).size,444,"every candidate host is unique");
 assert.equal(SERVICE_DOCUMENT_PARSERS.length,30,"30 distinct evidence parsers");
 assert.equal(SERVICE_DOCUMENT_CHECKS.length,30,"30 new cross-reference tests");
 assert.equal(new Set(SERVICE_DOCUMENT_PARSERS.map((item)=>item.id)).size,30);
@@ -53,4 +53,4 @@ assert.equal(raw.crossChecks.find((x)=>x.id==="D01")?.status,"supported");
 assert(raw.parsedDocumentCategories>=2);
 assert.equal(runServiceDocumentChecks([{...official,text:"Denver CO ages 2-18 no ABA therapy waitlist pediatric service shortage"}],"Denver, CO","2-18").supported,0,"negated availability must not prove a waitlist");
 assert.equal(runServiceDocumentChecks([{...official,text:"My child with autism at our home in Denver CO ages 2-18 has ABA therapy waitlist"}],"Denver, CO","2-18").parsedCategories.length,0,"private household content excluded");
-console.log("30 public document parsers + 30 cross-checks and 20 youth sources validated; 294 configured source channels, 90 runnable cross-checks.");
+console.log("30 public document parsers + 30 cross-checks and 20 youth sources validated; "+PUBLIC_SOURCE_CHANNELS.length+" configured source channels, 90 runnable cross-checks.");

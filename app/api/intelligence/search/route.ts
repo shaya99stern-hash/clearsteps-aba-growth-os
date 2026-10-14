@@ -36,6 +36,7 @@ import { assessOpportunityReliability } from "@/lib/intelligence/score-reliabili
 import { buildClientGrowthPlan } from "@/lib/intelligence/client-growth";
 import { PUBLIC_SOURCE_CHANNELS, matchedPublicSourceChannels, isAggregateOnlyPublicSourceUrl } from "@/lib/intelligence/signals/source-channel-catalog";
 import { getStateCountyBundle } from "@/lib/intelligence/joins/collectors";
+import { clientNarrowingQueries, narrowLead, summarizeNarrowing, withNarrowing, type LeadNarrowing } from "@/lib/intelligence/signals/client-narrowing";
 import { scoutDataJoins, type ScoutDataJoins } from "@/lib/intelligence/joins/scout";
 
 export const runtime = "nodejs";
@@ -128,7 +129,16 @@ export async function POST(request: Request) {
       ({ lane:"referral" as const, query:value }));
     plan.queries = [...focused,...plan.queries].slice(0,20);
   }
-  const searchQueries = plan.queries.slice(0, 15);
+  // Client runs always add hunting queries built from the 200 narrowing signals and this release's
+  // state publishers, on top of the 15-query plan, so referral gateways are searched for directly.
+  const narrowingProbes = engine === "client"
+    ? clientNarrowingQueries(state, targetLocation, Math.floor(Date.now() / 86_400_000), 6)
+    : [];
+  const searchQueries = [
+    ...plan.queries.slice(0, 15),
+    ...narrowingProbes.map((query) => ({ lane: "referral" as const, query })),
+  ];
+  plan.queries = [...searchQueries, ...plan.queries.slice(15)];
   const searchStarted = deadline.elapsed();
   const searchSettled: Array<{ index: number; planQuery: (typeof searchQueries)[number]; hits: PublicSearchHit[]; error: string | null }> = [];
   const webSearch = Promise.all(searchQueries.map(async (planQuery, index) => {
@@ -369,17 +379,22 @@ export async function POST(request: Request) {
       const fit = qualifyYouthLead(lead,ageBand as YouthAgeBand);
       const documented = fit.ageStatus === "documented";
       const competitor = fit.organizationRole === "aba_competitor";
+      const narrowing = narrowLead(lead, state);
       return {
-        lead: {
+        lead: withNarrowing({
           ...lead,
           score: Math.min(lead.score, documented ? competitor ? 30 : 60 : 35),
           confidence: Math.min(lead.confidence, documented ? fit.supportingPublishers >= 2 ? 75 : 55 : 40),
           unknowns: [...lead.unknowns,...fit.missingChecks.filter((item) => !lead.unknowns.includes(item))],
-        },
+        }, narrowing),
         fit,
+        narrowing,
+        // Competitors keep their narrowing reasons as market intel but never outrank referral sources.
+        priority: youthLeadPriority(fit) + (competitor ? 0 : narrowing.priorityBonus),
       };
     }).filter((item) => item.fit.ageStatus !== "outside")
-      .sort((a,b) => youthLeadPriority(b.fit) - youthLeadPriority(a.fit) || b.lead.score - a.lead.score) : [];
+      .sort((a,b) => b.priority - a.priority || b.lead.score - a.lead.score) : [];
+    const narrowedLeads: LeadNarrowing[] = classified.map((item) => item.narrowing);
     const resolved = engine === "client" ? classified.map((item) => item.lead) : organizationQualified;
 
     // Review discovery is capped to real named competitor organizations. Do not crawl
@@ -411,11 +426,19 @@ export async function POST(request: Request) {
     }));
     if (reviewsCut) truncatedStages.push("competitor review discovery");
     track("competitor review discovery", reviewStarted, null);
-    return { institutionalCandidates, verifiedInstitutions, verifiedInstitutionalWebsites, classified, resolved, competitors, reputationEntries };
+    return { institutionalCandidates, verifiedInstitutions, verifiedInstitutionalWebsites, classified, resolved, competitors, reputationEntries, narrowedLeads };
   })();
 
   const [followupResults, qualification] = await Promise.all([followupTrack, qualificationTrack]);
-  const { institutionalCandidates, verifiedInstitutions, verifiedInstitutionalWebsites, classified, resolved, competitors, reputationEntries } = qualification;
+  const { institutionalCandidates, verifiedInstitutions, verifiedInstitutionalWebsites, classified, resolved, competitors, reputationEntries, narrowedLeads } = qualification;
+  const narrowing = engine === "client" ? summarizeNarrowing(narrowingProbes, narrowedLeads) : null;
+  if (narrowing) sourceStatus.push({
+    source: `Client narrowing (${narrowing.signals} signals)`,
+    status: narrowing.leadsMatched > 0 ? "complete" : "unavailable",
+    detail: `${narrowing.probes.length} hunting searches across ${narrowing.dimensions} client-acquisition dimensions; ` +
+      `${narrowing.leadsMatched} leads matched public narrowing evidence, ${narrowing.strongLeads} strong fits ranked first` +
+      (narrowing.topSignals.length ? ": " + narrowing.topSignals.slice(0, 4).map((item) => `${item.name} (${item.leads})`).join(", ") : ""),
+  });
 
   if(engine==="client")sourceStatus.push({
     source:"Official organization website resolution",
@@ -563,6 +586,7 @@ export async function POST(request: Request) {
       youthQualifications,
       ageBand: engine === "client" ? ageBand : null,
       clientGrowth,
+      narrowing,
       providerReputation,
       demographics: census ? { geographyName: census.geographyName, geographyKind: census.geographyKind, year: census.year, metrics: census.metrics } : null,
       indicatorSummary: {

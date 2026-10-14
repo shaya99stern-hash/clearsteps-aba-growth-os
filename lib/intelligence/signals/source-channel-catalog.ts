@@ -1,5 +1,6 @@
 import { EXPANDED_PUBLIC_SOURCE_CHANNELS } from "./expanded-source-channels";
 import { ADDITIONAL_YOUTH_SOURCE_CHANNELS } from "./additional-youth-source-channels";
+import { V6_PUBLIC_SOURCE_CHANNELS } from "./v6-source-channels";
 import type { LeadEngine } from "../phase3/indicator-catalog";
 export interface PublicSourceChannel {
   host: string;
@@ -469,11 +470,12 @@ const ORIGINAL_PUBLIC_SOURCE_CHANNELS: readonly PublicSourceChannel[] = [
   }
 ];
 
-/** Candidate publisher hostnames, NOT 274 live adapters or 274 proven independent sources. */
+/** Candidate publisher hostnames, NOT live adapters or proven independent sources. */
 export const PUBLIC_SOURCE_CHANNELS: readonly PublicSourceChannel[] = [
   ...ORIGINAL_PUBLIC_SOURCE_CHANNELS,
   ...EXPANDED_PUBLIC_SOURCE_CHANNELS,
   ...ADDITIONAL_YOUTH_SOURCE_CHANNELS,
+  ...V6_PUBLIC_SOURCE_CHANNELS,
 ];
 
 function relevant(item: PublicSourceChannel, engine: LeadEngine) {
@@ -490,11 +492,14 @@ export function choosePublicSourceChannels(
   const newLocal = ADDITIONAL_YOUTH_SOURCE_CHANNELS.filter((item) => item.scope === state && relevant(item, engine));
   const newBroad = ADDITIONAL_YOUTH_SOURCE_CHANNELS.filter((item) =>
     ["national", "federal"].includes(item.scope) && relevant(item, engine));
+  // Every run reserves one slot for this release's state publishers so they are actually searched.
+  const v6Local = V6_PUBLIC_SOURCE_CHANNELS.filter((item) => item.scope === state && relevant(item, engine));
   const seed = [...location.toLowerCase()].reduce((value,char)=>((value*31)+char.charCodeAt(0))>>>0,17) +
     Math.max(0, Math.floor(rotation)) * 101;
   const rotated=(entries: PublicSourceChannel[],number:number,offset:number)=>
     entries.length ? Array.from({length:Math.min(number,entries.length)},(_,i)=>entries[(seed+offset+i)%entries.length]) : [];
   return [...new Map([
+    ...rotated(v6Local,Math.min(1,max),53),
     ...rotated(newLocal,Math.min(1,max),31),
     ...rotated(newBroad,Math.min(1,Math.max(0,max-1)),47),
     ...rotated(local,Math.ceil(max * 0.5),0),
@@ -535,7 +540,7 @@ export function isAggregateOnlyPublicSourceUrl(value: string): boolean {
     const url = new URL(value);
     if (url.protocol !== "https:" && url.protocol !== "http:") return false;
     const host = url.hostname.toLowerCase().replace(/^www\./, "");
-    return ADDITIONAL_YOUTH_SOURCE_CHANNELS.some((channel) =>
+    return PUBLIC_SOURCE_CHANNELS.some((channel) =>
       channel.access === "aggregate-only" &&
       (host === channel.host || host.endsWith("." + channel.host))
     );

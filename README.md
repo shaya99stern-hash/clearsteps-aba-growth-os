@@ -26,6 +26,14 @@ Scout fans out to Census, NPPES, state registries and keyless public search unde
 - Each search provider has bounded concurrency and a circuit breaker, so a provider that is rate-limiting is skipped for two minutes instead of costing a timeout on every query.
 - Pillar scores weight each observation by its confidence.
 
+## Client narrowing
+
+Every client Scout run uses 444 candidate public publishers (150 added in v6: 35 each for Missouri, Kansas and Colorado, 20 federal, 25 national) and 200 hardcoded client-acquisition narrowing signals in 20 dimensions: state early-intervention gateways (First Steps, tiny-k, Early Intervention Colorado), local disability authorities (SB 40 boards, Children's Services Funds, CDDOs, Community Centered Boards), state Medicaid plans, diagnostic pathways, unmet demand, school pathways, therapy partners, family hubs and more.
+
+- **Hunting:** six extra searches per run target the strongest state gateways and probes plus two site searches on v6 state or federal publishers, rotating daily.
+- **Ranking:** each lead's own public evidence is matched against all 200 signals. Leads on a referral pathway, with the state's Medicaid plans or with unmet demand rank first, and carry a "Client fit N/100" reason. Within one dimension extra synonyms add at most 2 points, and competitors never outrank referral sources.
+- Signals describe organizations and public programs only; none identifies or targets a child, parent or household.
+
 ## Run locally
 
 Requires Node 22+, npm, and a PostgreSQL instance only if durable server-side persistence is desired.
@@ -45,6 +53,7 @@ For a database-backed environment, supply `DATABASE_URL` as a server-only secret
 npm run verify:intelligence
 npm run verify:aba-engine
 npm run verify:scout-runtime
+npm run verify:client-narrowing
 npm run verify:command-center
 npm run lint
 npm run build
