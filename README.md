@@ -16,6 +16,16 @@ The main experience is **Scout**. Choose a lead engine (Clients, RBTs or BCBAs),
 - **Outreach** (`/outreach`): manual-review drafts and suppression workflows; sending is intentionally unavailable.
 - **Sources** (`/connectors`): public-source inventory and health.
 
+## Research runtime
+
+Scout fans out to Census, NPPES, state registries and keyless public search under a 60-second serverless limit. All collectors run on one deadline-bounded timeline:
+
+- Official collectors and the public search plan start together; website enrichment, institutional website resolution, competitor-review discovery and weak-clue follow-up run in two concurrent tracks.
+- Each stage has a cutoff. When an upstream is slow, Scout returns the evidence it has and lists the stages it stopped waiting on (`timing.truncatedStages`) instead of being killed with no answer.
+- Search results and enriched pages are cached for 30 minutes per server instance, robots.txt for an hour, and identical in-flight requests are coalesced.
+- Each search provider has bounded concurrency and a circuit breaker, so a provider that is rate-limiting is skipped for two minutes instead of costing a timeout on every query.
+- Pillar scores weight each observation by its confidence.
+
 ## Run locally
 
 Requires Node 22+, npm, and a PostgreSQL instance only if durable server-side persistence is desired.
@@ -34,6 +44,7 @@ For a database-backed environment, supply `DATABASE_URL` as a server-only secret
 ```bash
 npm run verify:intelligence
 npm run verify:aba-engine
+npm run verify:scout-runtime
 npm run verify:command-center
 npm run lint
 npm run build

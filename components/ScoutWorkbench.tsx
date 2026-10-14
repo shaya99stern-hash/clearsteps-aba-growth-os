@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUp,
   Check,
@@ -106,6 +106,7 @@ type SearchResponse = {
     reasoning: string[];
   };
   errors?: string[];
+  timing?: { budgetMs: number; elapsedMs: number; stagesMs: Record<string, number>; truncatedStages: string[] };
   providerReputation?: Record<string,{
     organizationId:string;
     organizationName:string;
@@ -144,8 +145,24 @@ type SearchResponse = {
 
 const ENGINE_LABELS: Record<Engine, string> = { client: "Clients", rbt: "RBTs", bcba: "BCBAs" };
 const STATE_NAMES: Record<TargetState, string> = { MO: "Missouri", KS: "Kansas", CO: "Colorado" };
+// Starter requests per engine; {place} is replaced with the selected state's name.
+const EXAMPLE_REQUESTS: Record<Engine, string[]> = {
+  client: [
+    "Pediatric practices and developmental evaluators that refer for autism in {place}",
+    "Early intervention and special education programs serving ages 2–5 in {place}",
+    "Where are families waiting for ABA services in {place}?",
+  ],
+  rbt: [
+    "Where are ABA providers hiring RBTs in {place}?",
+    "Colleges with psychology or education programs near {place} for RBT recruiting",
+  ],
+  bcba: [
+    "BCBA job demand and competing employers in {place}",
+    "Graduate ABA programs and supervision pipelines near {place}",
+  ],
+};
 const DEFAULT_SOURCE_STATES: SourceState[] = [
-  { source: "U.S. Census ACS", status: "working", detail: "Child-population context" },
+  { source: "U.S. Census population", status: "working", detail: "Child-population context" },
   { source: "CMS NPPES", status: "working", detail: "Public provider cross-reference" },
   { source: "Public Web Search", status: "working", detail: "Market and hiring fallback" },
   { source: "Public Website Enrichment", status: "working", detail: "Contact/service verification" },
@@ -173,6 +190,14 @@ export function ScoutWorkbench({
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [historyResult, setHistoryResult] = useState<"saved" | "unavailable" | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!running || startedAt === null) return;
+    const timer = window.setInterval(() => setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000)), 1000);
+    return () => window.clearInterval(timer);
+  }, [running, startedAt]);
   const leads = useMemo(() => response?.leads ?? [], [response]);
   const score = response?.engineScores?.[response.engine ?? engine] ?? null;
   const reliability = response?.scoreReliability?.[response.engine ?? engine];
@@ -212,6 +237,8 @@ export function ScoutWorkbench({
     const controller = new AbortController();
     controllerRef.current = controller;
     setRunning(true);
+    setStartedAt(Date.now());
+    setElapsedSeconds(0);
     setHistoryResult(null);
     setResponse(null);
     setSelected(null);
@@ -222,7 +249,13 @@ export function ScoutWorkbench({
         body: JSON.stringify({ query, location, state: targetState, engine, ageBand, maxResults: 20 }),
         signal: controller.signal,
       });
-      const json = await result.json() as SearchResponse;
+      // A platform timeout or proxy error returns an HTML page, not the JSON contract.
+      const json = await result.json().catch(() => ({
+        ok: false,
+        error: result.status === 504 || result.status === 408
+          ? "Research took longer than the hosting limit allows. Narrow the location (e.g. a county) and run again."
+          : `Research service returned an unexpected response (HTTP ${result.status}). Try again shortly.`,
+      })) as SearchResponse;
       if (controller.signal.aborted) return;
       const stored = json.ok && json.territory
         ? recordScoutRun(json, { query, location, state: targetState, engine })
@@ -310,6 +343,12 @@ export function ScoutWorkbench({
             rows={3}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && query.trim().length >= 3 && !running) {
+                event.preventDefault();
+                run();
+              }
+            }}
             placeholder={`Describe what to find in ${STATE_NAMES[targetState]}…`}
           />
           <div className="scoutComposerFooter">
@@ -337,10 +376,37 @@ export function ScoutWorkbench({
             </div>
           </div>
         </div>
+        {!running && !response && !query.trim() && (
+          <div className="scoutExamples" aria-label="Example research requests">
+            {EXAMPLE_REQUESTS[engine].map((example) => {
+              const text = example.replace("{place}", STATE_NAMES[targetState]);
+              return (
+                <button key={example} type="button" className="scoutExample" onClick={() => setQuery(text)}>
+                  <Search size={13} aria-hidden="true" />
+                  <span>{text}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       {(running || response) && (
         <section className="researchResults" aria-live="polite">
+          {running && (
+            <div className="scoutProgress" role="status">
+              <span className="scoutProgressPulse" aria-hidden="true" />
+              <span>Researching public sources · {elapsedSeconds}s</span>
+              <small>{elapsedSeconds < 8 ? "Census, NPPES, state registries and web search run in parallel" : elapsedSeconds < 25 ? "Enriching organization websites and cross-checking publishers" : "Finishing cross-references — Scout always answers within about 50 seconds"}</small>
+              <i style={{ width: `${Math.min(96, Math.round((elapsedSeconds / 50) * 100))}%` }} aria-hidden="true" />
+            </div>
+          )}
+          {response?.timing && (
+            <p className="scoutTiming">
+              Completed in {(response.timing.elapsedMs / 1000).toFixed(1)}s
+              {response.timing.truncatedStages.length > 0 && <> · stopped waiting on {response.timing.truncatedStages.join(", ")} to stay within the time limit</>}
+            </p>
+          )}
           {response?.plan?.interpretation && (
             <details className="scoutReading" aria-label="How Scout understood your request">
               <summary>

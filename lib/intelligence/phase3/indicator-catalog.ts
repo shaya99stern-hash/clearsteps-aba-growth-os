@@ -339,12 +339,16 @@ export function scoreEngineFromObservations(engine: LeadEngine, observations: re
       );
       const values = pillarObservations.map((observation) => {
         const direction = definitionById.get(observation.indicatorId)?.direction;
-        return direction === "lower_opportunity" ? 100 - observation.value : observation.value;
+        return {
+          value: direction === "lower_opportunity" ? 100 - observation.value : observation.value,
+          weight: observation.confidence,
+        };
       });
       return {
         pillarId: pillar.id,
         title: pillar.title,
-        score: values.length ? average(values) : 0,
+        // A 30-confidence web clue must not move a pillar as far as an 85-confidence federal count.
+        score: confidenceWeightedMean(values),
         observed: pillarObservations.length,
         applicable: pillarDefinitions.length,
         weight: pillar.weights[engine],
@@ -381,6 +385,14 @@ export function indicatorsForEngine(engine: LeadEngine) {
 
 export function indicatorDefinition(id: string) {
   return definitionById.get(id);
+}
+
+/** Mean weighted by observation confidence; falls back to a plain mean when every weight is zero. */
+export function confidenceWeightedMean(items: ReadonlyArray<{ value: number; weight: number }>) {
+  if (!items.length) return 0;
+  const totalWeight = items.reduce((sum, item) => sum + Math.max(0, item.weight), 0);
+  if (totalWeight <= 0) return average(items.map((item) => item.value));
+  return Math.round(items.reduce((sum, item) => sum + item.value * Math.max(0, item.weight), 0) / totalWeight);
 }
 
 function average(values: readonly number[]) {

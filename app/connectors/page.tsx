@@ -27,12 +27,13 @@ export default async function SourcesPage() {
           <div>
             <span className="eyebrow">Public source discovery · No API keys</span>
             <h2>{snapshot.channelCatalog.total} registered research channels</h2>
-            <p>These are candidate public websites the scraper can investigate through bounded site-specific searches, not 76 functioning direct integrations. Only sources that return actual results are counted as acquired evidence in Scout.</p>
+            <p>These are candidate public websites the scraper can investigate through bounded site-specific searches, not {snapshot.channelCatalog.total} functioning direct integrations. Only sources that return actual results are counted as acquired evidence in Scout.</p>
+            <div className={styles.channelGroups}>
             {(["CO", "KS", "MO", "federal", "national"] as const).map((scope) => {
               const channels = snapshot.channelCatalog.channels.filter((channel) => channel.scope === scope);
               return (
-                <details key={scope}>
-                  <summary>{scope === "CO" ? "Colorado" : scope === "KS" ? "Kansas" : scope === "MO" ? "Missouri" : scope === "federal" ? "Federal" : "National / Community"} · {channels.length} channels</summary>
+                <details key={scope} className={styles.channelGroup}>
+                  <summary><span>{scope === "CO" ? "Colorado" : scope === "KS" ? "Kansas" : scope === "MO" ? "Missouri" : scope === "federal" ? "Federal" : "National / Community"}</span><b>{channels.length} channels</b></summary>
                   <div className={styles.manifestMeta}>
                     {channels.map((channel) => (
                       <span key={channel.host}>{channel.host} · {channel.kind}</span>
@@ -41,6 +42,7 @@ export default async function SourcesPage() {
                 </details>
               );
             })}
+            </div>
           </div>
         </section>
 
