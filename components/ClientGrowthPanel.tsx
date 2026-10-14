@@ -64,7 +64,7 @@ export function ClientGrowthPanel({ plan }: { plan: ClientGrowthPlan }) {
             {copied?"Copied":"Copy plan"}
           </button>
           <button type="button" disabled={added} onClick={addTasks}
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-zinc-950 disabled:opacity-70">
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--primary-bg)] px-4 py-2 text-sm font-semibold text-[var(--primary-fg)] transition-colors hover:bg-[var(--primary-hover)] disabled:opacity-60">
             {added?<Check size={16}/>:<ClipboardList size={16}/>}
             {added?"Tasks in workspace":`Create ${plan.actions.length} tasks`}
           </button>
@@ -83,7 +83,7 @@ export function ClientGrowthPanel({ plan }: { plan: ClientGrowthPlan }) {
         {plan.actions.map((item,index)=>(
           <article className="rounded-xl border border-white/10 bg-zinc-950/40 p-4" key={item.id}>
             <div className="flex items-center justify-between gap-3">
-              <span className="text-xs font-semibold uppercase tracking-wide text-orange-200">{index+1}. {item.purpose}</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-violet-200">{index+1}. {item.purpose}</span>
               <span className="text-xs text-zinc-400">{item.status==="prepare"?"Setup needed":"Research"}</span>
             </div>
             <h3 className="mt-2 text-sm font-semibold leading-5 text-white">{item.title}</h3>
@@ -92,7 +92,7 @@ export function ClientGrowthPanel({ plan }: { plan: ClientGrowthPlan }) {
             {item.dependency&&<p className="mt-2 text-xs text-zinc-500"><strong>Before launch:</strong> {item.dependency}</p>}
             {item.url&&<a href={item.url} target={item.url.startsWith("/")?undefined:"_blank"}
               rel={item.url.startsWith("/")?undefined:"noopener noreferrer"}
-              className="mt-3 inline-flex min-h-9 items-center gap-1.5 text-xs font-semibold text-orange-200 underline underline-offset-4">
+              className="mt-3 inline-flex min-h-9 items-center gap-1.5 text-xs font-semibold text-violet-200 underline underline-offset-4">
               {item.id==="staff_capacity"?<SearchCheck size={15}/>:<ArrowUpRight size={15}/>}
               {item.id==="staff_capacity"?"Open RBT recruiter":item.id==="activate_intake"?"Preview family contact page":"Open source"}
             </a>}

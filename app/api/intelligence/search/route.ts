@@ -19,12 +19,14 @@ import {
 } from "@/lib/intelligence/official/scout-state-source";
 import {
   INDICATOR_CATALOG,
+  confidenceWeightedMean,
   scoreEngineFromObservations,
   type IndicatorObservation,
   type LeadEngine,
 } from "@/lib/intelligence/phase3/indicator-catalog";
 import { REGULATORY_RULES, type AbaRole } from "@/lib/intelligence/phase3/regulatory-rules";
-import type { ResolvedLead } from "@/lib/intelligence/source-types";
+import type { PublicSearchHit, ResolvedLead } from "@/lib/intelligence/source-types";
+import { Deadline, withinBudget } from "@/lib/intelligence/runtime";
 import { scanPublicSignals } from "@/lib/intelligence/signals/public-signal-scan";
 import { planWeakSignalFollowups } from "@/lib/intelligence/signals/adaptive-followup";
 import { qualifyYouthLead, youthLeadPriority, ageBandSearchQueries, type YouthAgeBand } from "@/lib/intelligence/signals/youth-qualification";
@@ -39,6 +41,17 @@ import { scoutDataJoins, type ScoutDataJoins } from "@/lib/intelligence/joins/sc
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+// Stage cutoffs on one run timeline (ms since the request started). The remaining headroom under
+// maxDuration covers scoring, persistence and serialization.
+const RUN_BUDGET_MS = 52_000;
+const SEARCH_UNTIL_MS = 22_000;
+const OFFICIAL_UNTIL_MS = 24_000;
+const ENRICH_UNTIL_MS = 33_000;
+const INSTITUTION_UNTIL_MS = 41_000;
+const REVIEWS_UNTIL_MS = 48_000;
+const FOLLOWUP_UNTIL_MS = 48_000;
+const COUNTY_UNTIL_MS = 50_000;
 
 type SourceState = { source: string; status: "working" | "complete" | "unavailable"; detail: string };
 
@@ -84,6 +97,18 @@ export async function POST(request: Request) {
     });
   }
 
+  // One wall-clock budget for the whole run. Every network stage below has a cutoff on this
+  // timeline, so a slow upstream degrades the answer instead of letting the platform kill the
+  // function at maxDuration and return nothing at all.
+  const deadline = new Deadline(RUN_BUDGET_MS);
+  const until = (mark: number) => Math.max(0, mark - deadline.elapsed());
+  const stageMs: Record<string, number> = {};
+  const truncatedStages: string[] = [];
+  const track = <T,>(name: string, started: number, value: T) => {
+    stageMs[name] = deadline.elapsed() - started;
+    return value;
+  };
+
   const rows: Array<{
     lane: SearchLane;
     hit: Awaited<ReturnType<typeof searchPublicWeb>>[number];
@@ -96,10 +121,45 @@ export async function POST(request: Request) {
   const countyBundle = engine === "client" ? getStateCountyBundle(state) : null;
   countyBundle?.catch(() => undefined);
 
-  const [censusSettled, nppesSettled] = await Promise.allSettled([
+  // Stage A — official collectors and the public search plan start together. The search plan
+  // only depends on the request, so it no longer waits for Census/NPPES/state sources to finish.
+  if (engine === "client") {
+    const focused = ageBandSearchQueries(ageBand,targetLocation).map((value) =>
+      ({ lane:"referral" as const, query:value }));
+    plan.queries = [...focused,...plan.queries].slice(0,20);
+  }
+  const searchQueries = plan.queries.slice(0, 15);
+  const searchStarted = deadline.elapsed();
+  const searchSettled: Array<{ index: number; planQuery: (typeof searchQueries)[number]; hits: PublicSearchHit[]; error: string | null }> = [];
+  const webSearch = Promise.all(searchQueries.map(async (planQuery, index) => {
+    try {
+      searchSettled.push({ index, planQuery, hits: await searchPublicWeb(planQuery.query, 5), error: null });
+    } catch (error) {
+      searchSettled.push({ index, planQuery, hits: [], error: error instanceof Error ? error.message : "search failed" });
+    }
+  }));
+
+  const officialStarted = deadline.elapsed();
+  const demographicsAndProviders = Promise.allSettled([
     fetchCensusDemographics({ state, location: targetLocation }),
     searchNppesLive({ state, location: targetLocation, engine, perCategory: 12 }),
   ]);
+  const stateSourceTask: Promise<{ value: Awaited<ReturnType<typeof collectScoutStateSource>>; error: unknown }> = stateSourceDescriptor
+    ? demographicsAndProviders.then(([censusResult]) => collectScoutStateSource({
+      state,
+      engine,
+      location: targetLocation,
+      // Only verified exact age cohort; no substitution of under-18 estimates.
+      under18Population: censusResult.status === "fulfilled" ? censusResult.value.metrics.ages2to18 ?? 0 : 0,
+    })).then((value) => ({ value, error: null }), (error: unknown) => ({ value: null, error }))
+    : Promise.resolve({ value: null, error: null });
+
+  const budgetExpired = (what: string) => new Error(`${what} did not answer within Scout's time budget`);
+  const [censusSettled, nppesSettled] = await withinBudget(demographicsAndProviders, until(OFFICIAL_UNTIL_MS), [
+    { status: "rejected", reason: budgetExpired("Census") },
+    { status: "rejected", reason: budgetExpired("NPPES") },
+  ] as const);
+  track("census+nppes", officialStarted, null);
 
   const census = censusSettled.status === "fulfilled" ? censusSettled.value : null;
   if (census) {
@@ -140,60 +200,47 @@ export async function POST(request: Request) {
 
   let stateContribution = EMPTY_STATE_CONTRIBUTION;
   if (stateSourceDescriptor) {
-    try {
-      const stateSource = await collectScoutStateSource({
-        state,
-        engine,
-        location: targetLocation,
-        under18Population: census?.metrics.ages2to18 ?? 0, // Only verified exact age cohort; no substitution of under-18 estimates.
-      });
-      if (stateSource) {
-        stateContribution = stateSource.contribution;
-        observations.push(...stateContribution.observations);
-        if (stateContribution.snapshotOnly) {
-          unavailableSource(
-            sourceStatus,
-            stateSource.descriptor.source,
-            stateContribution.sourceDetail ?? "Only historical organizational listings available",
-          );
-        } else {
-          completeSource(
-            sourceStatus,
-            stateSource.descriptor.source,
-            stateContribution.sourceDetail ?? stateSource.descriptor.emptyDetail,
-          );
-        }
-      }
-    } catch (error) {
-      const detail = errorMessage(error, stateSourceDescriptor.errorFallback);
+    const stateSource = await withinBudget(stateSourceTask, until(OFFICIAL_UNTIL_MS), {
+      value: null,
+      error: budgetExpired(stateSourceDescriptor.source),
+    });
+    track("state source", officialStarted, null);
+    if (stateSource.error) {
+      const detail = errorMessage(stateSource.error, stateSourceDescriptor.errorFallback);
       unavailableSource(sourceStatus, stateSourceDescriptor.source, detail);
       errors.push(`${stateSourceDescriptor.errorPrefix}: ${detail}`);
+    } else if (stateSource.value) {
+      stateContribution = stateSource.value.contribution;
+      observations.push(...stateContribution.observations);
+      if (stateContribution.snapshotOnly) {
+        unavailableSource(
+          sourceStatus,
+          stateSource.value.descriptor.source,
+          stateContribution.sourceDetail ?? "Only historical organizational listings available",
+        );
+      } else {
+        completeSource(
+          sourceStatus,
+          stateSource.value.descriptor.source,
+          stateContribution.sourceDetail ?? stateSource.value.descriptor.emptyDetail,
+        );
+      }
     }
   }
 
-  if (engine === "client") {
-    const focused = ageBandSearchQueries(ageBand,targetLocation).map((value) =>
-      ({ lane:"referral" as const, query:value }));
-    plan.queries = [...focused,...plan.queries].slice(0,20);
+  // Always execute the bounded public search plan. NPPES hits are registry rows,
+  // not searched publisher corroboration; they must never terminate discovery.
+  await withinBudget(webSearch, until(SEARCH_UNTIL_MS), undefined);
+  track("public search", searchStarted, null);
+  const searchResults = [...searchSettled].sort((a, b) => a.index - b.index);
+  const queriesAttempted = searchQueries.length;
+  if (searchResults.length < searchQueries.length) {
+    truncatedStages.push("public search");
+    errors.push(`public web search: ${searchQueries.length - searchResults.length}/${searchQueries.length} queries still pending at the time budget; partial results used`);
   }
-  const searchQueries = plan.queries.slice(0, 15);
-  let queriesAttempted = 0;
-  for (let index = 0; index < searchQueries.length; index += 5) {
-    const batch = searchQueries.slice(index, index + 5);
-    queriesAttempted += batch.length;
-    const results = await Promise.all(batch.map(async (planQuery) => {
-      try {
-        return { planQuery, hits: await searchPublicWeb(planQuery.query, 5), error: null as string | null };
-      } catch (error) {
-        return { planQuery, hits: [], error: error instanceof Error ? error.message : "search failed" };
-      }
-    }));
-    for (const result of results) {
-      if (result.error) errors.push(`${result.planQuery.lane}: ${result.error}`);
-      rows.push(...result.hits.map((hit) => ({ lane: result.planQuery.lane, hit })));
-    }
-    // Always execute the bounded public search plan. NPPES hits are registry rows,
-    // not searched publisher corroboration; they must never terminate discovery.
+  for (const result of searchResults) {
+    if (result.error) errors.push(`${result.planQuery.lane}: ${result.error}`);
+    rows.push(...result.hits.map((hit) => ({ lane: result.planQuery.lane, hit })));
   }
   const webHits = rows.filter((row) => row.hit.sourceId === "duckduckgo-html" || row.hit.sourceId === "bing-rss").length;
   if (webHits === 0) {
@@ -213,24 +260,36 @@ export async function POST(request: Request) {
       (matchedDomains.length ? ": " + matchedDomains.slice(0, 7).join(", ") : ""),
   });
 
+  // Stage B — enrich the top public pages. Late results after the cutoff are discarded rather
+  // than mutating rows that have already been resolved into leads.
   const uniqueForEnrichment = Array.from(
     new Map(rows
       .filter((row) => !row.hit.sourceId.startsWith("cms-nppes-") && !isRestrictedReviewSite(row.hit.url))
       .map((row) => [safeDomain(row.hit.url) ?? row.hit.url, row])).values(),
   ).slice(0, 6);
+  const enrichStarted = deadline.elapsed();
   const browserReady = await playwrightAvailable();
   let browserEnrichments = 0;
+  let enrichmentOpen = true;
+  const enrichedPages = new Map<(typeof uniqueForEnrichment)[number], NonNullable<(typeof rows)[number]["enrichment"]>>();
 
-  await Promise.all(uniqueForEnrichment.map(async (row) => {
-    row.enrichment = await enrichPublicWebsite(row.hit.url);
-    if (!browserReady || !needsBrowserEnrichment(row.enrichment)) return;
-    try {
-      row.enrichment = await collectPublicPageWithPlaywright(row.hit.url);
-      browserEnrichments += 1;
-    } catch (error) {
-      errors.push(`browser enrichment: ${error instanceof Error ? error.message : "failed"}`);
+  const enrichment = Promise.all(uniqueForEnrichment.map(async (row) => {
+    let page = await enrichPublicWebsite(row.hit.url);
+    if (browserReady && needsBrowserEnrichment(page) && enrichmentOpen) {
+      try {
+        page = await collectPublicPageWithPlaywright(row.hit.url);
+        if (enrichmentOpen) browserEnrichments += 1;
+      } catch (error) {
+        if (enrichmentOpen) errors.push(`browser enrichment: ${error instanceof Error ? error.message : "failed"}`);
+      }
     }
+    if (enrichmentOpen && page) enrichedPages.set(row, page);
   }));
+  const enrichmentFinished = await withinBudget(enrichment.then(() => true), until(ENRICH_UNTIL_MS), false);
+  enrichmentOpen = false;
+  track("website enrichment", enrichStarted, null);
+  if (!enrichmentFinished) truncatedStages.push("website enrichment");
+  for (const [row, page] of enrichedPages) row.enrichment = page;
   const enrichedCount = uniqueForEnrichment.filter((row) => row.enrichment).length;
   if (enrichedCount > 0) {
     completeSource(sourceStatus, "Public Website Enrichment", enrichedCount + " actual public pages enriched");
@@ -249,28 +308,115 @@ export async function POST(request: Request) {
     targetLocation,
   ).slice(0, maxResults);
   const unqualified = mergeStateSourceLeads(resolvedPublic, stateContribution, targetLocation, maxResults);
+
+  // Stage C — two independent tracks run concurrently:
+  //   1. institutional website resolution → age/organization qualification → competitor reviews
+  //   2. adaptive follow-up of weak public clues (depends only on the raw search rows)
+  const followupStarted = deadline.elapsed();
+  const initialSignals = scanPublicSignals(
+    rows.map((item)=>item.hit),new Date().toISOString(),targetLocation,
+    engine === "client" ? ageBand : "all",
+  );
+  const followupPlan = planWeakSignalFollowups(
+    initialSignals.clues,targetLocation,engine === "client" ? ageBand : "all",
+    5,Math.floor(Date.now()/86_400_000),
+  );
+  const followupSettled: PromiseSettledResult<PublicSearchHit[]>[] = [];
+  const followupTrack = withinBudget(Promise.all(followupPlan.map((probe) =>
+    searchPublicWeb(probe.query,4).then(
+      (value) => { followupSettled.push({ status: "fulfilled", value }); },
+      (reason: unknown) => { followupSettled.push({ status: "rejected", reason }); },
+    ),
+  )).then(() => true), until(FOLLOWUP_UNTIL_MS), false).then((finished) => {
+    if (!finished) truncatedStages.push("weak-clue follow-up");
+    return track("weak-clue follow-up", followupStarted, [...followupSettled]);
+  });
+
   // The state registry gives a *name*, not a verified contact. Resolve the top
   // institutional facilities against an independently located organization site.
   // This is a bounded public lookup, never a family, home or personal-review crawl.
-  const institutionalCandidates = engine === "client"
-    ? unqualified.filter(isPublicInstitutionalLead).slice(0,5) : [];
-  const verifiedInstitutions = await Promise.all(institutionalCandidates.map(async (lead)=>{
-    try {
-      const hits=await searchPublicWeb(publicInstitutionLookupQuery(lead.name,targetLocation),5);
-      const matched=selectOrganizationWebsiteHit(lead,hits);
-      if (!matched) return lead;
-      const site=await enrichPublicWebsite(matched.url);
-      return enrichInstitutionalLead(lead,matched,site);
-    } catch {
-      return lead;
-    }
-  }));
-  const institutionalById=new Map(verifiedInstitutions.map((lead)=>[lead.id,lead]));
-  const organizationQualified=unqualified.map((lead)=>institutionalById.get(lead.id)??lead);
-  const verifiedInstitutionalWebsites=verifiedInstitutions.filter((lead)=>{
-    const original=institutionalCandidates.find((candidate)=>candidate.id===lead.id);
-    return Boolean(original&&original.website!==lead.website);
-  }).length;
+  const qualificationTrack = (async () => {
+    const institutionStarted = deadline.elapsed();
+    const institutionalCandidates = engine === "client"
+      ? unqualified.filter(isPublicInstitutionalLead).slice(0,5) : [];
+    let institutionsCut = false;
+    const verifiedInstitutions = await Promise.all(institutionalCandidates.map(async (lead) => {
+      const verified = (async () => {
+        try {
+          const hits=await searchPublicWeb(publicInstitutionLookupQuery(lead.name,targetLocation),5);
+          const matched=selectOrganizationWebsiteHit(lead,hits);
+          if (!matched) return lead;
+          const site=await enrichPublicWebsite(matched.url);
+          return enrichInstitutionalLead(lead,matched,site);
+        } catch {
+          return lead;
+        }
+      })();
+      const outcome = await withinBudget(verified, until(INSTITUTION_UNTIL_MS), null);
+      if (outcome === null) institutionsCut = true;
+      return outcome ?? lead;
+    }));
+    if (institutionsCut) truncatedStages.push("institution website resolution");
+    track("institution website resolution", institutionStarted, null);
+    const institutionalById=new Map(verifiedInstitutions.map((lead)=>[lead.id,lead]));
+    const organizationQualified=unqualified.map((lead)=>institutionalById.get(lead.id)??lead);
+    const verifiedInstitutionalWebsites=verifiedInstitutions.filter((lead)=>{
+      const original=institutionalCandidates.find((candidate)=>candidate.id===lead.id);
+      return Boolean(original&&original.website!==lead.website);
+    }).length;
+
+    const classified = engine === "client" ? organizationQualified.map((lead) => {
+      const fit = qualifyYouthLead(lead,ageBand as YouthAgeBand);
+      const documented = fit.ageStatus === "documented";
+      const competitor = fit.organizationRole === "aba_competitor";
+      return {
+        lead: {
+          ...lead,
+          score: Math.min(lead.score, documented ? competitor ? 30 : 60 : 35),
+          confidence: Math.min(lead.confidence, documented ? fit.supportingPublishers >= 2 ? 75 : 55 : 40),
+          unknowns: [...lead.unknowns,...fit.missingChecks.filter((item) => !lead.unknowns.includes(item))],
+        },
+        fit,
+      };
+    }).filter((item) => item.fit.ageStatus !== "outside")
+      .sort((a,b) => youthLeadPriority(b.fit) - youthLeadPriority(a.fit) || b.lead.score - a.lead.score) : [];
+    const resolved = engine === "client" ? classified.map((item) => item.lead) : organizationQualified;
+
+    // Review discovery is capped to real named competitor organizations. Do not crawl
+    // the reviews themselves or enrich Google/Yelp pages; links are verification-only.
+    const reviewStarted = deadline.elapsed();
+    const competitors = resolved.filter((lead) => providerReviewQuery(lead,targetLocation)).slice(0,3);
+    const emptyDossier = (lead: ResolvedLead) => ({
+      ...buildProviderReviewDossier(lead,[]),
+      independentThemes:summarizeCompanyReviewEvidence(lead,[],targetLocation),
+    });
+    let reviewsCut = false;
+    const reputationEntries = await Promise.all(competitors.map(async (lead) => {
+      const dossier = (async () => {
+        try {
+          const queries = providerReviewQueries(lead,targetLocation);
+          const gathered = await Promise.allSettled(queries.map((query) => searchPublicWeb(query,4)));
+          const hits = gathered.flatMap((result) => result.status === "fulfilled" ? result.value : []);
+          return {
+            ...buildProviderReviewDossier(lead,hits),
+            independentThemes:summarizeCompanyReviewEvidence(lead,hits,targetLocation),
+          };
+        } catch {
+          return emptyDossier(lead);
+        }
+      })();
+      const outcome = await withinBudget(dossier, until(REVIEWS_UNTIL_MS), null);
+      if (outcome === null) reviewsCut = true;
+      return [lead.id, outcome ?? emptyDossier(lead)] as const;
+    }));
+    if (reviewsCut) truncatedStages.push("competitor review discovery");
+    track("competitor review discovery", reviewStarted, null);
+    return { institutionalCandidates, verifiedInstitutions, verifiedInstitutionalWebsites, classified, resolved, competitors, reputationEntries };
+  })();
+
+  const [followupResults, qualification] = await Promise.all([followupTrack, qualificationTrack]);
+  const { institutionalCandidates, verifiedInstitutions, verifiedInstitutionalWebsites, classified, resolved, competitors, reputationEntries } = qualification;
+
   if(engine==="client")sourceStatus.push({
     source:"Official organization website resolution",
     status:verifiedInstitutionalWebsites?"complete":"unavailable",
@@ -279,22 +425,6 @@ export async function POST(request: Request) {
       verifiedInstitutions.filter((lead)=>lead.phones.length||lead.emails.length).length+
       " with published contacts (not necessarily referral decision-makers)",
   });
-  const classified = engine === "client" ? organizationQualified.map((lead) => {
-    const fit = qualifyYouthLead(lead,ageBand as YouthAgeBand);
-    const documented = fit.ageStatus === "documented";
-    const competitor = fit.organizationRole === "aba_competitor";
-    return {
-      lead: {
-        ...lead,
-        score: Math.min(lead.score, documented ? competitor ? 30 : 60 : 35),
-        confidence: Math.min(lead.confidence, documented ? fit.supportingPublishers >= 2 ? 75 : 55 : 40),
-        unknowns: [...lead.unknowns,...fit.missingChecks.filter((item) => !lead.unknowns.includes(item))],
-      },
-      fit,
-    };
-  }).filter((item) => item.fit.ageStatus !== "outside")
-    .sort((a,b) => youthLeadPriority(b.fit) - youthLeadPriority(a.fit) || b.lead.score - a.lead.score) : [];
-  const resolved = engine === "client" ? classified.map((item) => item.lead) : organizationQualified;
   const youthQualifications = Object.fromEntries(classified.map((item) => [item.lead.id,item.fit]));
   if (engine === "client") sourceStatus.push({
     source:"Child age and organization qualification",
@@ -305,26 +435,6 @@ export async function POST(request: Request) {
       " competitor(s), " + classified.filter((item) => item.fit.ageStatus !== "documented").length +
       " research-only candidates; no individual families collected",
   });
-
-  // Review discovery is capped to real named competitor organizations. Do not crawl
-  // the reviews themselves or enrich Google/Yelp pages; links are verification-only.
-  const competitors = resolved.filter((lead) => providerReviewQuery(lead,targetLocation)).slice(0,3);
-  const reputationEntries = await Promise.all(competitors.map(async (lead) => {
-    try {
-      const queries = providerReviewQueries(lead,targetLocation);
-      const gathered = await Promise.allSettled(queries.map((query) => searchPublicWeb(query,4)));
-      const hits = gathered.flatMap((result) => result.status === "fulfilled" ? result.value : []);
-      return [lead.id,{
-        ...buildProviderReviewDossier(lead,hits),
-        independentThemes:summarizeCompanyReviewEvidence(lead,hits,targetLocation),
-      }] as const;
-    } catch {
-      return [lead.id,{
-        ...buildProviderReviewDossier(lead,[]),
-        independentThemes:summarizeCompanyReviewEvidence(lead,[],targetLocation),
-      }] as const;
-    }
-  }));
   const providerReputation = Object.fromEntries(reputationEntries);
   sourceStatus.push({
     source:"Public competitor review discovery",
@@ -337,19 +447,8 @@ export async function POST(request: Request) {
   });
 
   // First pass exposes weak institutional clues even if only a single publication exists.
-  // Pursue independent cross-checks before computing final market evidence.
+  // Independent cross-checks ran above before computing final market evidence.
   // This does not search for or build dossiers on identifiable children or households.
-  const initialSignals = scanPublicSignals(
-    rows.map((item)=>item.hit),new Date().toISOString(),targetLocation,
-    engine === "client" ? ageBand : "all",
-  );
-  const followupPlan = planWeakSignalFollowups(
-    initialSignals.clues,targetLocation,engine === "client" ? ageBand : "all",
-    5,Math.floor(Date.now()/86_400_000),
-  );
-  const followupResults = await Promise.allSettled(
-    followupPlan.map((probe)=>searchPublicWeb(probe.query,4)),
-  );
   const followupHits = followupResults.flatMap((result)=>
     result.status === "fulfilled"?result.value:[],
   );
@@ -389,7 +488,12 @@ export async function POST(request: Request) {
   let dataJoins: ScoutDataJoins | null = null;
   if (countyBundle) {
     try {
-      const joined = scoutDataJoins(await countyBundle, targetLocation);
+      const bundle = await withinBudget(countyBundle, until(COUNTY_UNTIL_MS), null);
+      if (!bundle) {
+        truncatedStages.push("county data joins");
+        throw new Error("statewide county joins were still loading at the time budget; re-run to use the cached ranking");
+      }
+      const joined = scoutDataJoins(bundle, targetLocation);
       dataJoins = joined.dataJoins;
       observations.push(...joined.observations);
       const completePrograms = joined.dataJoins.programs.filter((program) => program.status === "complete").length;
@@ -484,6 +588,12 @@ export async function POST(request: Request) {
       })),
       territory,
       errors,
+      timing: {
+        budgetMs: RUN_BUDGET_MS,
+        elapsedMs: deadline.elapsed(),
+        stagesMs: stageMs,
+        truncatedStages,
+      },
     },
     {
       query,
@@ -579,7 +689,7 @@ function dedupeObservations(observations: IndicatorObservation[]) {
   }
   return [...grouped.entries()].map(([indicatorId, items]) => ({
     indicatorId,
-    value: Math.round(items.reduce((sum, item) => sum + item.value, 0) / items.length),
+    value: confidenceWeightedMean(items.map((item) => ({ value: item.value, weight: item.confidence }))),
     confidence: Math.round(items.reduce((sum, item) => sum + item.confidence, 0) / items.length),
     sourceIds: Array.from(new Set(items.flatMap((item) => item.sourceIds))),
     capturedAt: items.map((item) => item.capturedAt).filter(Boolean).sort().at(-1),

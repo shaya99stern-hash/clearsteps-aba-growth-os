@@ -45,7 +45,7 @@
 .metrics strong {
   display: block;
   margin-top: 5px;
-  font-family: ui-serif, "New York", Georgia, serif;
+  font-family: var(--font-display);
   font-size: 24px;
   font-weight: 560;
 }
@@ -79,7 +79,7 @@
 .panelHeader h2,
 .composerHeader h2 {
   margin: 4px 0 0;
-  font-family: ui-serif, "New York", Georgia, serif;
+  font-family: var(--font-display);
   font-size: 20px;
   font-weight: 560;
 }
@@ -95,7 +95,7 @@
 }
 
 .panelHeader > button:disabled { opacity: .35; cursor: default; }
-.panelHeader > strong { color: var(--accent); font-family: ui-serif, "New York", Georgia, serif; font-size: 22px; }
+.panelHeader > strong { color: var(--accent); font-family: var(--font-display); font-size: 22px; }
 
 .recipientList {
   max-height: 450px;
@@ -133,12 +133,12 @@
   background: var(--card);
 }
 
-.selected .check { background: var(--text); }
+.selected .check { background: var(--primary-bg); }
 
 .recipientText { min-width: 0; display: grid; gap: 3px; }
 .recipientText strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
 .recipientText small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--tertiary); font-size: 9px; }
-.recipient > svg { color: #66625c; }
+.recipient > svg { color: #64636d; }
 
 .emptyPanel {
   min-height: 220px;
@@ -313,8 +313,8 @@
   gap: 7px;
   border: 0;
   border-radius: 999px;
-  background: var(--text);
-  color: #111;
+  background: var(--primary-bg);
+  color: var(--primary-fg);
   font-size: 10px;
   font-weight: 750;
   cursor: pointer;

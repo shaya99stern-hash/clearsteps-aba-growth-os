@@ -63,6 +63,9 @@ jobs:
       - name: Verify Phase 3 ABA Engine rules
         run: npm run verify:aba-engine
 
+      - name: Verify Scout runtime (cache, failover, extraction, 60s time budget)
+        run: npm run verify:scout-runtime
+
       - name: Verify Colorado and cross-source public indicators
         run: npm run verify:colorado-signals
 

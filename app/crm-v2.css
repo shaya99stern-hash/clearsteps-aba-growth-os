@@ -32,7 +32,7 @@
 .crmKpi strong {
   display: block;
   margin-top: 5px;
-  font-family: ui-serif, "New York", "Iowan Old Style", Georgia, serif;
+  font-family: var(--font-display);
   font-size: 25px;
   font-weight: 590;
   line-height: 1;
@@ -189,7 +189,7 @@
 }
 
 .crmCard:hover {
-  border-color: rgba(215,122,89,.22);
+  border-color: rgba(187,166,236,.22);
   background: #1c1c1f;
 }
 
@@ -221,11 +221,11 @@
   height: 31px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(215,122,89,.15);
+  border: 1px solid rgba(187,166,236,.15);
   border-radius: 9px;
-  background: rgba(215,122,89,.08);
+  background: rgba(187,166,236,.08);
   color: var(--accent);
-  font-family: ui-serif, "New York", Georgia, serif;
+  font-family: var(--font-display);
   font-size: 16px;
 }
 
@@ -399,7 +399,7 @@
 
 .crmListScore {
   color: var(--accent);
-  font-family: ui-serif, "New York", Georgia, serif;
+  font-family: var(--font-display);
   font-size: 15px;
 }
 
@@ -460,7 +460,7 @@
 
 .crmDrawerHeader h2 {
   margin: 6px 0 4px;
-  font-family: ui-serif, "New York", "Iowan Old Style", Georgia, serif;
+  font-family: var(--font-display);
   font-size: 27px;
   font-weight: 570;
   line-height: 1;
@@ -479,9 +479,9 @@
   gap: 13px;
   align-items: center;
   padding: 13px;
-  border: 1px solid rgba(215,122,89,.17);
+  border: 1px solid rgba(187,166,236,.17);
   border-radius: 14px;
-  background: linear-gradient(135deg, rgba(215,122,89,.1), rgba(255,255,255,.02));
+  background: linear-gradient(135deg, rgba(187,166,236,.1), rgba(255,255,255,.02));
 }
 
 .crmDrawerScore > div:first-child {
@@ -493,7 +493,7 @@
 
 .crmDrawerScore strong {
   color: var(--accent);
-  font-family: ui-serif, "New York", Georgia, serif;
+  font-family: var(--font-display);
   font-size: 38px;
   font-weight: 570;
   line-height: 1;
@@ -662,7 +662,7 @@
 }
 
 .crmDrawerFooter button {
-  border: 1px solid rgba(215,122,89,.2);
+  border: 1px solid rgba(187,166,236,.2);
   background: var(--accent);
   color: #18100d;
   cursor: pointer;

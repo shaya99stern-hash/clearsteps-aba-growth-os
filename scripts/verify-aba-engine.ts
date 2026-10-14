@@ -75,3 +75,12 @@ assert.equal(nppes.results.length, 1);
 assert.equal(nppes.errors.length, 0);
 
 console.log("Phase 3 ABA Engine verification passed.");
+
+// Pillar scores weight each observation by its confidence.
+const mixedConfidence = scoreEngineFromObservations("client", [
+  { indicatorId: "demographic-demand.01", value: 90, confidence: 90, sourceIds: ["census"] },
+  { indicatorId: "demographic-demand.02", value: 10, confidence: 10, sourceIds: ["web"] },
+]);
+const demandPillar = mixedConfidence.pillarBreakdown.find((pillar) => pillar.pillarId === "demographic-demand")!;
+assert.equal(demandPillar.score, 82, "low-confidence clue moves the pillar far less than a high-confidence measurement");
+console.log("Confidence-weighted pillar scoring verified.");

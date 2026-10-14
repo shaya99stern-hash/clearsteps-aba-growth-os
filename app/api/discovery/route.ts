@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getDefaultSearchProvider } from "@/lib/connectors/searchProviders/searchProviderRegistry";
-import { SearchProviderError } from "@/lib/connectors/searchProviders/types";
 import { buildOpportunities } from "@/lib/discovery/evidence";
 import type { NormalizedSearchResult } from "@/lib/domain/types";
 

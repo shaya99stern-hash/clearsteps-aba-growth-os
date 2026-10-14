@@ -1,35 +1,42 @@
 import { validatePublicHttpUrl } from "./network-safety";
+import { CoalescingCache } from "./runtime";
 
 const USER_AGENT = "ClearStepsResearch";
+
+type Rule = { kind: "allow" | "disallow"; path: string };
+
+// One robots.txt fetch per origin per hour instead of one per enriched page.
+const robotsCache = new CoalescingCache<Rule[]>(500, 60 * 60_000);
 
 export async function robotsAllows(value: string): Promise<boolean> {
   const target = await validatePublicHttpUrl(value);
   if (!target) return false;
 
   const url = new URL(target);
-  const robotsUrl = `${url.origin}/robots.txt`;
+  const rules = await robotsCache.get(url.origin, () => fetchRules(url.origin));
+  return isAllowed(url.pathname + url.search, rules);
+}
+
+async function fetchRules(origin: string): Promise<Rule[]> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 4_000);
   try {
-    const response = await fetch(robotsUrl, {
+    const response = await fetch(`${origin}/robots.txt`, {
       headers: { "user-agent": `${USER_AGENT}/1.0` },
       redirect: "error",
       cache: "no-store",
       signal: controller.signal,
     });
-    if (!response.ok) return true;
-    const rules = parseRobots(await response.text());
-    return isAllowed(url.pathname || "/", rules);
+    if (!response.ok) return [];
+    return parseRobots(await response.text());
   } catch {
-    return true;
+    return [];
   } finally {
     clearTimeout(timer);
   }
 }
 
-type Rule = { kind: "allow" | "disallow"; path: string };
-
-function parseRobots(text: string): Rule[] {
+export function parseRobots(text: string): Rule[] {
   const groups: Array<{ agents: string[]; rules: Rule[] }> = [];
   let current: { agents: string[]; rules: Rule[] } | null = null;
 
@@ -59,10 +66,19 @@ function parseRobots(text: string): Rule[] {
   return (exact ?? wildcard)?.rules ?? [];
 }
 
-function isAllowed(pathname: string, rules: Rule[]) {
-  const matching = rules
-    .filter((rule) => rule.path && pathname.startsWith(rule.path.replace(/\*.*$/, "")))
-    .sort((a, b) => b.path.length - a.path.length);
-  if (!matching.length) return true;
-  return matching[0].kind === "allow";
+/** RFC 9309: the longest matching path wins, `*` matches any run, `$` anchors, Allow wins ties. */
+export function isAllowed(path: string, rules: readonly Rule[]) {
+  let best: Rule | null = null;
+  for (const rule of rules) {
+    if (!rule.path || !robotsPatternMatches(rule.path, path)) continue;
+    if (!best || rule.path.length > best.path.length || (rule.path.length === best.path.length && rule.kind === "allow")) best = rule;
+  }
+  return !best || best.kind === "allow";
+}
+
+function robotsPatternMatches(pattern: string, path: string) {
+  const anchored = pattern.endsWith("$");
+  const body = anchored ? pattern.slice(0, -1) : pattern;
+  const source = body.split("*").map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*");
+  return new RegExp("^" + source + (anchored ? "$" : "")).test(path);
 }

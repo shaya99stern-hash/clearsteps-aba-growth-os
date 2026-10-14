@@ -29,7 +29,7 @@
 .summaryStrip strong {
   display: block;
   margin-top: 5px;
-  font-family: ui-serif, "New York", Georgia, serif;
+  font-family: var(--font-display);
   font-size: 24px;
   font-weight: 560;
 }
@@ -89,7 +89,7 @@
 
 .composerLead input::placeholder,
 .composer textarea::placeholder {
-  color: #77736b;
+  color: #75747e;
 }
 
 .composer textarea {
@@ -150,8 +150,8 @@
   gap: 6px;
   border: 0;
   border-radius: 999px;
-  background: var(--text);
-  color: #111;
+  background: var(--primary-bg);
+  color: var(--primary-fg);
   font-size: 11px;
   font-weight: 750;
   cursor: pointer;

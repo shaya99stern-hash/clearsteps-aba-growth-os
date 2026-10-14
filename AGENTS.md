@@ -1,9 +1,9 @@
 ## Stack
 
-- Web application: Next.js 16.2.4 App Router
+- Web application: Next.js 16.3.8 App Router
 - UI runtime: React 19.2.4 + TypeScript 5
 - Styling: Tailwind CSS 4 plus scoped CSS modules/global CSS
-- Database: PostgreSQL via Prisma 7.8.0 and `@prisma/adapter-pg`
+- Database: PostgreSQL via Prisma 7.10.0 and `@prisma/adapter-pg`
 - Browser acquisition: Playwright 1.62.1 with Chromium headless shell
 - Validation: Zod 4.4.3
 - Deployment target: Vercel
