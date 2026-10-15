@@ -66,6 +66,9 @@ jobs:
       - name: Verify Scout runtime (cache, failover, extraction, 60s time budget)
         run: npm run verify:scout-runtime
 
+      - name: Verify 150 v6 sources and 200 client narrowing signals
+        run: npm run verify:client-narrowing
+
       - name: Verify Colorado and cross-source public indicators
         run: npm run verify:colorado-signals
 

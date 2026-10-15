@@ -10,6 +10,7 @@
     "verify:intelligence": "tsx scripts/verify-intelligence.ts",
     "verify:aba-engine": "tsx scripts/verify-aba-engine.ts",
     "verify:scout-runtime": "tsx scripts/verify-scout-runtime.ts",
+    "verify:client-narrowing": "tsx scripts/verify-client-narrowing.ts",
     "postinstall": "prisma generate && node scripts/copy-maplibre-worker.mjs",
     "browser:install": "playwright install --with-deps --only-shell chromium",
     "verify:browser": "tsx scripts/verify-browser.ts",
