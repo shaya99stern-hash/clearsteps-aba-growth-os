@@ -60,6 +60,7 @@ body { font-size: 13.52px; line-height: 1.5; letter-spacing: -.006em; font-featu
 .referenceHeading h1 { font-size: 26px; font-weight: 650; line-height: 1.15; letter-spacing: -.028em; }
 .referenceHome .referenceHeading h1 { font-size: 24px; }
 .referenceHeading p { color: var(--secondary); font-size: 14.48px; line-height: 1.45; margin-top: 4px; }
+.referenceHeading > p { margin-top: 0; }
 .referenceHeadingRow { flex-direction: row; align-items: flex-end; justify-content: space-between; gap: 16px; }
 .referenceWorkspaces { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
 .referenceTile { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 16px; border: 1px solid var(--border); border-radius: 10px; background: #151517; }

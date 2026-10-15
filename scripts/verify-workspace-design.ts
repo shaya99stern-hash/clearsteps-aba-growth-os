@@ -33,10 +33,13 @@ try {
   assert.equal(await page.locator("body").evaluate((el) => getComputedStyle(el).backgroundColor), "rgb(11, 11, 12)");
   await page.addStyleTag({ content: "nextjs-portal { display: none; }" });
   await noOverflow(page);
+  await page.addStyleTag({ content: "nextjs-portal { display: none; }" });
   await page.screenshot({ path: `${output}/home-desktop.png`, fullPage: true, caret: "initial" });
   await page.getByRole("navigation", { name: "Workspaces", exact: true }).getByRole("link", { name: /Leads/ }).click();
   await page.waitForURL("**/leads");
   await page.getByRole("heading", { name: "Leads", exact: true }).waitFor();
+  assert.equal(Math.round((await page.locator(".referenceLeadForm").boundingBox())!.y), 155);
+  await page.addStyleTag({ content: "nextjs-portal { display: none; }" });
   await page.screenshot({ path: `${output}/leads-desktop.png`, fullPage: true, caret: "initial" });
   await page.getByLabel("City or county", { exact: true }).fill("Denver");
   await page.getByRole("button", { name: "CO", exact: true }).click();
@@ -49,6 +52,7 @@ try {
   assert.equal(new URL(page.url()).searchParams.get("engine"), "rbt");
   await page.goto(`${base}/today`);
   await page.getByRole("button", { name: "Complete Follow up with referral partner", exact: true }).waitFor();
+  await page.addStyleTag({ content: "nextjs-portal { display: none; }" });
   await page.screenshot({ path: `${output}/today-desktop.png`, fullPage: true, caret: "initial" });
   await page.getByRole("button", { name: "Complete Follow up with referral partner", exact: true }).click();
   await page.reload();
@@ -56,6 +60,7 @@ try {
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("clearsteps.tasks.v1")!)[0].status), "done");
   await page.goto(`${base}/crm`);
   await page.getByRole("heading", { name: "CRM", exact: true }).waitFor();
+  await page.addStyleTag({ content: "nextjs-portal { display: none; }" });
   await page.screenshot({ path: `${output}/crm-desktop.png`, fullPage: true, caret: "initial" });
   await page.locator(".workspaceRail").getByRole("link", { name: "Organizations", exact: true }).click();
   await page.waitForURL("**/organizations");
@@ -79,7 +84,8 @@ try {
       await page.locator(".referencePage").waitFor();
       await page.addStyleTag({ content: "nextjs-portal { display: none; }" });
       await noOverflow(page);
-      await page.screenshot({ path: `${output}/${route.slice(1) || "home"}-${width}.png`, fullPage: true, caret: "initial" });
+      await page.addStyleTag({ content: "nextjs-portal { display: none; }" });
+  await page.screenshot({ path: `${output}/${route.slice(1) || "home"}-${width}.png`, fullPage: true, caret: "initial" });
     }
     await page.getByRole("button", { name: "Open navigation" }).click();
     const menu = page.getByRole("dialog", { name: "Workspace navigation" });
