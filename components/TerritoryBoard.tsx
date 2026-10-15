@@ -32,7 +32,7 @@ export function TerritoryBoard() {
           <h2>Territories worth understanding.</h2>
           <p>Compare completed Scout runs by market and engine. Ratings are research signals, not validated demand, licensing clearance or payer approval.</p>
         </div>
-        <Link className={styles.primaryAction} href="/"><Search size={15} /> Run Scout <ArrowUpRight size={15} /></Link>
+        <Link className={styles.primaryAction} href="/scout"><Search size={15} /> Run Scout <ArrowUpRight size={15} /></Link>
       </section>
       <div className={styles.stats}>
         <div className={styles.metric}><span>Researched markets</span><strong>{latest.length}</strong><small>unique market + engine combinations</small></div>
@@ -49,7 +49,7 @@ export function TerritoryBoard() {
           <MapPinned size={28} aria-hidden="true" />
           <h3>Your first market starts in Scout.</h3>
           <p>Run a real Missouri, Kansas, or Colorado research scan. Its scores, evidence coverage, source status and warnings will appear here automatically—without entering the data twice.</p>
-          <Link href="/" className={styles.primaryAction}>Research a market <ArrowUpRight size={15} /></Link>
+          <Link href="/scout" className={styles.primaryAction}>Research a market <ArrowUpRight size={15} /></Link>
         </section>
       ) : visible.length === 0 ? (
         <section className={styles.empty}><h3>No matching markets</h3><p>Change the filters to view the research already saved on this device.</p></section>

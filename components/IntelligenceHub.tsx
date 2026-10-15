@@ -54,7 +54,7 @@ export function IntelligenceHub() {
           <h2>What deserves attention next.</h2>
           <p>One decision queue generated from actual Scout research, CRM records and unfinished tasks. No fabricated opportunities or automated contact.</p>
         </div>
-        <Link href="/" className={styles.primaryAction}><Search size={15} /> New research <ArrowUpRight size={15} /></Link>
+        <Link href="/scout" className={styles.primaryAction}><Search size={15} /> New research <ArrowUpRight size={15} /></Link>
       </section>
       <div className={styles.stats}>
         <div className={styles.metric}><span>Overdue tasks</span><strong>{summary.overdue}</strong><small>{summary.unfinished} unfinished total</small></div>
@@ -70,7 +70,7 @@ export function IntelligenceHub() {
             <Lightbulb size={28} />
             <h3>Nothing to prioritize yet.</h3>
             <p>Run Scout, review sourced leads, save appropriate organizations or candidates to their CRM, and add tasks. Qualified work will surface here automatically.</p>
-            <Link href="/" className={styles.primaryAction}>Start in Scout <ArrowUpRight size={15} /></Link>
+            <Link href="/scout" className={styles.primaryAction}>Start in Scout <ArrowUpRight size={15} /></Link>
           </div>
         ) : (
           <div className={styles.queueList}>

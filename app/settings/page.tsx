@@ -8,7 +8,7 @@ export default function SettingsPage() {
     <PageShell title="Settings" description="What this workspace actually does, and what requires verification before an operational decision.">
       <div className="grid gap-4 lg:grid-cols-2">
         <InfoCard title="Research: Missouri, Kansas & Colorado" description="Scout compares public territory demand and staffing indicators. Families are acquired only through voluntary agency inquiries, never through public school or competitor lists.">
-          <Link href="/" className="underline underline-offset-4">Open Scout →</Link>
+          <Link href="/scout" className="underline underline-offset-4">Open Scout →</Link>
         </InfoCard>
         <InfoCard title="Family-facing intake page" description={familyContact.published
           ? "Owner-activated contact destination is configured. Confirm the service area, staff coverage and external intake workflow remain accurate."

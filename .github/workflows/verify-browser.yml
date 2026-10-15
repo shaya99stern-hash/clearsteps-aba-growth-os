@@ -10,6 +10,7 @@ on:
       - "components/**/*.tsx"
       - "components/**/*.css"
       - "scripts/verify-browser.ts"
+      - "scripts/verify-workspace-design.ts"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/verify-browser.yml"
@@ -27,6 +28,7 @@ on:
       - "components/**/*.tsx"
       - "components/**/*.css"
       - "scripts/verify-browser.ts"
+      - "scripts/verify-workspace-design.ts"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/verify-browser.yml"
@@ -69,6 +71,17 @@ jobs:
 
       - name: Launch Chromium and verify Clear Steps UI
         run: npm run verify:browser
+
+      - name: Verify reference workspace design flows
+        run: npm run verify:workspace-design
+
+      - name: Save workspace screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workspace-design-evidence
+          path: e2e-evidence
+          if-no-files-found: ignore
 
       - name: Show app log on failure
         if: failure()

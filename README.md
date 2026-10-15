@@ -4,9 +4,14 @@
 
 ## Start here
 
-The main experience is **Scout**. Choose a lead engine (Clients, RBTs or BCBAs), choose Missouri or Kansas, enter a city/ZIP/county and run a public-source investigation. Review the evidence, coverage, confidence, current state/payer rule references, and unknowns before saving any eligible organization or recruiter-sourced candidate to the relevant CRM.
+The workspace opens on **Home**, following the supplied Puma layout with Clear Steps branding. **Leads** prepares a public-source search in **Scout**, while **CRM** opens saved relationships and **Today** shows tasks needing attention. Existing research and CRM data flows are preserved.
 
-- **Scout** (`/`): bounded official/public research, public-source enrichment and dossiers, with a summary saved to this device after successful runs.
+- **Home** (`/`): Leads and CRM workspace cards, plus a link to today's tasks.
+- **Leads** (`/leads`): select MO, KS or CO, a city/county, and a lead type; review and run the prepared search in Scout.
+- **CRM** (`/crm`): organizations, contacts, pipeline counts and due tasks from the existing stores.
+- **Today** (`/today`): due/overdue tasks, onboarding progress and saved leads; completing a task uses the existing task persistence.
+
+- **Scout** (`/scout`): bounded official/public research, public-source enrichment and dossiers, with a summary saved to this device after successful runs. Legacy `/?state=...&engine=...` links redirect here with their research scope intact.
 - **Map** (`/map`): county scores and census-tract hotspots statewide; click a point or enter an address to see licensed child care (priority / confirmed / unconfirmed), ABA providers, pediatric practices, schools and hospitals, with 202 indicators at 2, 5 and 10 miles and eight two-source convergence tests.
 - **Territories** (`/territories`): rank every county with 90 cross-source data joins (51 need no API key), then compare latest research summaries per market, state and engine; spot thin or aging evidence; re-run a scan with its original scope.
 - **Intelligence** (`/intelligence`): prioritize overdue tasks, high-evidence CRM items and markets needing verification. Create linked verification tasks; no messages are sent.
@@ -55,6 +60,7 @@ npm run verify:aba-engine
 npm run verify:scout-runtime
 npm run verify:client-narrowing
 npm run verify:command-center
+npm run verify:workspace-design # with the local app running; CLEARSTEPS_UI_URL overrides localhost:3000
 npm run lint
 npm run build
 ```

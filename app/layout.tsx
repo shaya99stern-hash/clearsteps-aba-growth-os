@@ -1,13 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "./workspace-v2.css";
 import "./crm-v2.css";
 import "./phase3.css";
 import "./phase4.css";
 import "./ui-refinement.css";
+import "./reference-design.css";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
+const geistSans = Inter({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
@@ -30,7 +31,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#0d0d0f",
+  themeColor: "#0b0b0c",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

@@ -16,7 +16,7 @@ export default function WorkspaceError({ error, reset }: { error: Error & { dige
         <p>Your saved work has not been intentionally changed. You can retry the screen or return to Scout.</p>
         <div className="routeErrorActions">
           <button type="button" onClick={() => reset()}>Try again</button>
-          <Link href="/">Back to Scout</Link>
+          <Link href="/scout">Back to Scout</Link>
         </div>
       </div>
     </main>

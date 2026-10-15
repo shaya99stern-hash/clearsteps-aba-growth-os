@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ArrowUpRight, Menu, Plus, X } from "lucide-react";
-import { navGroups } from "./AppNav";
+import { isNavActive, navGroups } from "./AppNav";
 
 export function MobileDrawer({ title }: { title: string }) {
   const pathname = usePathname();
@@ -91,7 +91,7 @@ export function MobileDrawer({ title }: { title: string }) {
                   <h3>{group.label}</h3>
                   {group.items.map((item) => {
                     const Icon = item.icon;
-                    const active = item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(item.href + "/");
+                    const active = isNavActive(pathname, item.href);
                     return (
                       <Link
                         key={item.href}

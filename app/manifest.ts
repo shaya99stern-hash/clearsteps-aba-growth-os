@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Missouri, Kansas and Colorado public client-acquisition research and RBT recruiting.",
     start_url: "/",
     display: "standalone",
-    background_color: "#0d0d0f",
-    theme_color: "#0d0d0f",
+    background_color: "#0b0b0c",
+    theme_color: "#0b0b0c",
     icons: [
       {
         src: "/api/app-icon",
