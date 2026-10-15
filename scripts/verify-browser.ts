@@ -174,7 +174,7 @@ async function verifyMobilePwa(baseUrl: string) {
     await assertNativeMobileChrome(page, "Tasks");
     await assertVisibleKeyboardFocus(page, page.getByLabel("Task title"), "Task title");
 
-    await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
+    await page.goto(baseUrl + "/scout", { waitUntil: "domcontentloaded" });
     await assertNoBodyOverflow(page, "Scout");
     await assertNativeMobileChrome(page, "Scout");
 
@@ -184,7 +184,7 @@ async function verifyMobilePwa(baseUrl: string) {
     const drawer = page.getByRole("dialog", { name: "Workspace navigation" });
     await drawer.waitFor({ state: "visible" });
     assert.equal(await drawer.getByRole("link", { name: "Scout", exact: true }).getAttribute("aria-current"), "page");
-    assert.equal(await drawer.getByRole("link").count(), 12, "all eleven primary workspaces plus source status should remain reachable");
+    assert.equal(await drawer.getByRole("link").count(), 18, "all workspace destinations plus source status should remain reachable");
     await page.keyboard.press("Escape");
     await drawer.waitFor({ state: "detached" });
     assert.equal(await openNavigation.evaluate((button) => document.activeElement === button), true, "closing drawer returns focus to hamburger");
@@ -360,7 +360,7 @@ async function verifySeamlessRouting(baseUrl: string) {
   const failed: string[] = [];
   page.on("pageerror", (error) => failed.push(error.message));
   try {
-    await page.goto(baseUrl, { waitUntil: "networkidle" });
+    await page.goto(baseUrl + "/scout", { waitUntil: "networkidle" });
     const input = page.locator('textarea[aria-label="Research request"]');
     assert.equal(await input.inputValue(), "", "Fresh Scout input starts blank");
     await input.fill("Find family inquiries in Denver");
@@ -375,7 +375,7 @@ async function verifySeamlessRouting(baseUrl: string) {
     const primary: Array<[string, string, string]> = [
       ["Territories", "/territories", "Territories"],
       ["Map", "/map", "Map"],
-      ["Intelligence", "/intelligence", "Intelligence"],
+      ["Activity & insights", "/intelligence", "Intelligence"],
       ["Market Sources", "/pipeline", "Market Sources"],
       ["Talent CRM", "/talent", "Talent"],
       ["Outreach", "/outreach", "Outreach"],
@@ -383,7 +383,7 @@ async function verifySeamlessRouting(baseUrl: string) {
       ["Sources", "/connectors", "Sources"],
       ["Settings", "/settings", "Settings"],
       ["More tools", "/more", "More"],
-      ["Scout", "/", "Scout"],
+      ["Scout", "/scout", "Scout"],
     ];
     for (const [label, path, title] of primary) {
       await page.getByRole("button", { name: "Open navigation" }).click();
@@ -420,7 +420,7 @@ async function verifySeamlessRouting(baseUrl: string) {
     await page.goto(baseUrl + "/missing-clearsteps-route-404", { waitUntil: "domcontentloaded" });
     await page.getByRole("heading", { name: "Screen not found" }).waitFor({ state: "visible" });
     await page.getByRole("link", { name: "Return to Scout" }).click();
-    await page.waitForURL((url) => url.pathname === "/");
+    await page.waitForURL((url) => url.pathname === "/scout");
     assert.equal(await page.locator('textarea[aria-label="Research request"]').inputValue(), "");
     assert.deepEqual(failed, [], "No client-side uncaught exceptions during route and history tests");
   } finally {

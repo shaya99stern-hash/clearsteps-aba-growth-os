@@ -1,9 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Plus, Search } from "lucide-react";
+import { CircleUserRound, Settings } from "lucide-react";
 import { AppNav } from "./AppNav";
 import { MobileDrawer } from "./MobileDrawer";
+import { WorkspaceSearch } from "./WorkspaceSearch";
 
 export function PageShell({
   title,
@@ -27,43 +28,33 @@ export function PageShell({
 
       <MobileDrawer title={title} />
 
-      <aside className="workspaceRail">
+      <aside className="workspaceRail" aria-label="Primary">
         <div className="railHeader">
           <Link href="/" className="brandLockup" aria-label="Clear Steps home">
             <Image className="brandImage" src="/api/app-icon" alt="" width={40} height={40} priority unoptimized />
-            <span className="brandWords"><i>Clear Steps</i><b>ABA Engine</b></span>
+            <span className="brandWords"><i>Clear Steps</i><b>ABA Growth OS</b></span>
           </Link>
         </div>
         <AppNav />
         <div className="railFooter">
-          <span className="livePill"><i /> MO + KS + CO intelligence</span>
-          <p>Client acquisition · RBT recruiting · public evidence</p>
+          <Link href="/settings" className="navItem"><Settings size={16} aria-hidden="true" />Settings</Link>
+          <Link href="/settings" className="workspaceProfile"><CircleUserRound size={28} aria-hidden="true" /><span><strong>Clear Steps</strong><small>MO · KS · CO workspace</small></span></Link>
         </div>
       </aside>
 
       <section className="workspaceSurface">
         <header className="workspaceTopbar">
           <div className="topbarContext">
-            <span>ABA Engine</span>
-            <strong>{title}</strong>
+            <span>{title}</span>
           </div>
           <div className="topbarActions">
-            <Link href="/" className="topbarSearch">
-              <Search size={14} aria-hidden="true" />
-              <span>Scout</span>
-              <kbd>Research</kbd>
-            </Link>
-            <Link href="/tasks" className="topbarPrimary">
-              <Plus size={14} aria-hidden="true" />
-              <span>New task</span>
-            </Link>
+            <WorkspaceSearch />
           </div>
         </header>
 
         {!compact && (
           <div className="pageIntroWrap">
             <div className="pageIntro">
-              <span className="eyebrow">Missouri · Kansas · Colorado ABA intelligence</span>
               <h1>{title}</h1>
               <p>{description}</p>
             </div>

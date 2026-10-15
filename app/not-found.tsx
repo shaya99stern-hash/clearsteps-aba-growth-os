@@ -8,7 +8,7 @@ export default function WorkspaceNotFound() {
         <h1>Screen not found</h1>
         <p>This workspace address is no longer available. Your saved research and tasks have not been deleted.</p>
         <div className="routeErrorActions">
-          <Link href="/">Return to Scout</Link>
+          <Link href="/scout">Return to Scout</Link>
           <Link href="/more">Browse workspaces</Link>
         </div>
       </div>

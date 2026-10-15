@@ -1,0 +1,224 @@
+/* Puma Current reference: shared chrome and four workspace screens.
+   Geometry, palette and typography are taken from the supplied design. */
+:root {
+  --app: #0b0b0c; --surface: #151517; --card: #151517; --soft: #1b1b1e;
+  --text: #ededee; --secondary: #a3a3a9; --tertiary: #8b8b93;
+  --accent: #c6a35a; --border: rgba(255,255,255,.075); --ok: #3ecf8e;
+  --primary-bg: #f2f1ee; --primary-fg: #0b0b0c; --primary-hover: #fff;
+  --workspace-bg: #0b0b0c; --workspace-raised: #151517; --workspace-hover: #1b1b1e;
+  --workspace-line: rgba(255,255,255,.075); --workspace-focus: #c6a35a;
+  --aba-purple: #c6a35a; --aba-purple-strong: #dec184;
+  --aba-purple-soft: rgba(198,163,90,.1); --aba-purple-line: rgba(198,163,90,.25);
+  --rail-width: 236px; --topbar-height: 56px;
+}
+body { font-size: 13.52px; line-height: 1.5; letter-spacing: -.006em; font-feature-settings: 'cv11','ss01','ss03'; }
+.appFrame { display: block; }
+.workspaceRail { position: fixed; inset-block: 0; inset-inline-start: 0; width: 236px; height: 100dvh; padding: 14px 10px 12px; gap: 0; z-index: 40; background: var(--app); }
+.railHeader { padding: 0; min-height: 0; }
+.brandLockup { display: flex; width: 100%; gap: 10px; padding: 10px 16px; border-radius: 10px; }
+.brandLockup .brandImage { width: 44px; height: 44px; border-radius: 8px; box-shadow: none; }
+.brandLockup .brandWords { flex: 1; height: 71.76px; align-content: center; }
+.brandWords i { font-size: 19px; font-weight: 650; letter-spacing: -.035em; white-space: nowrap; }
+.brandWords b { font-size: 8px; letter-spacing: .12em; color: var(--tertiary); }
+.appNav { display: flex; flex: 1 1 auto; flex-direction: column; gap: 14px; margin: 0 -2px; padding: 0 2px; overflow-y: auto; }
+.navGroup { display: flex; flex-direction: column; gap: 1px; }
+.navGroupLabel { padding: 0 10px 6px; font-size: 11px; font-weight: 600; letter-spacing: .05em; line-height: 1.5; color: var(--tertiary); }
+.navGroupItems { display: flex; flex-direction: column; gap: 1px; }
+.navItem { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 0 10px; border-radius: 7px; font-size: 13.5px; font-weight: 500; color: var(--secondary); }
+.navItem svg { flex: none; color: var(--tertiary); }
+.navItem:hover { background: rgba(255,255,255,.035); color: var(--text); }
+.navItem.active { background: #1b1b1e; color: var(--text); box-shadow: inset 0 0 0 1px var(--border); }
+.navItem.active svg { color: var(--accent); }
+.navItem.active::before { display: none; }
+.railFooter { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; padding: 10px 0 0; border-top: 1px solid var(--border); }
+.workspaceProfile { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 10px; }
+.workspaceProfile:hover { background: rgba(255,255,255,.035); }
+.workspaceProfile > svg { color: var(--tertiary); flex: none; }
+.workspaceProfile > span { display: flex; flex-direction: column; line-height: 1.25; }
+.workspaceProfile strong { font-size: 12.5px; font-weight: 600; }
+.workspaceProfile small { font-size: 11px; color: var(--tertiary); }
+.workspaceSurface { margin-inline-start: 236px; min-height: 100dvh; background: var(--app); }
+.workspaceTopbar { position: sticky; top: 0; z-index: 39; height: 56px; min-height: 56px; padding: 0 28px; gap: 12px; background: var(--app); border-bottom: 1px solid transparent; backdrop-filter: none; }
+.topbarContext { flex: 1; }
+.topbarContext > span { font-size: 13.5px; font-weight: 500; color: var(--secondary); text-transform: none; letter-spacing: inherit; }
+.topbarContext > span::after { display: none; }
+.topbarSearch { display: flex; align-items: center; gap: 8px; width: min(420px,38vw); height: 34px; padding: 0 6px 0 11px; border-radius: 9px; border: 1px solid rgba(255,255,255,.13); background: #111113; color: var(--tertiary); font-size: 13px; text-align: start; cursor: pointer; }
+.topbarSearch:hover { background: #151517; border-color: rgba(255,255,255,.2); }
+.topbarSearch > span { flex: 1; }
+.topbarSearch kbd { display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border-radius: 5px; border: 1px solid rgba(255,255,255,.13); background: #1b1b1e; font: inherit; font-size: 11px; font-weight: 550; color: var(--tertiary); }
+.pageContent.compact:has(.referencePage) { width: 100%; max-width: none; padding: 0; }
+.pageIntroWrap { padding-top: 16px; }
+.pageIntro { padding: 8px 0 20px; }
+.pageIntro h1 { font-size: 26px; line-height: 1.15; font-weight: 650; letter-spacing: -.028em; margin: 0 0 4px; }
+.pageIntro p { font-size: 14.48px; line-height: 1.45; }
+.referencePage { width: 100%; max-width: 960px; margin: 0 auto; padding: 16px 28px 48px; }
+.referencePage.referenceNarrow { max-width: 760px; }
+.referencePage :where(h1,h2,h3,p,ul) { margin: 0; padding: 0; }
+.referencePage ul { list-style: none; }
+.referencePage svg { flex: none; }
+.referenceHeading { display: flex; flex-direction: column; gap: 4px; padding: 8px 0 20px; min-width: 0; }
+.referenceHeading h1 { font-size: 26px; font-weight: 650; line-height: 1.15; letter-spacing: -.028em; }
+.referenceHome .referenceHeading h1 { font-size: 24px; }
+.referenceHeading p { color: var(--secondary); font-size: 14.48px; line-height: 1.45; margin-top: 4px; }
+.referenceHeadingRow { flex-direction: row; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.referenceWorkspaces { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.referenceTile { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 16px; border: 1px solid var(--border); border-radius: 10px; background: #151517; }
+.referenceTile:hover { background: #1b1b1e; }
+.referenceTile > svg:first-child { color: var(--accent); }
+.referenceTile > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.referenceTile strong { font-size: 15px; font-weight: 600; }
+.referenceTile small { font-size: 12px; color: var(--secondary); }
+.referenceTile > svg:last-child { margin-inline-start: auto; color: var(--secondary); }
+.referenceHomeToday { margin-top: 20px; }
+.referencePage .referenceLabel { font-size: 11.52px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--tertiary); line-height: 1.2; }
+.referenceRowLink { display: flex; align-items: center; gap: 10px; min-height: 44px; width: 100%; font-size: 13px; }
+.referenceRowLink > svg { color: var(--tertiary); }
+.referenceRowLink > span { flex: 1; min-width: 0; }
+.referenceRowLink:hover { color: #fff; }
+.referencePrimary { display: inline-flex; justify-content: center; align-items: center; gap: 7px; height: 36px; padding: 0 14px; border-radius: 8px; border: 0; background: #f2f1ee; color: #0b0b0c; font-size: 13.52px; font-weight: 550; line-height: 1; white-space: nowrap; cursor: pointer; }
+.referencePrimary:hover { background: #fff; color: #0b0b0c; }
+.referenceRecords { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); border: 1px solid var(--border); border-radius: 10px; background: #151517; overflow: hidden; }
+.referenceRecords .referenceTile { border: 0; border-radius: 0; padding: 12px; gap: 10px; }
+.referenceRecords .referenceTile:first-child { grid-column: 1 / -1; border-bottom: 1px solid var(--border); }
+.referenceRecords .referenceTile:last-child { border-inline-start: 1px solid var(--border); }
+.referenceRecords .referenceTile strong { font-size: 13px; font-weight: 550; }
+.referenceRecords .referenceTile small { font-size: 11px; }
+.referenceRecords .referenceTile > svg { color: var(--secondary); width: 18px; }
+.referenceSummary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); padding: 14px 0; }
+.referenceSummary > a { display: flex; flex-direction: column; gap: 2px; align-items: center; border-inline-end: 1px solid var(--border); }
+.referenceSummary > a:last-child { border: 0; }
+.referenceSummary strong { font-size: 20px; font-weight: 550; font-variant-numeric: tabular-nums; }
+.referenceSummary span { font-size: 11px; color: var(--secondary); }
+.referencePanel { min-width: 0; background: #151517; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.referencePanelHeading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 14px 16px 12px; border-bottom: 1px solid var(--border); }
+.referencePanelHeading h2 { font-size: 14.48px; font-weight: 600; letter-spacing: -.012em; line-height: 1.2; }
+.referencePanelHeading > a { display: flex; align-items: center; gap: 6px; min-height: 30px; margin: -4px -6px 0 0; padding: 0 10px; color: var(--secondary); font-size: 12.48px; font-weight: 550; }
+.referenceTasks > li { display: flex; align-items: center; gap: 12px; min-height: 62px; padding: 6px 16px; border-bottom: 1px solid var(--border); }
+.referenceTasks > li:last-child { border-bottom: 0; }
+.referenceComplete { display: grid; place-items: center; flex: none; width: 44px; height: 44px; margin-inline: -12px -8px; border: 0; border-radius: 50%; background: transparent; cursor: pointer; }
+.referenceComplete > span { display: grid; place-items: center; width: 20px; height: 20px; border: 1.5px solid rgba(255,255,255,.25); border-radius: 50%; color: transparent; }
+.referenceComplete:hover > span, .referenceComplete:focus-visible > span { color: #3ecf8e; border-color: #3ecf8e; }
+.referenceTaskText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.referenceTaskText strong { font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.referenceTaskText small { color: var(--tertiary); font-size: 12.48px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.referenceTaskDue { font-size: 12.48px; color: var(--tertiary); white-space: nowrap; }
+.referenceEmpty { display: flex; gap: 10px; align-items: center; padding: 22px 16px; color: var(--secondary); font-size: 12.48px; }
+.referenceEmpty a { display: inline-flex; align-items: center; gap: 4px; color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+.referenceCommunication { display: grid; grid-template-columns: 1fr 1fr; margin: 8px 0; }
+.referenceCommunication .referenceRowLink { padding-inline-end: 12px; }
+.referenceCommunication .referenceRowLink:last-child { padding-inline-start: 12px; border-inline-start: 1px solid var(--border); }
+.referenceInsightLink { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 44px; border-top: 1px solid var(--border); color: var(--secondary); font-size: 13px; }
+.referenceEmailLink { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-size: 12px; color: var(--secondary); }
+.referenceBack { display: inline-flex; align-items: center; gap: 4px; width: fit-content; margin-inline-start: -4px; margin-bottom: 6px; padding: 4px 6px 4px 2px; color: var(--tertiary); font-size: 12.48px; font-weight: 500; border-radius: 6px; }
+.referenceOnboarding { padding: 16px; border-radius: 12px; border: 1px solid var(--border); background: radial-gradient(120% 140% at 100% 0%,rgba(198,163,90,.09),transparent 55%),#151517; margin-bottom: 14px; }
+.referenceOnboardingHeading { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.referenceOnboardingHeading h2 { font-size: 14.48px; font-weight: 620; line-height: 1.2; letter-spacing: -.012em; }
+.referenceOnboardingHeading p { font-size: 12.48px; color: var(--tertiary); margin-top: 2px; }
+.referenceProgress { display: flex; gap: 4px; padding-top: 6px; }
+.referenceProgress span { width: 22px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.1); }
+.referenceProgress span.done { background: var(--accent); }
+.referenceSteps { display: grid; gap: 8px; grid-template-columns: repeat(3,minmax(0,1fr)); }
+.referenceSteps > a { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 10px; background: rgba(255,255,255,.025); border: 1px solid var(--border); min-width: 0; }
+.referenceStepIcon { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 9px; border: 1px solid rgba(255,255,255,.13); background: #232327; }
+.referenceStepIcon.done { background: rgba(62,207,142,.12); border-color: rgba(62,207,142,.3); color: #3ecf8e; }
+.referenceSteps strong { display: flex; gap: 7px; font-weight: 600; font-size: 13.52px; }
+.referenceSteps b { font-size: 11px; color: var(--tertiary); }
+.referenceSteps small { display: block; margin-top: 2px; color: var(--tertiary); font-size: 12.48px; line-height: 1.4; }
+.referenceNumbers { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); border: 1px solid var(--border); border-radius: 10px; background: #151517; margin-block: 12px; }
+.referenceNumbers a { display: flex; flex-direction: column; gap: 6px; min-width: 0; min-height: 64px; padding: 9px 10px; border-inline-start: 1px solid var(--border); }
+.referenceNumbers a:first-child { border: 0; }
+.referenceNumbers span { font-size: 10px; color: var(--secondary); font-weight: 500; }
+.referenceNumbers strong { font-size: 19px; font-weight: 650; letter-spacing: -.03em; line-height: 1.3; margin-top: 3px; font-variant-numeric: tabular-nums; }
+.referenceSection { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.referenceSectionHint { font-size: 12.48px; color: var(--secondary); }
+.referenceLeadRow { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.referenceLeadRow:last-child { border: 0; }
+.referenceScore { display: grid; place-items: center; min-width: 34px; height: 22px; border-radius: 6px; background: rgba(198,163,90,.14); color: #dec184; font-size: 11.52px; font-weight: 650; }
+.referenceLeadRow > span:nth-child(2) { flex: 1; min-width: 0; }
+.referenceLeadRow strong { display: block; font-size: 13.52px; font-weight: 600; }
+.referenceLeadRow small,.referenceLeadRow p { display: block; font-size: 12.48px; color: var(--secondary); }
+.referenceLeadRow p { margin-top: 5px; }
+.referenceActivity { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: #151517; }
+.referenceActivity > svg:first-child { color: var(--accent); }
+.referenceActivity > span { flex: 1; min-width: 0; }
+.referenceActivity strong { font-weight: 600; }
+.referenceActivity small { display: block; font-size: 12.48px; color: var(--secondary); }
+.referenceLeadForm { margin-bottom: 24px; padding: 18px; }
+.referenceLeadForm form { display: flex; flex-direction: column; gap: 24px; }
+.referenceLeadForm fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.referenceLeadForm legend { margin-bottom: 8px; font-size: 13px; font-weight: 550; padding: 0; }
+.referenceStateChips { display: flex; flex-wrap: wrap; gap: 8px; }
+.referenceStateChips button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 62px; padding: 0 11px; border-radius: 999px; border: 1px solid rgba(255,255,255,.13); color: var(--secondary); background: transparent; font-size: 12.48px; font-weight: 550; cursor: pointer; }
+.referenceStateChips button[aria-pressed=true] { background: #f2f1ee; color: #0b0b0c; border-color: #f2f1ee; }
+.referenceField { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.referenceField label { font-size: 12.48px; font-weight: 550; }
+.referenceField input,.referenceField select { width: 100%; min-width: 0; height: 36px; padding: 0 12px; border: 1px solid rgba(255,255,255,.13); border-radius: 8px; background: #111113; color: var(--text); font-size: 13.52px; }
+.referenceField input::placeholder { color: var(--tertiary); }
+.referenceField p { font-size: 11.52px; color: var(--tertiary); line-height: 1.45; }
+.referenceLocation { position: relative; }
+.referenceLocation > svg { position: absolute; inset-inline-start: 11px; top: 10px; color: var(--tertiary); pointer-events: none; }
+.referenceLocation input { padding-inline-start: 34px; }
+.referenceFormColumns { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; }
+.referenceFilters { border-top: 1px solid var(--border); margin: -4px 0; }
+.referenceFilters summary { display: flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; font-size: 13px; color: var(--secondary); list-style: none; }
+.referenceFilters summary::-webkit-details-marker { display: none; }
+.referenceFilters summary svg { margin-inline-start: auto; }
+.referenceFilters[open] summary svg { transform: rotate(90deg); }
+.referenceFilters p { padding: 8px 0 12px; font-size: 12.48px; color: var(--tertiary); }
+.referenceFilters a { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; }
+.referenceLeadForm .referencePrimary { width: 100%; }
+.referenceLeadForm .referenceFormHint { text-align: center; font-size: 12px; color: var(--secondary); margin-top: -12px; }
+.referenceRecentSearches { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.referenceRecentSearch { display: flex; align-items: flex-start; gap: 10px; background: #151517; border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px 16px; min-width: 0; }
+.referenceRecentSearch > div { flex: 1; min-width: 0; }
+.referenceRecentSearch strong { display: flex; align-items: center; gap: 8px; font-weight: 600; overflow-wrap: anywhere; }
+.referenceRecentSearch small { display: block; color: var(--tertiary); font-size: 12.48px; margin-top: 8px; }
+.referenceBadge { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; border-radius: 999px; font-size: 11.52px; font-weight: 550; white-space: nowrap; background: rgba(62,207,142,.12); color: #3ecf8e; }
+.referenceBadge i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.workspaceSearchDialog { margin: 12vh auto auto; width: min(560px,calc(100vw - 32px)); max-height: 70vh; padding: 0; border: 1px solid rgba(255,255,255,.13); border-radius: 12px; background: #151517; color: var(--text); box-shadow: 0 24px 80px #0008; }
+.workspaceSearchDialog::backdrop { background: #0009; }
+.workspaceSearchBody { padding: 12px; }
+.workspaceSearchInput { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+.workspaceSearchInput input { flex: 1; min-width: 0; height: 40px; padding: 0 8px; border: 0; background: transparent; }
+.workspaceSearchInput button { display: grid; place-items: center; width: 40px; height: 40px; background: transparent; border: 0; cursor: pointer; }
+.workspaceSearchDialog nav { display: grid; gap: 2px; margin-top: 8px; }
+.workspaceSearchDialog nav a { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 12px; border-radius: 6px; }
+.workspaceSearchDialog nav a:hover { background: #232327; }
+.workspaceSearchDialog p { padding: 12px; color: var(--secondary); }
+/* Existing Clear Steps tools inherit the reference palette and compact chrome. */
+.scoutHeroV3 { padding-top: 24px; }
+.scoutHeadlineRow h1 { font-size: 26px; font-weight: 650; letter-spacing: -.028em; }
+.scoutComposerV3,.segmentedControl,.scoutAgeFocus { background: #151517; box-shadow: none; }
+.segmentButton.active { color: #ededee; background: #232327; border-color: rgba(255,255,255,.13); }
+.scoutRunButton { color: #0b0b0c; background: #f2f1ee; }
+.territoryInsight { background: rgba(198,163,90,.06); border-color: rgba(198,163,90,.18); }
+@media (max-width: 900px) {
+  .workspaceSurface { margin-inline-start: 0; min-height: calc(100dvh - 54px); background: var(--app); }
+  .csMobileHeader { background: #0b0b0c; border-color: var(--border); }
+  .csMobileIconButton { background: #151517; border-color: rgba(255,255,255,.13); width: 44px; height: 44px; }
+  .csMobileHeader { grid-template-columns: 44px minmax(0,1fr) 44px; }
+  .csDrawer { background: #0b0b0c; }
+  .csDrawerLink { min-height: 44px; font-size: 13.5px; font-weight: 500; }
+  .csDrawerLink.isActive { background: #1b1b1e; color: #ededee; }
+  .csDrawerLink.isActive svg,.csDrawerFooter a { color: #c6a35a; }
+  .csDrawerActiveMarker { background: #c6a35a; }
+  .referencePage { padding: 16px 24px 48px; }
+  .referenceSteps { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) {
+  .referencePage { padding: 16px 18px max(32px,env(safe-area-inset-bottom)); }
+  .referenceWorkspaces { grid-template-columns: 1fr; }
+  .referenceHeadingRow { align-items: flex-start; flex-wrap: wrap; gap: 12px; }
+  .referencePrimary { min-height: 44px; }
+  .referenceField input,.referenceField select { height: 44px; font-size: 16px; }
+  .referenceLocation > svg { top: 14px; }
+  .referenceFormColumns { grid-template-columns: 1fr; }
+  .referenceRecords .referenceTile { gap: 8px; }
+  .referenceRecords .referenceTile small { font-size: 10.5px; }
+  .referenceNumbers a { padding: 9px 8px; }
+  .referenceRecentSearch { flex-wrap: wrap; }
+  .referenceRecentSearch > div { flex-basis: calc(100% - 30px); }
+  .referenceRecentSearch > svg { order: -1; display: none; }
+  .referenceEmpty { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) { .csDrawer { animation: none; } }
